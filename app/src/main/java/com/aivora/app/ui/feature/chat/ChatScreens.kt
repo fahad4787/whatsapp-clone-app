@@ -1,15 +1,11 @@
 package com.aivora.app.ui.feature.chat
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -18,9 +14,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -59,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,12 +84,23 @@ fun ChatIdScreen(
 ) {
     val context = LocalContext.current
     val dark = isSystemInDarkTheme()
+    val density = LocalDensity.current
     val haptics = rememberAivoraHaptics()
     val chat = remember(chatId) { InMemoryChatStore.chat(chatId) }
     val messages by InMemoryChatStore.messages(chatId).collectAsState()
     var text by remember { mutableStateOf("") }
     var peerTyping by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val bgColor = MaterialTheme.colorScheme.background
+    val wallpaper = remember(dark, bgColor) {
+        Brush.verticalGradient(
+            listOf(
+                if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight,
+                bgColor,
+            ),
+        )
+    }
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
     val media = rememberMediaActions(context) { uri ->
         haptics.confirm()
         InMemoryChatStore.sendMedia(chatId, uri.toString())
@@ -101,9 +111,10 @@ fun ChatIdScreen(
         InMemoryChatStore.markRead(chatId)
     }
 
-    LaunchedEffect(messages.size) {
+    LaunchedEffect(messages.size, peerTyping, imeVisible) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.lastIndex + if (peerTyping) 1 else 0)
+            val index = messages.lastIndex + if (peerTyping) 1 else 0
+            listState.animateScrollToItem(index.coerceAtLeast(0))
         }
     }
 
@@ -164,14 +175,7 @@ fun ChatIdScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight,
-                            MaterialTheme.colorScheme.background,
-                        ),
-                    ),
-                ),
+                .background(wallpaper),
         ) {
             LazyColumn(
                 state = listState,
@@ -261,41 +265,33 @@ fun ChatIdScreen(
                         }
                     },
                 )
-                AnimatedContent(
-                    targetState = text.isNotBlank(),
-                    transitionSpec = {
-                        (fadeIn(AivoraTweenFast) + scaleIn(initialScale = 0.85f, animationSpec = AivoraTweenFast)) togetherWith
-                            (fadeOut(AivoraTweenFast) + scaleOut(targetScale = 0.85f, animationSpec = AivoraTweenFast))
-                    },
-                    label = "sendMic",
-                ) { canSend ->
-                    Box(
-                        modifier = Modifier
-                            .padding(start = 4.dp)
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(AivoraColors.Primary),
-                        contentAlignment = Alignment.Center,
+                val canSend = text.isNotBlank()
+                Box(
+                    modifier = Modifier
+                        .padding(start = 4.dp)
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(AivoraColors.Primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    IconButton(
+                        onClick = {
+                            val body = text.trim()
+                            if (body.isNotEmpty()) {
+                                haptics.confirm()
+                                InMemoryChatStore.sendText(chatId, body)
+                                text = ""
+                                peerTyping = true
+                            } else {
+                                haptics.tick()
+                            }
+                        },
                     ) {
-                        IconButton(
-                            onClick = {
-                                val body = text.trim()
-                                if (body.isNotEmpty()) {
-                                    haptics.confirm()
-                                    InMemoryChatStore.sendText(chatId, body)
-                                    text = ""
-                                    peerTyping = true
-                                } else {
-                                    haptics.tick()
-                                }
-                            },
-                        ) {
-                            Icon(
-                                if (canSend) Icons.Default.Send else Icons.Default.Mic,
-                                contentDescription = if (canSend) "Send" else "Voice",
-                                tint = AivoraColors.OnPrimary,
-                            )
-                        }
+                        Icon(
+                            if (canSend) Icons.Default.Send else Icons.Default.Mic,
+                            contentDescription = if (canSend) "Send" else "Voice",
+                            tint = AivoraColors.OnPrimary,
+                        )
                     }
                 }
             }
