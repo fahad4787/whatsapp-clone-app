@@ -1,7 +1,16 @@
 package com.aivora.app.ui.feature.home
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -36,6 +46,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -54,6 +65,9 @@ import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.PersonRow
 import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.components.SearchField
+import com.aivora.app.ui.components.StatusRingAvatar
+import com.aivora.app.ui.motion.enterFadeSlide
+import com.aivora.app.ui.motion.pressScale
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 
@@ -154,95 +168,118 @@ fun HomeScreen(
                     containerColor = AivoraColors.Primary,
                     contentColor = AivoraColors.OnPrimary,
                 ) {
-                    Icon(
-                        if (tab == 1) Icons.Default.CameraAlt else Icons.Default.Add,
-                        contentDescription = null,
-                    )
+                    AnimatedContent(
+                        targetState = tab == 1,
+                        transitionSpec = {
+                            (fadeIn() + scaleIn()) togetherWith (fadeOut() + scaleOut())
+                        },
+                        label = "fabIcon",
+                    ) { camera ->
+                        Icon(
+                            if (camera) Icons.Default.CameraAlt else Icons.Default.Add,
+                            contentDescription = null,
+                        )
+                    }
                 }
             }
         },
     ) { padding ->
-        when {
-            searching || tab == 0 -> Column(
-                modifier = Modifier.fillMaxSize().padding(padding),
-            ) {
-                if (searching) {
-                    SearchField(query, { query = it }, "Search chats")
-                }
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 4.dp),
-                ) {
-                    if (!searching) {
-                        item {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onNavigate(Routes.Channels) }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text("Channels", fontWeight = FontWeight.SemiBold, color = AivoraColors.Primary)
-                                Spacer(modifier = Modifier.weight(1f))
-                                Text("Explore", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
+        AnimatedContent(
+            targetState = if (searching) 0 else tab,
+            modifier = Modifier.padding(padding),
+            transitionSpec = {
+                (fadeIn() + slideInVertically { it / 12 }) togetherWith
+                    (fadeOut() + slideOutVertically { -it / 12 })
+            },
+            label = "homeTab",
+        ) { current ->
+            when {
+                searching || current == 0 -> Column(modifier = Modifier.fillMaxSize()) {
+                    if (searching) {
+                        SearchField(query, { query = it }, "Search chats")
                     }
-                    items(chats, key = { it.id }) { chat ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onNavigate(Routes.ChatId.replace("{id}", chat.id)) }
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Avatar(chat.title)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    chat.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    chat.preview,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    chat.time,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (chat.unread > 0) AivoraColors.Primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                if (chat.unread > 0) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    UnreadBadge(chat.unread)
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                    ) {
+                        if (!searching) {
+                            item {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onNavigate(Routes.Channels) }
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text("Channels", fontWeight = FontWeight.SemiBold, color = AivoraColors.Primary)
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Text("Explore", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
-                    }
-                    if (!searching) {
-                        item {
-                            PersonRow(
-                                "Locked chats",
-                                "Authenticate to unlock",
-                                onClick = { onNavigate(Routes.LockedChats) },
-                            )
-                            PersonRow(
-                                "Archived",
-                                "Archive hides chats from your main list",
-                                onClick = { onNavigate(Routes.SettingsChatsArchived) },
-                            )
+                        itemsIndexed(chats, key = { _, chat -> chat.id }) { index, chat ->
+                            val interaction = remember { MutableInteractionSource() }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .enterFadeSlide(key = chat.id, fromY = 10f + index.coerceAtMost(6) * 2f)
+                                    .pressScale(interaction)
+                                    .clickable(
+                                        interactionSource = interaction,
+                                        indication = ripple(),
+                                        onClick = { onNavigate(Routes.ChatId.replace("{id}", chat.id)) },
+                                    )
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Avatar(chat.title)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        chat.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Text(
+                                        chat.preview,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        chat.time,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (chat.unread > 0) AivoraColors.Primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    if (chat.unread > 0) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        UnreadBadge(chat.unread)
+                                    }
+                                }
+                            }
+                        }
+                        if (!searching) {
+                            item {
+                                PersonRow(
+                                    "Locked chats",
+                                    "Authenticate to unlock",
+                                    onClick = { onNavigate(Routes.LockedChats) },
+                                )
+                                PersonRow(
+                                    "Archived",
+                                    "Archive hides chats from your main list",
+                                    onClick = { onNavigate(Routes.SettingsChatsArchived) },
+                                )
+                            }
                         }
                     }
                 }
+                current == 1 -> StatusTab(onNavigate = onNavigate)
+                current == 2 -> CommunitiesTab(onNavigate = onNavigate)
+                else -> CallsTab(onNavigate = onNavigate)
             }
-            tab == 1 -> StatusTab(modifier = Modifier.padding(padding), onNavigate = onNavigate)
-            tab == 2 -> CommunitiesTab(modifier = Modifier.padding(padding), onNavigate = onNavigate)
-            else -> CallsTab(modifier = Modifier.padding(padding), onNavigate = onNavigate)
         }
     }
 }
@@ -276,18 +313,23 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
         item {
             val subtitle = mine.firstOrNull()?.let { "${it.timeLabel} · Tap to view" }
                 ?: "Tap to add status update"
-            PersonRow(
-                "My status",
-                subtitle,
-                onClick = {
-                    val first = mine.firstOrNull()
-                    if (first != null) {
-                        onNavigate(Routes.status(first.id))
-                    } else {
-                        onNavigate(Routes.NewStatus)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        val first = mine.firstOrNull()
+                        if (first != null) onNavigate(Routes.status(first.id))
+                        else onNavigate(Routes.NewStatus)
                     }
-                },
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                StatusRingAvatar("Me", hasUnseen = mine.isNotEmpty())
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("My status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
                     Icon(Icons.Default.CameraAlt, null, tint = AivoraColors.Primary)
                 }
@@ -299,12 +341,22 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
                 color = AivoraColors.Primary,
             )
         }
-        items(recent, key = { it.id }) { status ->
-            PersonRow(
-                status.authorName,
-                status.timeLabel,
-                onClick = { onNavigate(Routes.status(status.id)) },
-            )
+        itemsIndexed(recent, key = { _, s -> s.id }) { index, status ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .enterFadeSlide(key = status.id, fromY = 8f + index * 2f)
+                    .clickable { onNavigate(Routes.status(status.id)) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusRingAvatar(status.authorName, hasUnseen = true)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(status.authorName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(status.timeLabel, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
         item {
             Text(
@@ -314,12 +366,21 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        items(viewed, key = { it.id }) { status ->
-            PersonRow(
-                status.authorName,
-                status.timeLabel,
-                onClick = { onNavigate(Routes.status(status.id)) },
-            )
+        itemsIndexed(viewed, key = { _, s -> s.id }) { _, status ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigate(Routes.status(status.id)) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusRingAvatar(status.authorName, hasUnseen = false)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(status.authorName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(status.timeLabel, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
         item {
             Spacer(Modifier.height(8.dp))

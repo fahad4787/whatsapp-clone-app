@@ -2,6 +2,8 @@ package com.aivora.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.ripple
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,14 +45,17 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.aivora.app.ui.motion.pressScale
 import com.aivora.app.ui.theme.AivoraColors
 
 data class SettingsItem(
@@ -248,23 +253,36 @@ fun SearchField(
     )
 }
 
+private fun avatarBrush(name: String): Brush {
+    val hues = listOf(
+        AivoraColors.Primary to AivoraColors.PrimaryDark,
+        AivoraColors.Blue to AivoraColors.BlueLight,
+        Color(0xFF0D9488) to Color(0xFF115E59),
+        Color(0xFF4F46E5) to Color(0xFF312E81),
+        Color(0xFFDB2777) to Color(0xFF9D174D),
+    )
+    val pair = hues[kotlin.math.abs(name.hashCode()) % hues.size]
+    return Brush.linearGradient(listOf(pair.first, pair.second))
+}
+
 @Composable
 fun Avatar(name: String, size: Int = 48, color: Color = AivoraColors.Primary) {
+    val brush = remember(name) { avatarBrush(name.ifBlank { "A" }) }
     Box(
         modifier = Modifier
             .size(size.dp)
             .clip(CircleShape)
-            .background(color.copy(alpha = 0.15f)),
+            .background(brush),
         contentAlignment = Alignment.Center,
     ) {
         if (name.isBlank()) {
-            Icon(Icons.Default.Person, contentDescription = null, tint = color)
+            Icon(Icons.Default.Person, contentDescription = null, tint = Color.White)
         } else {
             Text(
                 name.trim().first().uppercaseChar().toString(),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = color,
+                color = Color.White,
             )
         }
     }
@@ -277,17 +295,23 @@ fun PersonRow(
     onClick: () -> Unit,
     trailing: @Composable (() -> Unit)? = null,
 ) {
+    val interaction = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .pressScale(interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = ripple(),
+                onClick = onClick,
+            )
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Avatar(name)
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+            Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             if (subtitle != null) {
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -312,14 +336,18 @@ fun EmptyState(title: String, body: String) {
 
 @Composable
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val interaction = remember { MutableInteractionSource() }
     Button(
         onClick = onClick,
         enabled = enabled,
+        interactionSource = interaction,
         modifier = modifier
             .fillMaxWidth()
-            .height(52.dp),
+            .height(52.dp)
+            .pressScale(interaction, pressedScale = 0.98f),
         colors = ButtonDefaults.buttonColors(containerColor = AivoraColors.Primary),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 6.dp),
     ) {
         Text(text, fontWeight = FontWeight.SemiBold)
     }
