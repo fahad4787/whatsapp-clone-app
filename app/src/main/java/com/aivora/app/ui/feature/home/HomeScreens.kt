@@ -23,8 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
@@ -35,11 +33,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
@@ -51,8 +51,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.Devices
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -87,7 +85,11 @@ import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.InMemoryStatusStore
 import com.aivora.app.data.local.LocalChat
 import com.aivora.app.ui.components.AivoraBottomNav
+import com.aivora.app.ui.components.AivoraOverflowMenu
 import com.aivora.app.ui.components.Avatar
+import com.aivora.app.ui.components.ClearCallLogDialog
+import com.aivora.app.ui.components.CreateCallLinkDialog
+import com.aivora.app.ui.components.OverflowMenuItem
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
 import com.aivora.app.ui.components.StatusRingAvatar
@@ -126,17 +128,21 @@ fun HomeScreen(
         initialPage = HomeShellState.selectedTab.coerceIn(0, 3),
         pageCount = { 4 },
     )
-    val tab = pagerState.currentPage
+    // Chrome reads settled page only — avoids Scaffold recompose every swipe frame.
+    val settled = pagerState.settledPage
+    val selectionProgress = pagerState.currentPage + pagerState.currentPageOffsetFraction
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(ChatFilter.All) }
     var callFilter by remember { mutableStateOf(CallFilter.All) }
     var menuOpen by remember { mutableStateOf(false) }
+    var showCreateCallLink by remember { mutableStateOf(false) }
+    var showClearCallLog by remember { mutableStateOf(false) }
+    var callLogCleared by remember { mutableStateOf(false) }
     val allChats by InMemoryChatStore.chats.collectAsState()
     val unreadTotal = remember(allChats) {
         allChats.filterNot { it.archived }.sumOf { it.unread }
     }
 
-    // Sync tab state only after the swipe settles — avoids fighting the fling.
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
@@ -144,14 +150,25 @@ fun HomeScreen(
                 if (HomeShellState.selectedTab != page) {
                     HomeShellState.selectedTab = page
                     query = ""
+                    menuOpen = false
                 }
             }
     }
 
-    val pageSpring = remember {
-        spring<Float>(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow,
+    val pageSnap = remember {
+        androidx.compose.animation.core.tween<Float>(
+            durationMillis = 260,
+            easing = androidx.compose.animation.core.FastOutSlowInEasing,
+        )
+    }
+
+    if (showCreateCallLink) {
+        CreateCallLinkDialog(onDismiss = { showCreateCallLink = false })
+    }
+    if (showClearCallLog) {
+        ClearCallLogDialog(
+            onDismiss = { showClearCallLog = false },
+            onConfirm = { callLogCleared = true },
         )
     }
 
@@ -162,11 +179,11 @@ fun HomeScreen(
                     Text(
                         "Aivora",
                         fontWeight = FontWeight.Bold,
-                        color = if (tab == 0) AivoraColors.Primary else MaterialTheme.colorScheme.onBackground,
+                        color = if (settled == 0) AivoraColors.Primary else MaterialTheme.colorScheme.onBackground,
                     )
                 },
                 actions = {
-                    when (tab) {
+                    when (settled) {
                         0, 1 -> {
                             IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
                                 Icon(Icons.Default.CameraAlt, contentDescription = "Camera")
@@ -175,18 +192,29 @@ fun HomeScreen(
                                 IconButton(onClick = { menuOpen = true }) {
                                     Icon(Icons.Default.MoreVert, contentDescription = "Menu")
                                 }
-                                ChatsOverflowMenu(
+                                AivoraOverflowMenu(
                                     expanded = menuOpen,
                                     onDismiss = { menuOpen = false },
-                                    onNavigate = { route ->
-                                        menuOpen = false
-                                        onNavigate(route)
-                                    },
-                                    onFavourites = {
-                                        menuOpen = false
-                                        filter = ChatFilter.Favourites
-                                        HomeShellState.selectedTab = 0
-                                    },
+                                    items = listOf(
+                                        OverflowMenuItem("New group", Icons.Default.GroupAdd) {
+                                            onNavigate(Routes.NewGroup)
+                                        },
+                                        OverflowMenuItem("Chat privacy", Icons.Default.Lock) {
+                                            onNavigate(Routes.SettingsPrivacy)
+                                        },
+                                        OverflowMenuItem("Favourites", Icons.Default.Star) {
+                                            filter = ChatFilter.Favourites
+                                            scope.launch {
+                                                pagerState.animateScrollToPage(0, animationSpec = pageSnap)
+                                            }
+                                        },
+                                        OverflowMenuItem("Linked devices", Icons.Outlined.Devices) {
+                                            onNavigate(Routes.SettingsDevices)
+                                        },
+                                        OverflowMenuItem("Settings", Icons.Default.Settings) {
+                                            onNavigate(Routes.SettingsProfile)
+                                        },
+                                    ),
                                 )
                             }
                         }
@@ -195,19 +223,18 @@ fun HomeScreen(
                                 IconButton(onClick = { menuOpen = true }) {
                                     Icon(Icons.Default.MoreVert, contentDescription = "Menu")
                                 }
-                                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                    DropdownMenuItem(
-                                        text = { Text("Clear call log") },
-                                        onClick = { menuOpen = false },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Settings") },
-                                        onClick = {
-                                            menuOpen = false
-                                            onNavigate(Routes.SettingsProfile)
+                                AivoraOverflowMenu(
+                                    expanded = menuOpen,
+                                    onDismiss = { menuOpen = false },
+                                    items = listOf(
+                                        OverflowMenuItem("Create call link", Icons.Default.Link) {
+                                            showCreateCallLink = true
                                         },
-                                    )
-                                }
+                                        OverflowMenuItem("Clear call log", Icons.Default.Delete, danger = true) {
+                                            showClearCallLog = true
+                                        },
+                                    ),
+                                )
                             }
                         }
                         else -> {
@@ -223,24 +250,22 @@ fun HomeScreen(
         },
         bottomBar = {
             AivoraBottomNav(
-                selected = tab,
+                selected = settled,
+                selectionProgress = selectionProgress,
                 unreadCount = unreadTotal,
                 onSelect = { index ->
                     if (pagerState.settledPage != index) {
                         haptics.tick()
                         query = ""
                         scope.launch {
-                            pagerState.animateScrollToPage(
-                                page = index,
-                                animationSpec = pageSpring,
-                            )
+                            pagerState.animateScrollToPage(page = index, animationSpec = pageSnap)
                         }
                     }
                 },
             )
         },
         floatingActionButton = {
-            when (pagerState.settledPage) {
+            when (settled) {
                 0 -> HomeFab(Icons.Default.Edit, "New chat") {
                     haptics.tick()
                     onNavigate(Routes.NewChat)
@@ -266,7 +291,7 @@ fun HomeScreen(
             beyondViewportPageCount = 0,
             flingBehavior = PagerDefaults.flingBehavior(
                 state = pagerState,
-                snapAnimationSpec = pageSpring,
+                snapAnimationSpec = pageSnap,
             ),
             key = { it },
         ) { page ->
@@ -296,6 +321,8 @@ fun HomeScreen(
                     filter = callFilter,
                     onFilterChange = { callFilter = it },
                     onNavigate = onNavigate,
+                    callLogCleared = callLogCleared,
+                    onCreateCallLink = { showCreateCallLink = true },
                 )
                 else -> ProfileTab(
                     query = query,
@@ -324,41 +351,6 @@ private fun HomeFab(icon: ImageVector, contentDescription: String, onClick: () -
     }
 }
 
-@Composable
-private fun ChatsOverflowMenu(
-    expanded: Boolean,
-    onDismiss: () -> Unit,
-    onNavigate: (String) -> Unit,
-    onFavourites: () -> Unit,
-) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(
-            text = { Text("New group") },
-            leadingIcon = { Icon(Icons.Default.GroupAdd, null, tint = AivoraColors.Primary) },
-            onClick = { onNavigate(Routes.NewGroup) },
-        )
-        DropdownMenuItem(
-            text = { Text("Chat privacy") },
-            leadingIcon = { Icon(Icons.Default.Lock, null, tint = AivoraColors.Primary) },
-            onClick = { onNavigate(Routes.SettingsPrivacy) },
-        )
-        DropdownMenuItem(
-            text = { Text("Favourites") },
-            leadingIcon = { Icon(Icons.Default.Star, null, tint = AivoraColors.Primary) },
-            onClick = onFavourites,
-        )
-        DropdownMenuItem(
-            text = { Text("Linked devices") },
-            leadingIcon = { Icon(Icons.Outlined.Devices, null, tint = AivoraColors.Primary) },
-            onClick = { onNavigate(Routes.SettingsDevices) },
-        )
-        DropdownMenuItem(
-            text = { Text("Settings") },
-            leadingIcon = { Icon(Icons.Default.Settings, null, tint = AivoraColors.Primary) },
-            onClick = { onNavigate(Routes.SettingsProfile) },
-        )
-    }
-}
 
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -725,6 +717,8 @@ private fun CallsTab(
     filter: CallFilter,
     onFilterChange: (CallFilter) -> Unit,
     onNavigate: (String) -> Unit,
+    callLogCleared: Boolean = false,
+    onCreateCallLink: () -> Unit = {},
 ) {
     data class CallRow(
         val name: String,
@@ -742,8 +736,9 @@ private fun CallsTab(
             CallRow("Fatima Ali", "Incoming", false, false, "Sunday"),
         )
     }
-    val filtered = remember(calls, query, filter) {
-        calls.filter { row ->
+    val filtered = remember(calls, query, filter, callLogCleared) {
+        if (callLogCleared) emptyList()
+        else calls.filter { row ->
             val matchesQuery = query.isBlank() ||
                 row.name.contains(query, ignoreCase = true) ||
                 row.detail.contains(query, ignoreCase = true)
@@ -772,9 +767,7 @@ private fun CallsTab(
             CallQuickAction(Icons.Default.Call, "Call") { onNavigate(Routes.NewCall) }
             CallQuickAction(Icons.Default.Event, "Schedule") { onNavigate(Routes.ScheduledCalls) }
             CallQuickAction(Icons.Default.Dialpad, "Keypad") { onNavigate(Routes.NewCall) }
-            CallQuickAction(Icons.Default.StarBorder, "Favorites") {
-                onFilterChange(CallFilter.All)
-            }
+            CallQuickAction(Icons.Default.StarBorder, "Favorites") { onCreateCallLink() }
         }
         Row(
             modifier = Modifier
