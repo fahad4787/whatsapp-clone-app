@@ -1,0 +1,49 @@
+package com.aivora.app.data.model
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+/** Reconstructed from APK kotlinx.serialization descriptor. */
+@Serializable
+data class ConversationDto(
+    @SerialName("id") val id: String? = null,
+    @SerialName("type") val type: String? = null,
+    @SerialName("title") val title: String? = null,
+    @SerialName("description") val description: String? = null,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("avatar_thumb") val avatarThumb: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("peer") val peer: PeerDto? = null,
+    @SerialName("members") val members: List<MemberDto>? = null,
+    @SerialName("my_role") val myRole: String? = null,
+    @SerialName("last_message") val lastMessage: MessageDto? = null,
+    @SerialName("last_message_at") val lastMessageAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("unread_count") val unreadCount: Int = 0,
+    @SerialName("last_read_message_id") val lastReadMessageId: String? = null,
+    @SerialName("muted_until") val mutedUntil: String? = null,
+    @SerialName("archived") val archived: Boolean = false,
+    @SerialName("pinned") val pinned: Boolean = false,
+    @SerialName("manually_unread") val manuallyUnread: Boolean = false,
+    @SerialName("locked") val locked: Boolean = false,
+    @SerialName("wallpaper") val wallpaper: String? = null,
+    @SerialName("notify_for") val notifyFor: String? = null,
+    @SerialName("online_members") val onlineMembers: List<String>? = null,
+    @SerialName("only_admins_can_send") val onlyAdminsCanSend: Boolean = false,
+    @SerialName("only_admins_can_edit_info") val onlyAdminsCanEditInfo: Boolean = false,
+    @SerialName("disappearing_seconds") val disappearingSeconds: Int = 0,
+    @SerialName("advanced_privacy") val advancedPrivacy: Boolean = false,
+    @SerialName("is_self_chat") val isSelfChat: Boolean = false,
+    @SerialName("removed") val removed: Boolean = false,
+    @SerialName("active_call") val activeCall: ActiveCallDto? = null,
+    @SerialName("community_id") val communityId: String? = null,
+    @SerialName("community_name") val communityName: String? = null,
+    @SerialName("is_community_announcement") val isCommunityAnnouncement: Boolean = false,
+    @SerialName("unread_mentions") val unreadMentions: Int = 0,
+    @SerialName("disappearing_set_by") val disappearingSetBy: String? = null,
+    @SerialName("disappearing_set_at") val disappearingSetAt: String? = null,
+    @SerialName("device_locked") val deviceLocked: Boolean = false,
+    @SerialName("show_previews") val showPreviews: Boolean = false,
+    @SerialName("call_alerts") val callAlerts: Boolean = false,
+    @SerialName("message_request") val messageRequest: Boolean = false,
+)

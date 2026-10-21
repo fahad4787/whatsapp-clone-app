@@ -1,0 +1,2200 @@
+A call can have up to 
+A community keeps related groups together with one announcement group.
+A folder on this phone
+A list can hold 500 chats at most.
+A map pin for this place
+A new account can’t be made with this email address. Use your phone number instead.
+A new device
+A new link is made when you save, for the new time.
+A new message brings a chat back to your list.
+A number the office can reach you on.
+A pausable composition is in progress
+A poll can have up to 12 options.
+A question is required.
+A required auto migration spec (
+A required column type converter (
+A required DAO return type converter (
+A required type converter (
+A scheduled call is starting soon
+A scheduled call was cancelled
+A scheduled call was changed
+A timer is on
+a while
+AAC header insufficient data
+AAC header wrong Sampling Frequency Index
+About exceptions
+Abstract class can't be instantiated! Class name: 
+Account deleted
+Account information report
+Account protection
+accurate to 
+ActiveParent must have a focusedChild
+ActiveParent with no focused child
+activity with result code: 
+Actual serializer for polymorphic cannot be polymorphic itself
+Add a caption
+Add a caption on the next step
+Add a caption…
+Add a group photo
+Add a group photo · Optional
+Add a phone number
+Add a place or address
+Add a question and at least two options to continue.
+Add a recovery email
+Add a second account
+Add a second option.
+Add about
+Add account
+Add an account PIN
+Add an answer
+Add an emoji or sticker
+Add an option.
+Add another layer of privacy to the things you share in this group.
+Add another layer of privacy to the things you share with 
+Add at least one chat to save your list.
+Add blocked contact
+Add chats to it in My Profile → Lists. Archived chats stay under Archived.
+Add contact
+Add email
+Add links
+Add members
+Add More
+Add more privacy to your chats
+Add more protection to your account
+Add option
+Add participants
+Add participants and choose a date and time to continue.
+Add participants to continue.
+Add people or groups
+Add person
+Add phone number
+Add photo
+Add profile picture
+Add text
+Add to call
+Add to contacts
+Add to Favourites
+Add to group
+Add your name
+Add your phone number
+Advanced chat privacy
+Advanced chat privacy is on, so nothing from this chat is saved automatically.
+Advanced chat privacy is on, so this chat can't be exported.
+Advanced chat privacy · Can't be exported
+Advanced privacy is on: this chat can't be exported or forwarded out of.
+Alert only when someone mentions you or replies to you
+All contacts
+All members
+All messages here will be removed for you. The chat stays in your list, and 
+Allow access
+Allow access for chat transfer?
+Allow access to Photos
+Allow access to your contacts
+Allow access to your photos and videos
+Allow Aivora to read your contacts to choose someone to block.
+Allow camera
+Allow contacts
+Allow location access?
+Allow multiple answers
+Allow the camera in My Profile → ⋮ → Permissions to turn on video.
+Allow the camera to scan a code.
+Allow the camera to scan the code on your computer.
+Allow the camera to scan the code.
+Allow the microphone in My Profile → ⋮ → Permissions to answer calls.
+Allow while using the app
+Already suspended
+Also block 
+Also remove local chat attachments
+alternateText can't be an empty string.
+Always first
+Another app's storage
+Answered without video. Allow the camera in My Profile → ⋮ → Permissions.
+answerIntent is required
+Anyone can add you
+Anyone who opens your QR link can see them, even without the app.
+Anyone with the link can join this call — no chat needed.
+Apni boli, apni gal baat
+App info
+App lock
+App lock 
+App lock is off: this phone no longer has a screen lock.
+Apply date and time
+Approve only a code your own new phone is showing.
+Approve your new phone
+Approved. Signing in…
+Approving the code…
+Archive all
+Archive all chats
+Archive all chats?
+archive all clear all delete all chats history
+archive everything every chat
+archive hidden unarchive
+Archive hides chats from your main list without deleting messages.
+archive new messages stay archived unarchive
+Archived chats
+array too small: %s < %s
+as base class '
+Ask a question and add at least two answers.
+Ask the group a question and add at least two answers.
+Ask your administrator or the helpdesk to reset your PIN.
+at index 
+At least 3 characters.
+At most 30 characters.
+Attempted to add duplicate key to canonical CBOR Map.
+Audio call
+audio file
+audio files
+Authenticate to unlock
+Authentication failed
+Automatic backups
+Automatic backups start once you choose where to save them.
+Automatic download
+Automatically lock
+Available until
+Awaiting response
+Back to 
+Back to a text status
+Back to conversation
+Back to scheduled calls
+Back up
+Back up now
+Backing up chats…
+Backing up media…
+Backing up. Chat backup shows how it’s going.
+Backing up…
+Backup complete
+Backup couldn’t finish
+Backup file
+Backup folder
+Backup location
+Backup password
+Bad ComponentName while traversing activity parent metadata
+bad zip: expected 
+bad zip: filename contains 0x00
+bad zip: NTFS extra too short
+bad zip: truncated header in extra field
+bad zip: truncated value in extra field
+bad zip: zip64 extra repeated
+bad zip: zip64 extra required but absent
+bad zip: zip64 extra too short
+Base Bitrate(
+Battery and background activity
+Be careful with messages from people you don't know.
+Before you continue, make sure the number can receive SMS messages: a code is sent to it.
+Before you continue, make sure your new number can receive SMS messages.
+Bits size does not equal capacity
+Blank serial names are prohibited
+Block 
+Block ID too large
+Block is off. Your chat won't be deleted and 
+Block is on. Your chat won't be deleted, and 
+block unblock blocked users contacts
+Blocked contacts
+Blocked contacts can't call you or send you messages. 
+Blocked · Tap to unblock
+Blocking didn't go through. 
+blue ticks seen
+Aivora
+Aivora account
+Aivora backup.zip
+Aivora can’t cancel an approved code yet, so the code works until it expires.
+Aivora can’t recover a lost key or open the backup without it.
+Aivora can’t recover a lost password or open the backup without it.
+Aivora chat
+Aivora chat with 
+Aivora didn’t accept that code. Get a new code on your new phone, then start again.
+Aivora didn’t accept that code: 
+Aivora didn’t accept this code.
+Aivora didn’t cancel the code.
+Aivora didn’t cancel the code: 
+Aivora doesn’t take numbers from that country yet.
+Aivora is busy. Wait a minute, then get a new code.
+Aivora is busy. Wait a minute, then start again.
+Aivora is locked
+Aivora is a modern messaging and calling service.
+Aivora needs permission to read your contacts before it can share one.
+Aivora needs the camera to scan your new phone’s QR code.
+Aivora stayed locked, so it didn't switch accounts. Tap the notification again.
+Aivora user
+Aivora Web
+Both chats
+Both chats are archived, not deleted.
+both minLines 
+Both size 
+Buffer size should be non-negative, BUFFERED, or CONFLATED, but was 
+Built-in alpha
+Built-in InterruptionHandlingOffset
+Built-in scale
+Built-in shrink/expand
+Built-in slide
+Built-in veil
+Busy on another call
+By continuing you agree to the 
+Bytes cannot be negative
+Call a number that isn't in your contacts
+Call alerts
+CALL ALERTS
+Call back
+Call back on video
+Call canceled
+Call cancelled
+Call ended
+Call failed
+Call in progress · 
+Call link
+Call scheduled
+Call title
+call to 'resume' before 'invoke' with coroutine
+Call to create InputConfiguration but list of InputConfigData is empty.
+Call type
+call type changed to 
+Call updated
+called outside of runRecomposeAndApplyChanges
+Camera access lets this phone scan the QR code your new phone shows.
+camera microphone contacts location allow
+Camera off
+Can be freed on your device
+Can not perform this action after onSaveInstanceState
+Cancel event
+Cancel export
+Cancel scheduled call
+Cancel selection
+Cancel this call?
+Cancel this event?
+Cancel transfer
+Cancel transfer?
+Canceled by 
+Canceled by you
+Cancelling transfer…
+Cannot access the constructor 
+Cannot add sensorPixelModeUsed value on API 
+Cannot add views to 
+Cannot allocate 
+Cannot coerce value to an empty range: maximum 
+Cannot configure multiple outputs pre-S!
+Cannot create a mutable snapshot of an read-only snapshot
+Cannot create an instance of 
+Cannot disable reuse from root if it was caused by other groups
+Cannot end node insertion, there are no pending operations that can be realized.
+Cannot find implementation for 
+cannot find key template: 
+Cannot find value for key 
+Cannot get LayoutCoordinates, Modifier.Node is not attached.
+Cannot get View because the Modifier node is not currently attached.
+Cannot load adaptive icon from uri: 
+Cannot obtain node coordinator. Is the Modifier.Node attached?
+Cannot perform operation for Unspecified type.
+Cannot read CompositionLocal because the Modifier node is not currently attached.
+Cannot read metadata.
+Cannot return null from a non-@Nullable @Provides method
+Cannot round NaN value.
+Cannot set dynamicRangeProfile to a non-default value on API 
+Cannot set mirrorMode to a non-default value on API 
+Can’t answer this call here
+Can’t be invited to this call
+Can’t log out now
+Can’t switch accounts now
+Carry on recording
+Challenge not found in request or is unexpectedly empty
+Change email
+Change email address
+Change key
+Change number
+Change number instead
+Change password
+Change phone number
+Change photo
+Change PIN
+Change playback speed
+Change your backup password?
+Change your encryption key?
+Change your key
+Change your password
+Changes saved
+Changes will be shared with 
+Changes will be shared with everyone in 
+Changes will be shared with everyone in this chat.
+Changes will show in this chat.
+Characteristics did not contain key FLASH_INFO_AVAILABLE. Flash is not available.
+charSequence cannot be null
+Chat backup
+Chat export saved
+Chat history
+Chat lock
+chat lock hide locked chats search code
+Chat lock reviewed
+Chat lock turned off
+Chat locked
+Chat privacy
+chat settings
+Chats locked with your PIN
+Check back here when your report is ready. It isn’t available to download yet.
+Check failed
+Check failed.
+Check the details before inviting everyone.
+Check the verification email for 
+Check what you entered.
+Check your connection and try again.
+Check your email
+Checking that this backup is complete…
+Child of 
+Choose 
+Choose a contact to block
+Choose a date
+Choose a date and time to continue.
+Choose a group
+Choose a photo
+Choose a username
+Choose a username in Profile details to get your code.
+Choose an album
+Choose another file
+Choose another group
+Choose at least one person to continue.
+Choose backup file
+Choose contacts
+Choose date & time
+Choose from gallery
+Choose one answer
+Choose one conversation to export.
+Choose one or more answers
+Choose one or more contacts
+Choose photo
+Choose the country
+Choose the date and time
+Choose the end time
+Choose the people you want in this group.
+Choose the size of text inside your chats.
+Choose the start time
+Choose the time zone
+Choose voice or video
+Choose where to save
+Choose where your chat backups are saved.
+Choose whether new photos and videos from 
+Choose who can add you to groups and manage unwanted calls and contacts.
+Choose who can contact you
+Choose who to notify about your new phone number.
+Choosing who sees when you’re online isn’t available yet.
+Class '
+Class discriminator was missing and no default serializers were registered 
+Class not found: 
+Class with serial name 
+Clear all chats
+Clear call log
+Clear chat
+Clear messages
+clear messages empty every chat
+Clear messages in all chats?
+Clear option 
+Clear search
+Clear the number
+Clear the selection
+Clear this chat?
+Clear your call log?
+Close attach menu
+Close poll
+Close search
+Close this poll?
+Collecting messages and attachments for your export. Keep this screen open.
+Collecting messages for a text-only export. Keep this screen open.
+Collection contains no element matching the predicate.
+Column '
+community groups
+Components are not allowed to depend on interfaces they themselves provide.
+Composed into a View which doesn't propagate ViewTreeLifecycleOwner!
+Composed into a View which doesn't propagate ViewTreeSavedStateRegistryOwner!
+Composed into the View which doesn't propagate ViewTreeLifecycleOwner!
+Composed into the View which doesn't propagate ViewTreeSavedStateRegistryOwner!
+CompositionLocal 
+Confirm 
+Confirm & send invitations
+Confirm it's you
+Confirm it’s you
+Confirm password
+Confirm secret code
+Confirm with a code from your email
+Confirm your backup password
+Confirm your number
+Confirm your phone number
+CONFLATED capacity cannot be used with non-default onBufferOverflow
+Connect them to Wi-Fi or mobile data.
+Conscrypt is not available or does not support checking for FIPS build.
+Contact audiences
+Contact details
+Contact info
+Contacts I have chats with
+Contacts notified
+Contacts on Aivora
+Content found after the end of file
+Context is required to resolve the file uri of the icon: 
+Continue in Account settings
+Continue with 
+Control who can see your profile information and activity.
+Control your personal info
+Conversation text
+Copy key
+Copy link
+corrupt pendingModifications drain: 
+corrupt pendingModifications: 
+Could not convert 
+Could not decode image data
+Could not draw the code.
+Could not fetch interop view
+Could not find destination 
+Could not link
+Could not load more. Tap to try again.
+Could not load these. Tap to try again.
+Could not load who viewed this. Tap to try again.
+Could not open that picture.
+Could not open the camera.
+Could not play this video.
+Could not send that file.
+Couldn't add 
+Couldn't check for chats locked on the web.
+Couldn't find where you are. Type the place instead.
+Couldn't find xmp metadata
+Couldn't load this page
+couldn't name a point: 
+Couldn't open settings. Turn on location for Aivora in Settings.
+Couldn't open that file. Pick it again.
+Couldn't open that invite.
+Couldn't open that profile.
+Couldn't open the export to share it. Prepare it again.
+Couldn't open the phone's notification settings.
+Couldn't reach the place search. Check your connection and try again.
+Couldn't search for places. Try again.
+Couldn't search messages
+Couldn't search messages. Check your connection.
+Couldn't search. Check your connection.
+Couldn't update. 
+Couldn’t cancel the call.
+Couldn’t change link previews.
+Couldn’t change who sees your status.
+Couldn’t check whether this backup is complete.
+Couldn’t draw the code. Get a new one.
+Couldn’t load
+Couldn’t load all of your settings. 
+Couldn’t load your About · Try again
+Couldn’t load your privacy settings
+Couldn’t load your privacy settings. 
+Couldn’t open settings. Allow the camera for Aivora in Settings, Apps.
+Couldn’t open this backup
+Couldn’t reach Aivora. Check your connection and try again.
+Couldn’t save your choice.
+Couldn’t schedule the call.
+Count overflow has happened.
+Country / region
+Create a backup password
+Create a new group
+Create a OpenGL context first or run the GL methods on an OpenGL thread.
+Create a password to open your backup.
+Create call link
+Create event
+Create group
+Create group with 
+create make custom list filter chats
+Create passkey
+Create password
+Create poll
+Created 
+Created by you · Not sent
+createFromFontInfoWithFallback must only be called on API 29+
+Crop and rotate
+Crop video
+Current account
+Current backup password
+Current context doesn't contain Job in it: 
+Current location
+Current location sent to 
+Custom lists aren't available yet.
+custom lists filters favourites
+d MMM
+d MMM yyyy
+d MMM, h:mm a
+d MMMM
+d MMMM 'at' h:mm a
+d MMMM yyyy
+d MMMM yyyy 'at' h:mm a
+data bits cannot fit in the QR Code
+Data bytes does not match offset
+Data too big
+Data too big for any version
+Data too big for requested version
+Database is closed
+DataStore scope was cancelled before updateData could complete
+Date & time
+date and time changed to 
+Date changed from 
+date changed to 
+Debounce timeout should not be negative
+declineIntent is required
+Decode jpeg byte array failed
+Deep Linking failed: destination 
+Default FirebaseApp has not been initialized. Skip logging event to GA.
+Default lists
+Default message timer
+Delete 
+Delete account
+Delete all chats
+Delete all chats?
+Delete chat
+Delete chats
+Delete downloaded media
+Delete for everyone
+Delete for me
+Delete from call history
+Delete list
+Delete media from this device
+Delete my account
+Delete passkey
+Delete passkey?
+Delete photo
+delete remove every chat
+Delete report
+Delete starred messages
+Delete this call from your call history?
+Delete this chat?
+Delete this status
+Delete this status?
+Delete your account?
+Delete your app data and chat history
+Delete your Aivora account
+deleted or cleared
+Deleting this list does not delete any chats.
+Deleting your account is permanent
+Delivered to
+Dependency cycle detected: 
+Description updated.
+Detected that the device does not support a size 
+Device authentication · 
+Device authentication · Hidden folder 
+Device linked
+Dial a number
+Didn’t get the code?
+Didn’t get the email?
+Disable link previews
+Disappearing messages
+Disappearing messages are off
+Disappearing messages are on in this chat.
+disappearing messages new chats timer
+Disappearing messages on
+Disappears after 24 hours
+Disappears at 
+Disappears today at 
+Disappears tomorrow at 
+Discard changes
+Discard recording
+Discard this event?
+Discard this poll?
+Discard your changes?
+Dismiss as admin
+Divide by 0
+Does not contain segment
+Does not delete the account
+Done returns to Privacy. Completing this review doesn’t change your settings.
+Done · 1 participant
+Download a copy of your account information and settings. Chat messages are not included.
+download my data export report save share json zip
+Download report
+Draft: 
+Drag to reorder
+Drag to reorder. All always stays first.
+DROP TRIGGER IF EXISTS 
+e.g. Weekend catch-up
+Each option needs to be different.
+EC bytes mismatch
+Edit contact
+Edit event
+Edit group info
+Edit list
+Edit photo
+Edit profile
+Edit profile picture
+Edit scheduled call
+Edit text
+edited 
+Editing message
+EEE, d MMM
+EEEE, d MMMM
+EEEE, d MMMM yyyy
+eglChooseConfig failed.
+Email address
+email mail verify verification address recovery forgot pin reset
+Email sign-in isn’t available right now. Try again later, or use your phone number.
+Email verified
+Emoji or sticker
+Empty collection can't be reduced.
+Enable 
+Enable encrypted backup
+encrypt encryption password 64-digit key protect backup
+Encrypt your backup file on this phone with a password or a 64-digit encryption key.
+Encrypted backup
+Encrypted backup is on
+Encryption key
+End call
+end index
+End time
+End time removed.
+End your current call to answer 
+Ended at 
+Ends at 
+Enter a full phone number.
+Enter a group name to continue.
+Enter a list name
+Enter group name
+Enter is send
+enter key send keyboard new line return
+Enter sends a message instead of adding a new line.
+Enter the 6-digit code we emailed to 
+Enter the code
+Enter the number registered to this account.
+Enter the same password again to protect your backup.
+Enter the six-digit code
+Enter the six-digit code sent to 
+Enter the six-digit SMS verification code for 
+Enter your 64-digit key
+Enter your backup password
+Enter your chat-lock PIN
+Enter your current backup password to change it.
+Enter your email address again for a new code.
+Enter your number again for a new SMS code.
+Enter your old and new phone numbers with their country codes.
+Enter your phone number with its country code. We’ll send a code by SMS to verify it.
+Enter your PIN
+Enter your two-step verification PIN to continue.
+Error attempting to load resource: 
+Error code: 
+error code: 0x
+Error copying resource contents to temp file: 
+Error creating a new EGL Pbuffer surface
+Error destroying context
+Error destroying surface
+Error in createEglContext
+Error in Data#fromByteArray: 
+Error in Data#toByteArray: 
+Error in eglInitialize.
+Error in getDefaultEglDisplay
+Error making context current
+error parsing app ID
+error parsing project number
+error parsing sender ID
+Error releasing context
+error sending pendingIntent: 
+Error was captured in composition while live edit was enabled.
+Error was captured in composition.
+Error when reading current user id. Selected default user id `0`.
+Error while accessing metadata for cameraID: 
+Error while parsing timestamp in GCM event
+Error while parsing use_device_time in GCM event
+Event canceled · RSVPs are closed
+Event details
+Event starting
+Event title *
+Event updated
+Event updated · 
+Event updated · Everyone in 
+Event · Updated
+Every chat is already archived.
+Everyone can choose just one option.
+Everyone can edit the group info now.
+Everyone can select more than one option.
+Everyone can send messages now.
+everyone else
+Everyone in 
+everyone in 
+Everyone in the community · 
+Everyone in this chat can respond Going, Maybe or Not going.
+Everyone in this chat can RSVP after you send the event.
+Everyone invited sees the updated details.
+Everyone you have saved who has saved you
+exceeded size limit
+Exception during lenientFormat for 
+Exception in undelivered element handler for 
+Exception while trying to handle coroutine exception
+Exit group
+Expected 
+Expected a Class, ParameterizedType, or GenericArrayType, but <
+Expected a node group
+Expected a string of even length
+Expected alternating header names and values
+Expected at least one element
+Expected at least one element matching the predicate
+Expected BringIntoViewRequester to not be used before parents are placed.
+expected characters 'vorbis'
+expected header type 
+Expected object header. Got 0x
+Expected positive parallelism level, but got 
+Expected ready
+Expected recorder to be idle but a recording is either pending or in progress.
+Expected semantics node to have a coordinator.
+Expected size 
+expected to go to inactive state due to composition error
+Expecting 4 plane parameters
+Export chat
+Export chat with 
+export save copy conversation text file media mail share transcript
+Export wasn't prepared
+extraBufferCapacity cannot be negative, but was 
+Failed requirement.
+Failed to copy the given amount of bytes from the inputstream to the output stream.
+Failed to create an instance of 
+Failed to create an OutputConfiguration for 
+Failed to create AndroidOutputConfiguration for 
+Failed to create temp file.
+Failed to inflate ColorStateList.
+Failed to overwrite the file: 
+Failed to parse cover art attribute
+Failed to parse data atom to int
+Failed to parse index/count attribute: 
+Failed to parse text attribute: 
+Failed to parse uint8 attribute: 
+Failed to resolve attribute at index 1: 
+Failed to send big query analytics payload.
+Failed to set [
+Failed to write to OutputStream.
+Find a moment
+Find channels
+Find my location
+Find people you know
+Find words, links and details in your conversation.
+Finding starred messages…
+Finds which of your contacts are on Aivora. Only phone numbers are sent.
+Finish review
+Finishing backup…
+First page of 
+Flash auto
+Flash off
+Flash on
+Follow the departments and services you want updates from.
+Font size
+For StructureKind.CLASS please use 'buildClassSerialDescriptor' instead
+For this status only. To change who sees all of them, use Status privacy.
+Forgot PIN?
+Forward to
+Forwarded many times
+Found empty contents
+Found paragraph index 
+Four digits that people without your number need, with your username, to message you.
+framing bit expected to be set
+Free up storage
+fromIndex: 
+Full-screen calls
+Fully specified range is not actually fully specified.
+Future was expected to be done, 
+gallery save to photos show downloaded media pictures videos
+GenericGFPolys do not have same GenericGF field
+Get a new code
+Get a reminder before each call. Calls only start when you choose to join.
+Get started
+Get your account information
+Getting a code…
+Getting the file ready…
+Give your event a name
+Given String is empty or null
+glError: 
+Google Drive
+Google Drive or another app
+group 
+Group 
+Group admin
+Group audio call
+Group exceptions
+Group info
+Group name
+Group photo
+Group settings
+Group video
+Group video call
+Group voice call
+Groups notified
+Groups you manage
+h:mm a
+Headers cannot be null
+Help and feedback
+help support
+Help us understand what's wrong. 
+Hey! Found a spot for our Sunday catch-up?
+Hide locked chats
+Hide status from…
+Hint: 
+Hosted by 
+Hosted by you
+Hosted by you · 
+Hosted by you · Everyone in 
+How long should you share?
+HTTP 
+Http2Connection.Listener failure for 
+I saved my key
+If calls or notifications don't arrive, look here first.
+If you lose your key, Aivora can’t recover it or unlock your backup for you.
+If your new phone signs in with this code before 
+Ignoring adding capability '
+Ignoring format (
+Ignoring frame where first subframe has a reserved type: 
+Ignoring removing default capability '
+Ignoring unknown WAV chunk: 
+Illegal value array type 
+Illegal value type 
+ImageVector.Builder is single use, create a new instance to create a new ImageVector
+In a few seconds
+in ALL_JSON_OBJECTS class discriminator mode
+In person
+in the polymorphic scope of '
+in this chat
+in your chat
+in your chats
+Include media
+Include videos
+Incoming call
+Incoming call for 
+Incoming video
+Incoming voice and video calls
+Inconsistency between the count of nodes tracked by the state (
+Inconsistent composition
+Inconsistent state 
+Incorrect image format of the input image proxy: 
+Incorrect state. Precomposed children 
+Incorrect state. Total children 
+Indent should not be specified when default printing mode is used
+Index 
+Index overflow has happened.
+Index should be non-negative
+index: 
+Inflater did not finish
+Inoperable file:
+input is not hexadecimal
+input is too large to fit in a byte array
+Integer value 
+Interface can't be instantiated! Interface name: 
+Interleaving error: 
+Internal storage
+IntList is empty.
+invalid block mode, want GCM got 
+Invalid capture-to-encode ratio: 
+invalid ellipsizedWidth value
+invalid end value
+Invalid group index
+Invalid input received
+invalid key size, want 256 bits got 
+Invalid language tag bytes number: %d. Must be between 2 and 42.
+Invalid mask pattern
+Invalid mask pattern: 
+invalid maxLines value
+Invalid Nal units
+Invalid NAL units
+invalid padding mode, want NoPadding got 
+Invalid position: 
+invalid purposes mode, want PURPOSE_ENCRYPT | PURPOSE_DECRYPT got 
+Invalid rectangle, make sure no value is NaN
+Invalid remove index 
+Invalid restart scope
+Invalid SAD length: 
+invalid start value
+Invalid TTL: 
+invalid width value
+Invalid zip data. Stream ended after $totalBytesRead bytes. Expected 
+Invite a friend
+Invite by SMS
+Invite to Aivora
+isBackwardCompatible method returns true because robolectric build detected.
+it isn't
+It will be deleted for everyone who can see it.
+It will show as canceled in this chat.
+item at index 
+Item is not in pre-composed item range
+It’s now a video call.
+It’s now a voice call.
+It’s now in person.
+Join call
+Join me on Aivora: 
+Join video call
+Join voice call
+JSON file
+Just posted · 
+Just the people you choose
+Keep 
+Keep Aivora open until 
+Keep both phones nearby
+Keep chats archived
+Keep chats archived is off. A chat leaves Archived when a new message comes.
+Keep chats archived is on. New messages stay here until you unarchive a chat.
+Keep editing
+Keep event
+Keep locked
+Keep messages in this chat
+Keep received media in the chat only
+Keep scheduled call
+Keep sharing
+Keep starred messages
+Keep the app open for a moment.
+Keep the conversation inside the app
+Keep voice call
+Keep waiting
+Keep watching
+Keep your account with a new number
+Keep your key in a safe place.
+Keep your key safe. Aivora can’t show your key again or read your encrypted backup.
+Keep your new phone on its Transfer chats screen and online until it’s signed in.
+Keep your secret code private.
+Kept on this phone for now: your other devices don't follow this order yet.
+Kept on this phone. Your account didn't take it: 
+Kept on your device · 
+Know when your account changes
+Large items · Largest first
+Last completed backup remains 
+Last seen and online
+Last seen exceptions
+last seen read receipts
+Last shared: 
+Last successful backup
+Last update at 
+last update at 
+Last updated at 
+lateinit property 
+LayoutCoordinates is not attached.
+LazyVerticalGrid's width should be bound by parent.
+Leave and delete
+Leave and delete this group?
+Leave both phones unlocked while you scan.
+Leave now?
+Leave out the people you choose
+length changed to 
+less than a minute
+Less than a minute remaining
+Let people find me
+Limit automatic media saving
+Link a device
+Link previews aren’t generated for links you share when this is enabled.
+Linked devices
+List name
+Live location
+Live location ended
+Live location is visible to 
+Live location sharing stopped
+Live location stopped: Aivora no longer has location permission.
+Live location · from another device
+Live updates begin only after you tap Share live location.
+Loaded quirk settings from metadata:
+Loading your lists…
+Local and anonymous classes can not be ViewModels
+Location changed to 
+Location helps you find nearby places and share a pin with 
+Location is off on this phone. Tap here to turn it on, then try again.
+Location is off on this phone. Turn it on, or type the place.
+Location removed.
+Location sent
+LOCATION · 
+Lock a chat from its info to keep it here.
+Lock and hide this chat on this device.
+lock app fingerprint face unlock screen lock passcode biometric
+Lock chat
+Lock this chat
+Locked chat
+Locked chats
+locked chats hide hidden folder
+Locked on the web with your chat-lock PIN
+Log out
+Log out?
+Made 
+Made when you save · This replaces the in-person location.
+Made when you send · This replaces the in-person location.
+Magic number doesn't match: 
+Make group admin
+Make sure both are online
+Make the plan together
+Make time for your people. Choose who to call and a time that works for you.
+Manage my status
+Map not available yet
+Mark as read
+Mark as unread
+Matching contact
+Media attachments
+media automatic download save to photos network usage
+Media is kept on the server, so this is what your account takes up for everyone.
+Media visibility
+Media won't automatically save to Photos
+Media you've sent
+Media, links and docs
+MediaCodec error
+Meeting spot
+Meeting spot sent to 
+Memory card or USB storage
+Message 
+Message alerts
+Message and call alerts
+Message info
+Message me on Aivora: 
+Message not available
+Message request
+Message yourself
+Messages and calls are encrypted in transit. Tap to learn more.
+Messages can't be forwarded to other chats
+Messages cleared in 
+Messages other people already have in their chats won’t be removed.
+Messages sent before this change will remain.
+Method not decompiled: p000.bu4.invoke(java.lang.Object):java.lang.Object
+Migrated 
+Migrating WorkDatabase to the no-backup directory
+minLines 
+Mismatched number of dex files found in metadata
+Missed 
+Missed call
+Missed calls
+Missed recording an endGroup
+Missing profile key: 
+Missing required properties:
+Mixed audiences
+MMMM yyyy
+mode was UNNECESSARY, but rounding was necessary
+More actions
+More options
+Move and scale
+Move chats to a new phone
+move new phone transfer old phone switch sign in qr code
+Move to a new phone number
+Moved from 
+Multiple audio presentations or assets not supported
+Multiple components provide 
+Must be called on 
+Must not be called on GoogleApiHandler thread.
+Must not be called on the main application thread
+Must provide a UiContext or Application Context
+MutableVector is empty.
+Mute 
+Mute notifications
+Mute updates
+Muted updates
+Muted updates (
+Muted: only mentions and replies to you
+My code
+My contacts
+My contacts can add you
+My contacts except…
+My contacts except… · 
+My Profile
+My QR code
+My status
+name about photo picture username phone number links edit
+name is empty
+Name is null
+Names and votes are visible to both of you.
+Names and votes are visible to everyone in this conversation.
+Names and votes are visible to everyone in this group.
+NavHost requires a ViewModelStoreOwner to be provided via LocalViewModelStoreOwner
+Nearby didn't open on this phone.
+Nearby didn't open, so every way to share is listed instead.
+Need help?
+Needed for voice notes and for any call to carry your voice.
+negative minIndex
+negative scale factor
+negative size: 
+NetworkRequestConstraintController unregister callback
+New call
+New channel post
+New chat
+New contact
+New group
+New list
+New message
+New messages stay archived.
+New messages stay in this chat. Messages already on a timer will still expire.
+New phone number
+new phone number move sim add confirm verify unconfirmed
+New post
+New reaction
+New status
+new subcompose call while paused composition is still active
+Newer match
+Next automatic backup: 
+Next month
+No @Navigator.Name annotation found for 
+No active live location shares
+No ActivityResultRegistryOwner was provided via LocalActivityResultRegistryOwner
+No answer
+No app on this phone can open that link.
+No app on this phone can open that page.
+No app on this phone can pick a file.
+No app on this phone can share it.
+No app on this phone can share the invitation.
+No archived chats
+No archived chats. A chat you archive leaves the chat list and waits here.
+No backup yet
+No blocked contacts
+No browser on this phone can open the page.
+No call will start and no reminders will be sent.
+No calls scheduled yet
+No calls yet
+No camera app on this phone.
+No channels match.
+No chats in this list
+No chats match “
+No chats yet
+No chats yet. Start one from the Chats tab, then add it here.
+No communities yet
+No components
+No connection. A phone that signs in now can’t be seen until this phone is back online.
+No connection. Check your internet and try again.
+No connection. Still trying…
+No contacts match “
+No contacts on the app yet
+No contacts to send
+No contacts yet
+No country matches “
+No custom ringtone while this chat is locked
+No custom sound while this chat is locked
+No data bytes provided
+No default timer
+No EGL display.
+No email? Check your spam folder. This verification is for your second account, not 
+No end time
+No enum constant com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.
+No error correction bytes
+No favourites yet
+No further updates will be sent.
+No groups available
+No groups yet
+No locked chats
+No media was included.
+No messages found
+No missed calls
+no more bytes
+No NavigationEventDispatcher was provided via LocalNavigationEventDispatcherOwner
+No nodes can be emitted before calling deactivateToEndGroup
+No nodes can be emitted before calling skipAndEndGroup
+No one blocked
+No one found
+No one has read it yet.
+No OpenSSLSocketImpl superclass of socket of type 
+No past calls yet
+No path data available
+No phone number
+No pre-composed items to dispose
+no recompose scope found
+No reminder
+No reminder is set. You can edit or cancel this call anytime.
+No reminder will be sent. The call won’t start automatically.
+No repeated dots or underscores.
+No results for “
+No settings match “
+No space left on device
+No starred messages
+No start tag found
+No stickers yet
+No time zone matches “
+No unread chats
+No updates match.
+No updates yet
+No valid saved state was found for the key '
+No video calls
+No ViewModelStoreOwner was provided via LocalViewModelStoreOwner
+No views yet.
+No voice calls
+No votes yet
+Nobody chosen yet
+Nobody else from your contacts is on Aivora yet.
+Nobody in 
+Nobody in this chat will be able to vote or change answers.
+Nobody matches “
+Nobody's updates are muted.
+non-null surface!
+Non-serializable 
+Non-transparent snapshot was reused: 
+None of your contacts are on Aivora yet, or they're all blocked already.
+None of your contacts are on Aivora yet.
+not a normal value
+not a zip: end of central directory signature not found
+Not added
+Not added: 
+Not all bits consumed: 
+Not available
+Not available yet
+Not chosen
+Not delivered to anyone yet
+Not enough bytes to read: 
+Not going
+Not here? Choose from the phone's gallery
+Not in application's main thread
+Not in your contacts
+Not initialized yet
+Not now
+Not sent
+Not sent. Tap to retry
+Not verified
+Not your phone? Sign it out
+Nothing has been posted here.
+Nothing in this phone's address book yet.
+Nothing matches
+Nothing to clear
+Notification content
+Notification sound
+Notify contacts
+Now ends at 
+null current looper
+Null interface
+null reference
+null value in entry: 
+Number copied
+Number of bits and data bytes does not match
+Numbers with * or # can't be called on Aivora.
+Object of type 
+Off for this chat
+Off is the default and the result of disabling a timer.
+Okio Watchdog
+Old phone number
+Older match
+On a background
+On Aivora
+On mobile data
+On Wi-Fi
+On · Password
+One answer per person.
+Online for everyone
+Online same as last seen
+Online: not available yet
+Only 
+Only @mentions
+Only admins
+Only admins can edit the group info now.
+Only admins can send messages in this group.
+Only admins can send messages now.
+only admins post
+Only letters, numbers, dots and underscores.
+Only live locations shared from this phone are listed here for now.
+Only share with…
+only single-line, non-wrap text fields can scroll horizontally
+Only the members of 
+Only the people in this chat can
+Only this place is shared. Your location won’t update.
+Only VectorDrawables and rasterized asset types are supported ex. PNG, JPG, WEBP
+Only when you're mentioned or replied to
+Only you are in this chat, so your messages here count as read as soon as they're sent.
+Only you can
+Only you can see these votes.
+Only you can see this live location.
+Only you can see your location as it updates. You can stop at any time.
+Only your call history changes. Other people's history and your chats are not affected.
+Open 
+Open a backup
+Open Android's settings to change notifications.
+Open backup
+Open Aivora on your new phone to continue.
+Open device settings
+Open Encrypted backup
+Open group
+Open in maps
+Open live location
+Open settings
+Open with
+Opened by 
+Opens 15 minutes before the start
+Option 
+Optional. It is sent with the deletion, so the service can do better.
+order arrange move filters pills chats tab
+Order of dexfiles in metadata did not match baseline
+Other apps
+Other country
+Other sign-in verification remains available, even if you delete these passkeys.
+Other sign-in verification remains available, even if you delete this passkey.
+other voter
+other voters
+out of range: %s
+Out of range: %s
+Outgoing video
+Over-writing contents of 
+overflow: checkedAdd(
+Package manager required to locate emoji font provider
+parent composition reference not set
+Parser being asked to parse an empty input stream
+Parser being asked to read a large CBOR array
+Parser being asked to read a large CBOR map
+Participants · 
+passkey sign in fingerprint face screen lock password manager
+Passwords don’t match. Enter the same password again.
+Pause recording
+Pause voice message
+pending composition has not been applied
+People who have 
+People who turned off read receipts appear only as delivered.
+People you don’t share your last seen with won’t see when you were last on Aivora.
+Permissions should be called in the context of an Activity
+Personal conversation
+Personal information
+Phone number
+Phone number added
+Phone number and saved contact info
+Phone number changed
+Phone number confirmed
+Photo 
+Photo status
+Photo · view once
+Photos and videos
+Pick a chat
+Pick a contact
+Pick someone to call
+Pin a chat to keep it here.
+Pin a chat to keep its people here, a tap away from a call.
+pin security sign in recovery email change pin
+place search failed: 
+Place the new phone’s code inside the frame
+plain text
+Plan an audio or video call with your contacts.
+Play view once voice message
+Play voice message
+Play what you recorded
+Point at the code
+Point your camera at someone's Aivora code.
+Poll closed
+Poll voters
+Post an update
+Post status
+Postview Stream in StreamGraph cannot be null for reprocessing request
+Precise location improves map accuracy.
+PreferencesSerializer does not support type: 
+Preparing backup…
+Preparing your chat
+Press and hold a message in chat, then choose Star.
+Prevent chat exports
+Preview event
+Preview only · This event hasn’t been shared yet.
+Preview only · This poll hasn’t been sent yet.
+Preview poll
+Previous month
+Previous responses
+Previous responses remain visible, but RSVPs will be closed.
+Privacy checkup
+Privacy policy
+Privacy Policy
+Privacy review complete
+Processor cancelling 
+Profile details
+Profile hidden from everyone
+Profile links aren't available yet.
+Profile photo
+Profile photo exceptions
+Profile visible to everyone
+protect ip address calls link previews
+Protect IP address in calls
+Protect your backup
+PROTOCOL_ERROR padding 
+PruningProcessingQueue: Processing 
+public profile page qr link web show my name
+Put the plan on the calendar
+QR code
+QR page name and photo
+Quirk class names resource not found: 
+radix 
+React with 
+reacted 
+Reaction notifications
+reactions emoji
+Read by
+Read receipts
+Read receipts 
+Read the chats in a backup made by Aivora, from Google Drive or this phone.
+Read too much data during profile line parse
+Ready 
+Ready to share for 
+Reason: 
+Record a voice note
+recording audio…
+Recording was started when the Recorder had encountered error 
+Recovery email
+Release to stop
+reminder changed to 
+reminder moved to the start
+Reminder set for 
+reminder turned off
+Remove 
+remove close account
+Remove email
+Remove from Favourites
+Remove from group
+Remove like
+Remove messages from all your devices. This won't clear 
+Remove option 
+Remove photo
+Remove stars from all 
+Remove stars from all your starred messages. The messages will remain 
+Remove the star from 1 message. The message will remain 
+Remove these chats from the list
+Remove you from your groups
+Removes this report, not your account
+Reorder lists
+replay cannot be negative, but was 
+Replies are sent privately in your chat.
+Reply to 
+Reply with a message
+Replying to 
+Report 
+Report and block
+report problem suggestion
+Report requested
+Report submitted
+Report this channel
+Report wasn't submitted
+Request account info
+Request pending
+Request report
+Request sent. An admin of the group will let you in.
+Requested 
+Requested dimensions are too small: 
+Required value was null.
+Resend 
+Resend code
+Resend code in 
+Resend email
+Resend email in 
+Reset PIN
+Resolved capture/encode sample rate 
+Resource ID not found for key: 
+restore read open backup file transcripts readable copy
+Restoring the Navigation back stack failed: destination 
+Retain your 
+Retain your 1 starred message
+Retain your starred messages
+Retry report
+Review access to your app and verification when registering your number again.
+Review call
+review check up walkthrough who can contact personal information protection
+Review disappearing messages and protection for individual chats.
+Review live location
+Review scheduled call
+Review your privacy settings and choose what works for you.
+RS blocks mismatch
+Same as last seen
+Sample map
+Sample rate 
+Save a readable copy
+Save account info
+Save changes
+Save key
+Save photos and videos from this chat
+Save to files
+Save to Photos
+Saved as
+Saving backup…
+Saving photo…
+Saving to Google Drive…
+Scan again
+Scan code
+scan code share contact
+Scan QR code
+Scan the code on Aivora Web
+Scan this code with your old phone
+Scan with your old phone
+Scan your new phone’s code
+Schedule a call
+Schedule a new call
+Schedule call
+Schedule your first call
+Scheduled call
+Scheduled call canceled
+Scheduled calls
+Scheduled calls move here once they’ve ended or been canceled.
+Scope cannot be cancelled because it does not have a job: 
+Search a city, like Karachi or London
+Search by voice
+Search calls, contacts
+Search channels
+Search chats, people, media
+Search cities, towns and areas
+Search contacts
+Search conversation
+Search country or code
+Search groups
+Search in 
+Search in chat
+Search in chat with 
+Search messages
+Search messages shared in 
+Search messages you’ve shared with 
+Search name or number
+Search name, number or email
+Search people on Aivora
+Search people or groups
+Search profile, settings
+Search starred messages
+Search updates
+Searched your newest 
+Searching for active node in inactive hierarchy
+Searching for people has been switched off on Aivora.
+Secret code
+Security notifications
+Security notifications aren’t available yet.
+Select contact
+Select one
+Select one answer
+Select one or more
+Select one or more answers
+Send 
+Send a contact
+Send code
+Send current location instead
+Send document
+Send event
+Send feedback
+Send messages
+Send photo
+Send poll
+Send recording
+Send reply
+Send the first message to get the group started.
+Send this location?
+Send this place
+Send to 
+Send video
+Send your poll?
+Sending a new code…
+Sent at 
+Sent to 
+Serializer for class '
+Serializer for subclass '
+Set a new PIN
+Set a screen lock first
+Set PIN
+Set secret code
+Set up two-step verification
+Share a link anyone can join, without a chat
+Share a meeting spot
+Share a moment with your contacts
+Share account info
+Share contact
+Share export
+share invite
+Share link
+Share live location · 
+Share location
+Share my code
+Share screen
+share sharing map where location stop live
+Share status
+Share status with…
+Share this event?
+Share this status with
+Shared location
+Shared with 
+Sharing ends at 
+Sharing now
+Sharing where you are, and live location.
+Sharing with 
+should not happen but we got: 
+Show all
+Show calls on the lock screen
+Show content in notifications
+Show less
+Show more results
+Show my name and photo on my QR page
+Show newly downloaded media in your device gallery.
+Show previews
+Show security notifications on my devices
+Shows new messages and incoming calls.
+sign in alerts new device login security
+Sign in with a passkey
+Sign in with your phone number instead
+Sign in your new phone?
+Sign it out
+sign out
+Sign out
+Sign out 
+Sign-in code
+Sign-ins and changes to your account on your other devices
+Signing in by email is turned off. Use your phone number instead.
+Signing in by email isn’t available. Use your phone number instead.
+Signing in your new phone
+Silence Off
+Silence On
+Silence unknown callers
+silence unknown callers spam ringing
+Silenced 
+Silenced call
+Silenced call from 
+Silencing a caller doesn’t block them from calling or messaging you.
+Single answer
+single-line, non-wrap text fields can only scroll horizontally
+size 
+Size must defined when creating a deferred OutputConfiguration.
+Sizes don't match
+Skip for now
+Skipping remainder of malformed SEI NAL unit.
+Slot table is out of sync (expected 
+snapshot is closed
+Something went wrong.
+Something went wrong. Try again.
+Sound off
+Sound on
+Sound, vibration and banners
+Sound, vibration and pop-ups are set for each of these in Android's own settings.
+sounds ringtone vibration tones alerts
+SOURCETABLE 
+Starred messages
+starred messages saved
+Start a conversation
+Start again
+start and end cannot be negative. [start: 
+Start and end with a letter or number.
+start index
+Start new individual chats with messages that disappear after your chosen duration.
+Start time
+Start time *
+start time changed to 
+Start/end imbalance
+Started at 
+startIndex: 
+Starting now
+Starting now — tap to join the call
+Status audience
+Status privacy
+Status updates from people you have saved appear here for 24 hours.
+Step is zero.
+Sticker packs your administrator publishes appear here.
+Stop direct messages and calls
+Stop sharing
+Stop sharing and answer
+Stop sharing and switch
+Stop sharing in all chats
+Stop sharing live location?
+Stop sharing your location?
+Stop watching?
+Stopped at 
+Storage and data
+Submit report
+Submit this report?
+surface request is required to retry initialization.
+Surfaces are not yet available for 
+Switch account
+switch account second number another
+Switch camera
+Switch to video
+Switch to video call?
+Switching to 
+System default follows your phone's dark theme setting.
+System property '
+Tags are currently unsupported
+Take a photo
+Take photo
+Taking photos and video calls.
+Tap a result to open it in the conversation.
+Tap a setting to review it.
+Tap for a photo · Hold for video
+Tap the button below to start one.
+Tap the photo to change it
+Tap to advance · Hold to pause
+Tap to return
+Tap to start recording
+Tap to stop
+Tap to try again
+Task is already canceled
+Tell me when someone reacts to my message.
+Tell us in a few words
+Terms of Service
+Terms of Service and Privacy Policy
+terms service privacy policy legal
+text size small medium large bigger smaller message
+Thanks for helping keep the community safe. 
+That browser is now signed in. You can unlink it any time from Linked devices.
+That code has expired. Ask for a new one.
+That code is wrong. 
+That code isn’t right.
+That combination of buffers, offsets and length to xor result in out-of-bond accesses.
+That email address doesn’t look right. Check it and try again.
+That file is empty — there's nothing in it to send.
+That key doesn’t open this backup.
+That key isn’t right.
+That list no longer exists.
+That password doesn’t open this backup.
+That password isn’t right.
+That PIN isn’t right.
+That PIN isn’t right. Try again.
+That place can’t be kept for automatic backups. Choose another.
+That time has already passed. Choose a later time.
+The call opens 
+The call wasn't placed while Aivora was locked. Call again from the chat.
+the chat
+The chat gets a notice of the call · You are the organizer
+The code goes by SMS to 
+The code has expired, and no phone signed in to your account meanwhile.
+The code has expired. The phone that signed in with it was signed out again.
+The code no longer works, and no phone signed in with it.
+The code no longer works, but 
+The code no longer works. 
+The code works until 
+The codes don't match. Try again.
+The composition is disposed
+The composition should be activated before setting content.
+The copy isn’t encrypted. Keep it somewhere private.
+The details were changed 
+The details were changed.
+The device does not contain a restore credential.
+The event stays as it was.
+The expandedHeight is expected to be specified and finite
+The group was made, but its photo couldn't be set: 
+The group will see that you left. The chat is removed from this phone.
+The lengths of x and y should match.
+The organizer’s account is no longer available.
+The original 
+The paused composition has already been applied
+The paused composition has been applied
+The paused composition has been cancelled
+The paused composition has not completed yet
+The paused composition is invalid because of a previous exception
+The phone showing this code will be signed in to your account (
+The phone showing this code will be signed in to your account, with all your chats.
+The PointerEvent receiver cannot have a null MotionEvent.
+The provider font XML requires query attribute or fallback children.
+The server’s answer couldn’t be read. Try again later.
+The span value should be higher than 0
+The string is empty
+the total number of elements (%s) in the arrays must fit in an int
+The transformed name '
+theme dark mode light
+There are no chats in this backup.
+There are no downloaded photos or videos in this chat. New ones will appear here.
+There is no link in what you picked.
+There is no messaging app on this phone to send the invite.
+There is no table with name 
+There isn't enough space on this phone to prepare that file. Free some up and try again.
+These are also the settings restored when you unmute 
+These are no longer on the server to share.
+These chats are hidden from your chat list. Unlock a chat from its info to bring it back.
+they aren't
+This account
+This account has two-step verification on. Enter its six-digit PIN to add it.
+This account has two-step verification on. Enter its six-digit PIN.
+This account is no longer registered with Aivora.
+This account PIN is different from the SMS verification code and your device passcode.
+This account signs in by email.
+this account’s email address
+This action can't be undone.
+This action cannot be undone. You won’t be able to restore this account after deletion.
+This backup file is damaged or incomplete, so it can’t be read.
+This backup is too large to show on this phone.
+This call and its reminder will be removed from Upcoming.
+This call has ended.
+This call has no link to join it by yet.
+This call was canceled.
+This call will be removed from Upcoming.
+This can’t be undone. You can schedule a new call anytime.
+This chat
+this chat
+This chat has no attachments
+This chat is locked, so nothing from it is saved automatically.
+This code can’t be used any more. Get a new code and start again.
+This code has expired. Get a new code and scan it with your old phone.
+This device stops receiving messages and notifications until you sign in again.
+This doesn't prevent screenshots or people saving content manually.
+This event isn’t in this chat any more. It was deleted here, or the chat was cleared.
+This event was deleted.
+This export is no longer on your phone. Prepare it again.
+This feature is not available at the moment.
+This file can’t be read as a Aivora backup.
+This function should only be used for 1-D focus search
+This function should only be used for 2-D focus search
+This function should only be used within a parent that has focus.
+this group
+This is a fixed map pin. 
+This is a fixed map pin. It won’t move as you do.
+This is a fixed map pin. Nobody in 
+This is separate from your account PIN and chat-lock code.
+This isn't available yet.
+This key is shown only once. Aivora won’t show it again.
+This list no longer exists. It may have been deleted on another device.
+This message hasn't reached the server yet, so there's nothing to show.
+This message is no longer on this phone. It may have been deleted, or the chat cleared.
+This message was deleted
+This name and your photo are shown to everyone you message.
+This node does not have an owner.
+This option is already in the poll.
+This person
+This phone can no longer use your backup key, so it can’t make backups. 
+This phone can’t reach Aivora. Check its internet connection, then get a new code.
+This phone's camera can take photos here, not videos.
+This protects only your backup file. It is not your two-step verification PIN.
+This replaces the in-person location.
+This report is not a chat backup.
+This serializer can be used only with Json format.Expected Decoder to be JsonDecoder, got 
+This serializer can be used only with Json format.Expected Encoder to be JsonEncoder, got 
+This setting isn’t available yet.
+This sign-in has timed out. 
+This time has passed. Choose a later time.
+This update was deleted
+This usually takes a few seconds.
+This verification is for your second account, not 
+This version (
+tile voice
+tile voice level
+Time changed from 
+Time to be confirmed
+Time zone
+Time zone changed to 
+Timed out waiting for Task
+title changed to “
+Title changed to “
+title removed
+To show them here. Or choose from the phone's own gallery instead.
+To use Aivora again, get started and register a phone number.
+Today, 
+Tomorrow · 
+Too long to show here
+Too many attempts. Try again in 
+Too many tries. Try again in 
+Too many tries. Wait a minute and try again.
+Too many tries. Wait a while and try again.
+Too many wrong codes. 
+Too many wrong codes. Ask for a new one.
+Too many wrong PINs. Wait a while and try again.
+too short header: 
+tooltip transition
+Total bytes mismatch
+Total size
+Trailing comma before the end of JSON 
+transcribe transcription voice note audio text speech
+Transfer cancelled
+Transfer chats
+Transfer chats from your old phone
+Transfer complete
+Transfer interrupted
+Transition animation values: 
+Tried to seek backward
+Try again
+Try again.
+Trying common sample rates in proximity order to target 
+tryServicePendingRecording on state: 
+Turn message alerts on first.
+Turn off
+Turn off advanced chat privacy?
+Turn off chat lock?
+Turn off encrypted backup?
+Turn off timer
+Turn on
+Turn on advanced chat privacy?
+Turn on camera
+Turn on privacy
+Turn on your camera too? You can turn it off again at any time.
+Turned off
+twist 2 pro
+Two-step verification
+Two-step verification 
+Two-step verification is enabled
+Two-step verification is on, but the code for your recovery email wasn’t sent. 
+Two-step verification is on, so your 6-digit PIN is needed too.
+Two-step verification PIN
+Type a status
+Type at least 2 letters
+Type at least two letters to search.
+Type of the key 
+type should not be empty
+Type something…
+Type your secret code again.
+Unable to call 
+Unable to get icon package
+Unable to invoke Handler(Looper, Callback, boolean) constructor
+Unable to load image from path: 
+Unable to load image from URI: 
+Unable to log event: analytics library is missing
+Unable to obtain android.graphics.Bitmap
+Unable to parse preferences proto.
+Unable to post to main thread
+Unarchive 
+Unarchive 1 chat
+Unarchive chats
+Unbalanced begin/end empty
+Unblock 
+Unexpected aspect_ratio_idc value: 
+Unexpected CameraAccessException: 
+Unexpected CameraError: 
+Unexpected char 0x
+Unexpected configurations: Overwriting current previewStabilizationMode(
+Unexpected configurations: Overwriting current videoStabilizationMode(
+Unexpected header: 
+Unexpected header: Content-Length
+Unexpected header: Content-Type
+Unexpected hex digit: 
+Unexpected internal error  
+Unexpected JSON token at offset 
+Unexpected notification
+Unexpected order of duration components
+Unexpected special floating-point value 
+Unexpected state change from: 
+Unexpected status line: 
+Unexpected throwable: 
+Unexpected type converter 
+Unexpectedly removed anchors
+Unidentifiable major type: 
+Unknown callers ring
+Unknown callers silenced
+Unknown color space, please use a color space in ColorSpaces
+Unknown Dolby Vision level: 
+Unknown Dolby Vision profile: 
+Unknown duration unit short name: 
+Unknown number
+Unknown position: 
+Unknown type
+Unknown unit: 
+UnknownHostException (no network)
+Unlock Aivora
+Unlock with device authentication
+Unmute notifications
+Unmute to change message alerts.
+Unmute to turn message alerts on.
+Unmute updates
+Unrecognized cover art flags: 
+Unstar all
+Unstar all messages?
+Unstarring 
+Unsupported audio object type: 
+Unsupported coding mode in DTS HD header: 
+Unsupported direction for beyond bounds layout
+Unsupported epConfig: 
+Unsupported form type: 
+Unsupported meta version
+Unsupported OutputType: 
+Unsupported reference clock code in DTS HD header: 
+Unsupported surface rotation: 
+Unsupported type 
+Unsupported type: 
+Unsupported value type 
+Unsupported version
+Unsupported version number: 
+unsupported zip: spanned
+unsupported zip: too many bytes processed for 
+Until 
+Until you delete it
+Up to 10 at a time, so 
+Update available
+Update Aivora
+Update the plan
+updated 
+updated just now
+Use a 64-digit encryption key
+Use a different number that can receive a verification SMS.
+Use a key instead of a password to open your encrypted backup. Keep a copy somewhere safe.
+Use a number that can receive a verification SMS.
+Use a password
+Use another email address
+Use another phone number
+Use app setting: don't save
+Use app setting: save received photos
+Use at least 4 characters.
+Use at least 8 characters and include at least 1 letter.
+Use device authentication
+Use device authentication to verify it’s you when signing in.
+Use device passcode
+Use my PIN instead
+Use PIN instead
+Use the same phone number
+Use this date & time
+Use this phone’s number
+Use where I am now
+use Wi-Fi
+use Wi-Fi or mobile data
+Use your device’s fingerprint, face recognition or passcode to open Aivora.
+Use your fingerprint or device passcode to lock this chat.
+Use your screen lock to show them
+Username key
+Username key (optional)
+valid token
+Value case is null.
+Value not set.
+Value of type '
+Verification code
+Verify email
+Verify new number
+Verify phone number
+Verify your email address
+Verify your new number
+Verify your number
+Verify your second number
+Version 
+version update download new
+Video 
+Video call
+video call
+Video call link
+Video status
+Video · view once
+View count has dropped below 0
+View event
+View Locked chats
+View once
+View once voice message
+View once — they can open it one time, and can't save or forward it
+View once — they can play it one time, and can't save or forward it
+View profile photo
+View scheduled call
+View status
+View votes
+Viewed by
+Viewed by 
+ViewModelStore should be set before setGraph call
+Visible for 24 hours
+visitAncestors called on an unattached node
+visitChildren called on an unattached node
+visitSubtreeIf called on an unattached node
+Voice and video calls you make or receive appear here.
+Voice call
+voice call
+Voice call link
+Voice chat open · 
+voice level
+Voice message
+Voice message transcripts
+Voice message, 
+Voice only
+Votes are visible to both of you
+Waiting for 
+Waiting for a connection…
+waiting for a position
+Waiting for the server…
+Waiting for Wi-Fi…
+Waiting for your new phone…
+Waiting for your old phone.
+Waiting for your old phone. This code works until 
+We sent a code to 
+We will email you a 6-digit code to verify it.
+We will send a 6-digit code by SMS to verify it.
+Web address
+web computer browser sessions link
+We’ll email you a six-digit code to verify it.
+We’ll remind everyone at 
+What happened, or what would help?
+What should people call you?
+What this phone fetches without asking.
+What would you like to ask?
+What you’ve filled in will be lost.
+What you’ve typed will be lost.
+When roaming
+When someone in your phone book joins, they can be added to a group.
+When someone in your phone book joins, you can call them here.
+Where you are now
+Who can add me to groups
+who can add me to groups invite
+Who can contact you
+Who can edit group info
+Who can see my about
+Who can see my last seen
+Who can see my profile photo
+Who can see my status updates
+Who can see when I’m online
+Who can send messages
+who sees my about text
+who sees my photo picture avatar
+who sees my status audience contacts
+who sees online presence hide last seen
+Why are you leaving?
+Wi-Fi only
+width or height is greater than GL_MAX_TEXTURE_SIZE 
+width or height is less than 0
+Will receive an invitation
+Without media
+Write a question and add at least two answers.
+Write the first one below.
+Write your own…
+Writer is active
+Wrong unit for millisMultiplier: 
+Yes! Chai and a long walk?
+Yes, cancel call
+Yesterday · 
+Yesterday, 
+You accepted. The organizer can see your answer.
+You and 
+You can add at most 32 people at once.
+You can ask again in 
+You can ask for another code in 
+You can join from 
+you can post here
+You can respond Going, Maybe or Not going.
+You can RSVP after you send the event.
+You can use this address to reset your two-step verification PIN if you forget it.
+You created this group
+You declined, so you won’t be reminded. You can still change your mind.
+You have 20 lists, the most there can be. Delete one to make another.
+You have no chats to archive.
+You have no chats to clear.
+You have no chats to delete.
+You have no chats to export yet.
+You haven’t answered yet. The organizer will see your answer.
+You left Also block 
+You might go
+you only
+You were mentioned
+You won’t be able to vote or change answers.
+You · Organizer
+You'll leave 
+You're an admin
+You're speaking
+You're the owner
+You've already blocked 
+You've searched a lot just now. Try again in a minute.
+Your 
+Your account
+Your account info, right away
+Your account report is being prepared. You’ll be notified when it’s available to download.
+Your account report is ready
+Your answer
+Your approval hadn’t reached Aivora, so no phone was signed in with the code.
+Your backup file is encrypted on this phone before it’s saved.
+Your backup file is still named “
+Your chats are safe on Aivora’s server, and this phone is still signed in.
+Your choices are kept. Nothing has been sent and 
+Your choices are kept. Nothing has been sent.
+Your code carries your phone number. With a username, it carries that instead.
+Your code carries your username, not your phone number.
+Your current setting remains 
+Your details
+your email address
+Your email address
+Your group memberships stay unless you leave each group separately.
+Your groups will be notified regardless of this setting.
+your last position
+Your last report was available until 
+Your lists
+Your location will stop updating. The last shared map will remain in your conversation.
+Your most recent 5 messages from 
+Your name
+Your name and phone number
+Your new phone signs in as 
+Your new phone signs in to this account.
+Your new phone won’t be signed in.
+Your number is your identity and can't be changed here.
+Your passkey is ready
+Your passkeys are ready
+Your phone number
+Your poll will appear in 
+Your poll will appear in the conversation with 
+Your poll will appear in this chat.
+Your poll will appear in your chat with yourself.
+Your reminder has been turned off.
+Your reminder has moved to 
+Your reminder is still set for 
+Your report about 
+Your report goes to Aivora's administrators with up to five of 
+Your report is available
+Your report will be reviewed.
+Your report will usually be ready in a few seconds. It stays on this phone for 30 days.
+Your response
+Your response was saved.
+Your response was shared with 
+Your response was shared with everyone in 
+Your response was shared.
+Your saved backup is still encrypted. 
+Your saved backup isn’t encrypted yet. 
+Your saved backup still uses your old key. 
+Your saved backup still uses your old password. 
+Your screen lock wasn't confirmed. Chat lock is still 
+Your screen lock wasn’t confirmed, so the code isn’t approved.
+Your status disappears after 24 hours.
+You’ll be added as the organizer. Invitations are sent when you confirm the call.
+You’ll need to verify this number by SMS.
+You’re all set!
+You’re going
+You’re invited to a scheduled call
+You’re no longer sharing
+You’re not going
+You’re sharing live location in 
+You’re sharing live location in 1 chat.
+You’re sharing live location with 
+You’re sharing live location with 1 contact.
+You’re sharing your live location from the account in use. Answering switches to 
+You’re sharing your live location from this account. Switching to 
+You’ve reviewed your choices. You can revisit them anytime in Privacy.
+YuvImage failed to encode jpeg.
+ZIP archive

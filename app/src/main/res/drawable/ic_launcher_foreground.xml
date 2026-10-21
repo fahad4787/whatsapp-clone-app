@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icons mask to a circle/squircle and crop the outer ~17%.
+  Keep the full Aivora mark inside the 72dp safe zone (of 108dp) so nothing is clipped.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="72dp"
+        android:height="72dp"
+        android:drawable="@drawable/brand_mark"
+        android:gravity="center" />
+</layer-list>
