@@ -78,6 +78,7 @@ fun AivoraScaffold(
     actions: @Composable () -> Unit = {},
     fab: @Composable () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
+    titleContent: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Scaffold(
@@ -85,12 +86,16 @@ fun AivoraScaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        title,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    if (titleContent != null) {
+                        titleContent()
+                    } else {
+                        Text(
+                            title,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 },
                 navigationIcon = {
                     if (onBack != null) {
@@ -266,10 +271,15 @@ private fun avatarBrush(name: String): Brush {
 }
 
 @Composable
-fun Avatar(name: String, size: Int = 48, color: Color = AivoraColors.Primary) {
+fun Avatar(
+    name: String,
+    size: Int = 48,
+    color: Color = AivoraColors.Primary,
+    modifier: Modifier = Modifier,
+) {
     val brush = remember(name) { avatarBrush(name.ifBlank { "A" }) }
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(size.dp)
             .clip(CircleShape)
             .background(brush),

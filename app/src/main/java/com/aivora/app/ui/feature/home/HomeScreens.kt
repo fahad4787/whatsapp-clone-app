@@ -1,16 +1,16 @@
 package com.aivora.app.ui.feature.home
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -46,7 +45,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -58,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.InMemoryStatusStore
@@ -66,16 +65,19 @@ import com.aivora.app.ui.components.PersonRow
 import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.components.SearchField
 import com.aivora.app.ui.components.StatusRingAvatar
-import com.aivora.app.ui.motion.enterFadeSlide
-import com.aivora.app.ui.motion.pressScale
+import com.aivora.app.ui.motion.AivoraTweenFast
+import com.aivora.app.ui.motion.rememberAivoraHaptics
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun HomeScreen(
     onNavigate: (String) -> Unit = {},
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
+    val haptics = rememberAivoraHaptics()
     var tab by remember { mutableIntStateOf(0) }
     var searching by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -129,25 +131,25 @@ fun HomeScreen(
                 NavigationBar {
                     NavigationBarItem(
                         selected = tab == 0,
-                        onClick = { tab = 0 },
+                        onClick = { if (tab != 0) { haptics.tick(); tab = 0 } },
                         icon = { Icon(Icons.Default.Chat, contentDescription = null) },
                         label = { Text("Chats") },
                     )
                     NavigationBarItem(
                         selected = tab == 1,
-                        onClick = { tab = 1 },
+                        onClick = { if (tab != 1) { haptics.tick(); tab = 1 } },
                         icon = { Icon(Icons.Default.CameraAlt, contentDescription = null) },
                         label = { Text("Status") },
                     )
                     NavigationBarItem(
                         selected = tab == 2,
-                        onClick = { tab = 2 },
+                        onClick = { if (tab != 2) { haptics.tick(); tab = 2 } },
                         icon = { Icon(Icons.Default.Groups, contentDescription = null) },
                         label = { Text("Communities") },
                     )
                     NavigationBarItem(
                         selected = tab == 3,
-                        onClick = { tab = 3 },
+                        onClick = { if (tab != 3) { haptics.tick(); tab = 3 } },
                         icon = { Icon(Icons.Default.Call, contentDescription = null) },
                         label = { Text("Calls") },
                     )
@@ -158,6 +160,7 @@ fun HomeScreen(
             if (!searching) {
                 FloatingActionButton(
                     onClick = {
+                        haptics.tick()
                         when (tab) {
                             1 -> onNavigate(Routes.NewStatus)
                             2 -> onNavigate(Routes.SettingsCommunities)
@@ -171,7 +174,8 @@ fun HomeScreen(
                     AnimatedContent(
                         targetState = tab == 1,
                         transitionSpec = {
-                            (fadeIn() + scaleIn()) togetherWith (fadeOut() + scaleOut())
+                            (fadeIn(AivoraTweenFast) + scaleIn(animationSpec = AivoraTweenFast)) togetherWith
+                                (fadeOut(AivoraTweenFast) + scaleOut(animationSpec = AivoraTweenFast))
                         },
                         label = "fabIcon",
                     ) { camera ->
@@ -188,8 +192,7 @@ fun HomeScreen(
             targetState = if (searching) 0 else tab,
             modifier = Modifier.padding(padding),
             transitionSpec = {
-                (fadeIn() + slideInVertically { it / 12 }) togetherWith
-                    (fadeOut() + slideOutVertically { -it / 12 })
+                fadeIn(AivoraTweenFast) togetherWith fadeOut(AivoraTweenFast)
             },
             label = "homeTab",
         ) { current ->
@@ -217,33 +220,38 @@ fun HomeScreen(
                                 }
                             }
                         }
-                        itemsIndexed(chats, key = { _, chat -> chat.id }) { index, chat ->
-                            val interaction = remember { MutableInteractionSource() }
+                        items(chats, key = { it.id }) { chat ->
+                            val avatarMod = homeSharedAvatar(
+                                sharedTransitionScope,
+                                animatedVisibilityScope,
+                                chat.id,
+                            )
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .enterFadeSlide(key = chat.id, fromY = 10f + index.coerceAtMost(6) * 2f)
-                                    .pressScale(interaction)
-                                    .clickable(
-                                        interactionSource = interaction,
-                                        indication = ripple(),
-                                        onClick = { onNavigate(Routes.ChatId.replace("{id}", chat.id)) },
-                                    )
+                                    .clickable {
+                                        haptics.tick()
+                                        onNavigate(Routes.ChatId.replace("{id}", chat.id))
+                                    }
                                     .padding(horizontal = 16.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Avatar(chat.title)
+                                Avatar(chat.title, modifier = avatarMod)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         chat.title,
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                     Text(
                                         chat.preview,
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
@@ -281,6 +289,22 @@ fun HomeScreen(
                 else -> CallsTab(onNavigate = onNavigate)
             }
         }
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun homeSharedAvatar(
+    scope: SharedTransitionScope?,
+    visibility: AnimatedVisibilityScope?,
+    chatId: String,
+): Modifier {
+    if (scope == null || visibility == null) return Modifier
+    return with(scope) {
+        Modifier.sharedElement(
+            state = rememberSharedContentState(key = "chat-avatar-$chatId"),
+            animatedVisibilityScope = visibility,
+        )
     }
 }
 
@@ -341,11 +365,10 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
                 color = AivoraColors.Primary,
             )
         }
-        itemsIndexed(recent, key = { _, s -> s.id }) { index, status ->
+        items(recent, key = { it.id }) { status ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .enterFadeSlide(key = status.id, fromY = 8f + index * 2f)
                     .clickable { onNavigate(Routes.status(status.id)) }
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -366,7 +389,7 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        itemsIndexed(viewed, key = { _, s -> s.id }) { _, status ->
+        items(viewed, key = { it.id }) { status ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

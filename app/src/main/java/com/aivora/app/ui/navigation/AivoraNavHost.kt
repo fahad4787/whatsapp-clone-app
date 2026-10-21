@@ -1,13 +1,22 @@
 package com.aivora.app.ui.navigation
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.aivora.app.ui.feature.auth.LoginScreen
+import com.aivora.app.ui.motion.AivoraTweenFast
 import com.aivora.app.ui.feature.auth.ProfileSetupScreen
 import com.aivora.app.ui.feature.calls.NewCallScreen
 import com.aivora.app.ui.feature.calls.ScheduledCallsScreen
@@ -79,6 +88,7 @@ import com.aivora.app.ui.feature.settings.SettingsStorageScreen
 import com.aivora.app.ui.feature.settings.SettingsTwoStepScreen
 import com.aivora.app.ui.feature.transfer.TransferNewPhoneScreen
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AivoraNavHost(
     navController: NavHostController,
@@ -88,10 +98,10 @@ fun AivoraNavHost(
     val go: (String) -> Unit = { route -> navController.navigateSingleTop(route) }
     val back: () -> Unit = { navController.safePopBackStack() }
 
+    SharedTransitionLayout(modifier = modifier) {
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        modifier = modifier,
     ) {
         composable(
             route = Routes.ChannelSlug,
@@ -120,11 +130,23 @@ fun AivoraNavHost(
         composable(
             route = Routes.ChatId,
             arguments = listOf(navArgument("id") { type = NavType.StringType }),
+            enterTransition = {
+                fadeIn(AivoraTweenFast) +
+                    slideInHorizontally(animationSpec = tween<IntOffset>(160)) { it / 10 }
+            },
+            exitTransition = { fadeOut(AivoraTweenFast) },
+            popEnterTransition = { fadeIn(AivoraTweenFast) },
+            popExitTransition = {
+                fadeOut(AivoraTweenFast) +
+                    slideOutHorizontally(animationSpec = tween<IntOffset>(160)) { it / 10 }
+            },
         ) { entry ->
             ChatIdScreen(
                 chatId = entry.arguments?.getString("id").orEmpty(),
                 onBack = back,
                 onNavigate = go,
+                sharedTransitionScope = this@SharedTransitionLayout,
+                animatedVisibilityScope = this,
             )
         }
         composable(
@@ -175,8 +197,16 @@ fun AivoraNavHost(
                 onNavigate = go,
             )
         }
-        composable(Routes.Home) {
-            HomeScreen(onNavigate = go)
+        composable(
+            route = Routes.Home,
+            enterTransition = { fadeIn(AivoraTweenFast) },
+            exitTransition = { fadeOut(AivoraTweenFast) },
+        ) {
+            HomeScreen(
+                onNavigate = go,
+                sharedTransitionScope = this@SharedTransitionLayout,
+                animatedVisibilityScope = this,
+            )
         }
         composable(Routes.LockedChats) {
             LockedChatsScreen(onBack = back, onNavigate = go)
@@ -409,4 +439,5 @@ fun AivoraNavHost(
             YourDetailsScreen(onBack = back, onNavigate = go)
         }
     }
+    } // SharedTransitionLayout
 }
