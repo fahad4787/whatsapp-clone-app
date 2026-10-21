@@ -63,27 +63,11 @@ import com.aivora.app.ui.components.RadioGroup
 import com.aivora.app.ui.components.SearchField
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
-import com.aivora.app.data.local.MockData
+import com.aivora.app.data.local.InMemoryChatStore
+import com.aivora.app.data.local.SeedData
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VpnKey
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewChatScreen(
@@ -91,19 +75,19 @@ fun NewChatScreen(
     onNavigate: (String) -> Unit = {},
 ) {
     var query by remember { mutableStateOf("") }
-    val people = MockData.contacts.filter {
+    val people = SeedData.contacts.filter {
         query.isBlank() || it.first.contains(query, true) || it.second.contains(query, true)
     }
     AivoraScaffold(
         title = "New chat",
         onBack = onBack,
-        fab = { 
-        FloatingActionButton(
-            onClick = { onNavigate(Routes.NewGroup) },
-            containerColor = AivoraColors.Primary,
-            contentColor = AivoraColors.OnPrimary,
-        ) { Icon(Icons.Default.Add, contentDescription = null) }
- },
+        fab = {
+            FloatingActionButton(
+                onClick = { onNavigate(Routes.NewGroup) },
+                containerColor = AivoraColors.Primary,
+                contentColor = AivoraColors.OnPrimary,
+            ) { Icon(Icons.Default.Add, contentDescription = null) }
+        },
     ) {
         InfoBanner("Allow access to your contacts")
         SearchField(query, { query = it }, "Search")
@@ -121,12 +105,13 @@ fun NewChatScreen(
                 )
             }
             items(people) { (n, s) ->
-                val id = (MockData.chats.find { it.title == n }?.id)
-                    ?: (kotlin.math.abs(n.hashCode()) % 1000).toString()
                 PersonRow(
                     name = n,
                     subtitle = s,
-                    onClick = { onNavigate(Routes.ChatId.replace("{id}", id)) },
+                    onClick = {
+                        val id = InMemoryChatStore.openOrCreateDirect(n)
+                        onNavigate(Routes.ChatId.replace("{id}", id))
+                    },
                 )
             }
         }

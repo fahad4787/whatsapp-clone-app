@@ -90,7 +90,7 @@ fun ProfileIdScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    val chat = com.aivora.app.data.local.MockData.chat(profileId.ifBlank { "1" })
+    val chat = com.aivora.app.data.local.InMemoryChatStore.chat(profileId.ifBlank { "1" })
     AivoraScaffold(title = "Contact info", onBack = onBack) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Avatar(chat.title, size = 96)

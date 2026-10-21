@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,11 +48,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.PersonRow
 import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.components.SearchField
-import com.aivora.app.data.local.MockData
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 
@@ -63,8 +64,9 @@ fun HomeScreen(
     var tab by remember { mutableIntStateOf(0) }
     var searching by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    val chats = remember(query) {
-        MockData.chats.filter {
+    val allChats by InMemoryChatStore.chats.collectAsState()
+    val chats = remember(allChats, query) {
+        allChats.filter {
             query.isBlank() ||
                 it.title.contains(query, ignoreCase = true) ||
                 it.preview.contains(query, ignoreCase = true)

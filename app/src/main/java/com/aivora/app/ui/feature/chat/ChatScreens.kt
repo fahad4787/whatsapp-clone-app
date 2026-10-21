@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,19 +30,20 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.LinkButton
-import com.aivora.app.data.local.MockData
-import com.aivora.app.data.local.MockMessage
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 
@@ -52,12 +54,14 @@ fun ChatIdScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    val chat = remember(chatId) { MockData.chat(chatId) }
-    val messages = remember(chatId) {
-        mutableStateListOf<MockMessage>().also { it.addAll(MockData.messagesFor(chatId)) }
-    }
+    val chat = remember(chatId) { InMemoryChatStore.chat(chatId) }
+    val messages by InMemoryChatStore.messages(chatId).collectAsState()
     var text by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+
+    LaunchedEffect(chatId) {
+        InMemoryChatStore.markRead(chatId)
+    }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -97,6 +101,18 @@ fun ChatIdScreen(
                             )
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                     ) {
+                        msg.mediaUri?.let { uri ->
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = "Photo",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 220.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .padding(bottom = 6.dp),
+                                contentScale = ContentScale.Crop,
+                            )
+                        }
                         Text(
                             msg.body,
                             color = if (msg.mine) AivoraColors.OnPrimary else MaterialTheme.colorScheme.onSurface,
@@ -139,14 +155,7 @@ fun ChatIdScreen(
                 onClick = {
                     val body = text.trim()
                     if (body.isNotEmpty()) {
-                        messages.add(
-                            MockMessage(
-                                id = "local-${messages.size + 1}",
-                                mine = true,
-                                body = body,
-                                time = "Now",
-                            ),
-                        )
+                        InMemoryChatStore.sendText(chatId, body)
                         text = ""
                     }
                 },
