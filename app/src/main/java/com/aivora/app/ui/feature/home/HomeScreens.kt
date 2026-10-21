@@ -23,7 +23,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -133,8 +136,9 @@ fun HomeScreen(
         allChats.filterNot { it.archived }.sumOf { it.unread }
     }
 
-    LaunchedEffect(Unit) {
-        snapshotFlow { pagerState.currentPage }
+    // Sync tab state only after the swipe settles — avoids fighting the fling.
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
             .collect { page ->
                 if (HomeShellState.selectedTab != page) {
@@ -143,11 +147,12 @@ fun HomeScreen(
                 }
             }
     }
-    LaunchedEffect(HomeShellState.selectedTab) {
-        val target = HomeShellState.selectedTab.coerceIn(0, 3)
-        if (pagerState.currentPage != target && !pagerState.isScrollInProgress) {
-            pagerState.animateScrollToPage(target)
-        }
+
+    val pageSpring = remember {
+        spring<Float>(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        )
     }
 
     Scaffold(
@@ -221,17 +226,21 @@ fun HomeScreen(
                 selected = tab,
                 unreadCount = unreadTotal,
                 onSelect = { index ->
-                    if (tab != index) {
+                    if (pagerState.settledPage != index) {
                         haptics.tick()
                         query = ""
-                        HomeShellState.selectedTab = index
-                        scope.launch { pagerState.animateScrollToPage(index) }
+                        scope.launch {
+                            pagerState.animateScrollToPage(
+                                page = index,
+                                animationSpec = pageSpring,
+                            )
+                        }
                     }
                 },
             )
         },
         floatingActionButton = {
-            when (tab) {
+            when (pagerState.settledPage) {
                 0 -> HomeFab(Icons.Default.Edit, "New chat") {
                     haptics.tick()
                     onNavigate(Routes.NewChat)
@@ -254,7 +263,12 @@ fun HomeScreen(
                 .padding(padding)
                 .consumeWindowInsets(padding)
                 .imePadding(),
-            beyondViewportPageCount = 1,
+            beyondViewportPageCount = 0,
+            flingBehavior = PagerDefaults.flingBehavior(
+                state = pagerState,
+                snapAnimationSpec = pageSpring,
+            ),
+            key = { it },
         ) { page ->
             when (page) {
                 0 -> ChatsTab(
@@ -268,8 +282,8 @@ fun HomeScreen(
                         haptics.tick()
                         onNavigate(Routes.ChatId.replace("{id}", id))
                     },
-                    sharedTransitionScope = sharedTransitionScope,
-                    animatedVisibilityScope = animatedVisibilityScope,
+                    sharedTransitionScope = null,
+                    animatedVisibilityScope = null,
                 )
                 1 -> StatusTab(
                     query = query,

@@ -111,11 +111,18 @@ fun ChatIdScreen(
         InMemoryChatStore.markRead(chatId)
     }
 
-    LaunchedEffect(messages.size, peerTyping, imeVisible) {
-        if (messages.isNotEmpty()) {
-            val index = messages.lastIndex + if (peerTyping) 1 else 0
-            listState.animateScrollToItem(index.coerceAtLeast(0))
-        }
+    // Instant jump on open so it doesn't fight the slide-in transition.
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(chatId) {
+        entered = false
+        kotlinx.coroutines.delay(320)
+        entered = true
+    }
+    LaunchedEffect(messages.size, peerTyping, imeVisible, entered) {
+        if (messages.isEmpty()) return@LaunchedEffect
+        val index = (messages.lastIndex + if (peerTyping) 1 else 0).coerceAtLeast(0)
+        if (entered) listState.animateScrollToItem(index)
+        else listState.scrollToItem(index)
     }
 
     LaunchedEffect(peerTyping) {
@@ -126,11 +133,8 @@ fun ChatIdScreen(
         InMemoryChatStore.sendText(chatId, "Got it 👍", mine = false)
     }
 
-    val avatarModifier = sharedAvatarModifier(
-        sharedTransitionScope,
-        animatedVisibilityScope,
-        chatId,
-    )
+    // Shared elements fight the slide transition — keep avatar local for smoothness.
+    val avatarModifier = Modifier
 
     AivoraScaffold(
         title = chat.title,

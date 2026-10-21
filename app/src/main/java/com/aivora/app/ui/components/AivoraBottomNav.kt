@@ -106,7 +106,7 @@ fun AivoraBottomNav(
                 targetValue = slotWidth * selected,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
+                    stiffness = Spring.StiffnessMedium,
                 ),
                 label = "navIndicatorX",
             )

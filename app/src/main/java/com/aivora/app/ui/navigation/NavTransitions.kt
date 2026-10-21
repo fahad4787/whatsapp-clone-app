@@ -3,18 +3,23 @@ package com.aivora.app.ui.navigation
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.ui.unit.IntOffset
 import androidx.navigation.NavBackStackEntry
 
-private const val FadeMs = 200
-private const val SlideMs = 340
+private const val FadeMs = 180
+private const val SlideMs = 300
 
-private val SlideSpec = tween<IntOffset>(SlideMs, easing = FastOutSlowInEasing)
-private val FadeSpec = tween<Float>(FadeMs, easing = FastOutSlowInEasing)
+/** Material 3 emphasized — decelerate into place, accelerate out. */
+private val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)
+private val EmphasizedAccelerate = CubicBezierEasing(0.3f, 0.0f, 1.0f, 1.0f)
+
+private val SlideInSpec = tween<IntOffset>(SlideMs, easing = EmphasizedDecelerate)
+private val SlideOutSpec = tween<IntOffset>(SlideMs - 20, easing = EmphasizedAccelerate)
+private val FadeSpec = tween<Float>(FadeMs)
 
 /** Push screens that slide horizontally (chat, settings, new-chat, …). */
 fun isSlideRoute(route: String?): Boolean {
@@ -40,10 +45,10 @@ fun isSlideRoute(route: String?): Boolean {
 
 val NavEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
     if (isSlideRoute(targetState.destination.route)) {
-        // New screen enters from the right.
+        // Only the new screen moves — slides in from the right.
         slideIntoContainer(
             towards = AnimatedContentTransitionScope.SlideDirection.Start,
-            animationSpec = SlideSpec,
+            animationSpec = SlideInSpec,
         )
     } else {
         fadeIn(animationSpec = FadeSpec)
@@ -52,12 +57,8 @@ val NavEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTrans
 
 val NavExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
     if (isSlideRoute(targetState.destination.route)) {
-        // Previous screen eases slightly left so the slide is obvious.
-        slideOutOfContainer(
-            towards = AnimatedContentTransitionScope.SlideDirection.Start,
-            animationSpec = SlideSpec,
-            targetOffset = { full -> full / 4 },
-        )
+        // Keep home still under the sliding screen (soft fade only).
+        fadeOut(animationSpec = tween(SlideMs - 40), targetAlpha = 0.92f)
     } else {
         fadeOut(animationSpec = FadeSpec)
     }
@@ -65,11 +66,7 @@ val NavExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransit
 
 val NavPopEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
     if (isSlideRoute(initialState.destination.route)) {
-        slideIntoContainer(
-            towards = AnimatedContentTransitionScope.SlideDirection.End,
-            animationSpec = SlideSpec,
-            initialOffset = { full -> full / 4 },
-        )
+        fadeIn(animationSpec = tween(SlideMs - 40), initialAlpha = 0.92f)
     } else {
         fadeIn(animationSpec = FadeSpec)
     }
@@ -77,10 +74,10 @@ val NavPopEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTr
 
 val NavPopExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
     if (isSlideRoute(initialState.destination.route)) {
-        // Leaving screen exits to the right.
+        // Leaving screen exits fully to the right.
         slideOutOfContainer(
             towards = AnimatedContentTransitionScope.SlideDirection.End,
-            animationSpec = SlideSpec,
+            animationSpec = SlideOutSpec,
         )
     } else {
         fadeOut(animationSpec = FadeSpec)

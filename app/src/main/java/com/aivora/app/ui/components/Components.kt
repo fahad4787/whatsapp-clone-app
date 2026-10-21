@@ -2,7 +2,6 @@ package com.aivora.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,8 +54,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -119,42 +116,12 @@ fun AivoraScaffold(
         floatingActionButton = fab,
         bottomBar = bottomBar,
     ) { padding ->
-        val density = LocalDensity.current
-        val edgePx = with(density) { 28.dp.toPx() }
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .consumeWindowInsets(padding)
-                .imePadding()
-                .then(
-                    if (onBack != null) {
-                        Modifier.pointerInput(onBack) {
-                            var dragged = 0f
-                            var fromEdge = false
-                            detectHorizontalDragGestures(
-                                onDragStart = { offset ->
-                                    fromEdge = offset.x <= edgePx
-                                    dragged = 0f
-                                },
-                                onDragEnd = {
-                                    if (fromEdge && dragged > size.width * 0.22f) onBack()
-                                    dragged = 0f
-                                    fromEdge = false
-                                },
-                                onDragCancel = {
-                                    dragged = 0f
-                                    fromEdge = false
-                                },
-                                onHorizontalDrag = { _, amount ->
-                                    if (fromEdge && amount > 0f) dragged += amount
-                                },
-                            )
-                        }
-                    } else {
-                        Modifier
-                    },
-                ),
+                .imePadding(),
             content = content,
         )
     }
