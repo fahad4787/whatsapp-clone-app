@@ -291,32 +291,24 @@ fun RadioGroup(
     options: List<Pair<String, String?>>,
     selected: Int,
     onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    navigableIndices: Set<Int> = emptySet(),
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface),
+            .padding(horizontal = AivoraDimens.CardHorizontal)
+            .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+            .background(AivoraColors.SurfaceMuted),
     ) {
         options.forEachIndexed { index, (title, subtitle) ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onSelect(index) }
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(modifier = Modifier.weight(1f).padding(vertical = 10.dp)) {
-                    Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                    if (subtitle != null) {
-                        Text(
-                            subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
                 RadioButton(
                     selected = selected == index,
                     onClick = { onSelect(index) },
@@ -325,11 +317,31 @@ fun RadioGroup(
                         unselectedColor = MaterialTheme.colorScheme.outline,
                     ),
                 )
+                Column(modifier = Modifier.weight(1f).padding(vertical = 10.dp)) {
+                    Text(title, style = MaterialTheme.typography.bodyLarge)
+                    if (subtitle != null) {
+                        Text(
+                            subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (index in navigableIndices) {
+                    Icon(
+                        painter = painterResource(AivoraIcons.ChevronRight),
+                        contentDescription = null,
+                        tint = AivoraColors.IconSecondary,
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .size(20.dp),
+                    )
+                }
             }
             if (index < options.lastIndex) {
                 HorizontalDivider(
                     modifier = Modifier.padding(start = 16.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(0.4f),
+                    color = AivoraColors.Divider,
                 )
             }
         }
@@ -465,16 +477,35 @@ fun PersonRow(
 }
 
 @Composable
-fun EmptyState(title: String, body: String) {
+fun EmptyState(
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
+        if (icon != null) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = AivoraColors.Ink,
+                modifier = Modifier.size(48.dp),
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

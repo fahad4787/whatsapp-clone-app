@@ -38,7 +38,23 @@ Status: `todo` | `wip` | `pass` | `deferred`
 
 ## Wave 7 — Settings deep (sample; full list in Figma metadata)
 
-Privacy children, Account children, Backup/Transfer, Manage storage, Lists, Starred, Passkeys, Two-step, Email, Change number, Delete account, Proxy, Network usage, Auto-download — see Design canvas top-level frames named `Privacy · …`, `Account · …`, `Chat backup · …`, `Manage storage · …`, etc.
+| Wave | Frame | nodeId | Feature | Route | Status |
+|------|-------|--------|---------|-------|--------|
+| 7 · Settings deep | Privacy · Last seen and online | `412:9975` | `settings` | `Routes.SettingsPrivacyLastSeen` | wip |
+| 7 · Settings deep | Privacy · Profile photo | `412:9926` | `settings` | `Routes.SettingsPrivacyProfilePhoto` | wip |
+| 7 · Settings deep | Privacy · About | `412:9840` | `settings` | `Routes.SettingsPrivacyAbout` | wip |
+| 7 · Settings deep | Privacy · Status audience | `412:9798` | `settings` | `Routes.SettingsPrivacyStatus` | wip |
+| 7 · Settings deep | Privacy · Groups | `412:9719` | `settings` | `Routes.SettingsPrivacyGroups` | wip |
+| 7 · Settings deep | Privacy · Calls | `412:9612` | `settings` | `Routes.SettingsPrivacyCalls` | wip |
+| 7 · Settings deep | Privacy · Default message timer | `412:9633` | `settings` | `Routes.SettingsPrivacyDefaultTimer` | wip |
+| 7 · Settings deep | Privacy · Blocked contacts | `412:9586` | `settings` | `Routes.SettingsBlocked` | wip |
+| 7 · Settings deep | Two-step verification · Enabled | `412:8362` | `settings` | `Routes.SettingsTwoStep` | wip |
+| 7 · Settings deep | Passkeys · Introduction | `412:8797` | `settings` | `Routes.SettingsAccountPasskeys` | wip |
+| 7 · Settings deep | Account · Security notifications | `412:8821` | `settings` | `Routes.SettingsAccountSecurityNotifications` | wip |
+| 7 · Settings deep | Chat backup · Overview | `412:10320` | `settings` | `Routes.SettingsChatsBackup` | wip |
+| 7 · Settings deep | Starred · Empty | `412:7336` | `settings` | `Routes.SettingsStarred` | wip |
+
+Remaining: Transfer, Manage storage, Lists, Email/Change number/Delete flows, App lock, Chat lock, Live location, Passkeys managed, Backup children — see Design canvas `Privacy · …`, `Account · …`, `Chat backup · …`, `Manage storage · …`.
 
 ## Wave notes
 

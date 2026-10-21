@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,12 +23,16 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
@@ -34,10 +41,14 @@ import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Poll
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +62,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aivora.app.ui.components.Avatar
@@ -64,26 +78,60 @@ import com.aivora.app.ui.components.RadioGroup
 import com.aivora.app.ui.components.SearchField
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
+import com.aivora.app.ui.components.SettingsRow
+import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
+import com.aivora.app.ui.theme.AivoraDimens
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
+
+@Composable
+private fun SettingsSectionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = AivoraColors.Ink,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun SettingsFootnote(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = AivoraColors.TextSecondary,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+    )
+}
+
+@Composable
+private fun SettingsHeroIntro(
+    icon: ImageVector,
+    title: String,
+    body: String,
+) {
+    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
+        Icon(icon, contentDescription = null, tint = AivoraColors.Ink, modifier = Modifier.size(40.dp))
+        Spacer(Modifier.height(16.dp))
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        Text(body, style = MaterialTheme.typography.bodyMedium, color = AivoraColors.TextSecondary)
+    }
+}
 
 
 @Composable
@@ -244,18 +292,34 @@ fun SettingsPrivacyLastSeenScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var selected by remember { mutableIntStateOf(0) }
+    var lastSeen by remember { mutableIntStateOf(1) }
+    var online by remember { mutableIntStateOf(1) }
     AivoraScaffold(title = "Last seen and online", onBack = onBack) {
-        InfoBanner("If you don't share your last seen, you won't see other people's last seen either.")
+        Spacer(Modifier.height(8.dp))
+        SettingsSectionLabel("Who can see my last seen")
         RadioGroup(
             options = listOf(
-            "Everyone" to null,
-            "My contacts" to null,
-            "My contacts except…" to "Hide from selected contacts",
-            "Nobody" to null
+                "Everyone" to null,
+                "My contacts" to null,
+                "My contacts except…" to null,
+                "Nobody" to null,
             ),
-            selected = selected,
-            onSelect = { selected = it },
+            selected = lastSeen,
+            onSelect = { lastSeen = it },
+            navigableIndices = setOf(2),
+        )
+        Spacer(Modifier.height(16.dp))
+        SettingsSectionLabel("Who can see when I’m online")
+        RadioGroup(
+            options = listOf(
+                "Everyone" to null,
+                "Same as last seen" to null,
+            ),
+            selected = online,
+            onSelect = { online = it },
+        )
+        SettingsFootnote(
+            "If you don’t share your last seen or online status, you won’t be able to see other people’s last seen or online status.",
         )
     }
 }
@@ -266,19 +330,22 @@ fun SettingsPrivacyProfilePhotoScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var selected by remember { mutableIntStateOf(0) }
+    var selected by remember { mutableIntStateOf(2) }
     AivoraScaffold(title = "Profile photo", onBack = onBack) {
-        InfoBanner("Who can see your profile photo.")
+        Spacer(Modifier.height(8.dp))
+        SettingsSectionLabel("Who can see my profile photo")
         RadioGroup(
             options = listOf(
-            "Everyone" to null,
-            "My contacts" to null,
-            "My contacts except…" to "Hide from selected contacts",
-            "Nobody" to null
+                "Everyone" to null,
+                "My contacts" to null,
+                "My contacts except…" to "1 excluded",
+                "Nobody" to null,
             ),
             selected = selected,
             onSelect = { selected = it },
+            navigableIndices = setOf(2),
         )
+        SettingsFootnote("Your profile photo is visible to your contacts, except the people you exclude.")
     }
 }
 
@@ -290,17 +357,20 @@ fun SettingsPrivacyAboutScreen(
 ) {
     var selected by remember { mutableIntStateOf(0) }
     AivoraScaffold(title = "About", onBack = onBack) {
-        InfoBanner("Who can see your about info.")
+        Spacer(Modifier.height(8.dp))
+        SettingsSectionLabel("Who can see my about info")
         RadioGroup(
             options = listOf(
-            "Everyone" to null,
-            "My contacts" to null,
-            "My contacts except…" to "Hide from selected contacts",
-            "Nobody" to null
+                "Everyone" to null,
+                "My contacts" to null,
+                "My contacts except…" to null,
+                "Nobody" to null,
             ),
             selected = selected,
             onSelect = { selected = it },
+            navigableIndices = setOf(2),
         )
+        SettingsFootnote("About is a short bio under your profile photo.")
     }
 }
 
@@ -310,19 +380,22 @@ fun SettingsPrivacyStatusScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var selected by remember { mutableIntStateOf(0) }
-    AivoraScaffold(title = "Status privacy", onBack = onBack) {
-        InfoBanner("Choose who can see your status updates.")
+    var selected by remember { mutableIntStateOf(1) }
+    AivoraScaffold(title = "Status", onBack = onBack) {
+        Spacer(Modifier.height(8.dp))
+        SettingsSectionLabel("Who can see my status updates")
         RadioGroup(
             options = listOf(
-            "Everyone" to null,
-            "My contacts" to null,
-            "My contacts except…" to "Hide from selected contacts",
-            "Nobody" to null
+                "Everyone" to null,
+                "My contacts" to null,
+                "My contacts except…" to null,
+                "Only share with…" to null,
             ),
             selected = selected,
             onSelect = { selected = it },
+            navigableIndices = setOf(2, 3),
         )
+        SettingsFootnote("Changes to your privacy settings won’t affect status updates you’ve already sent.")
     }
 }
 
@@ -334,16 +407,20 @@ fun SettingsPrivacyGroupsScreen(
 ) {
     var selected by remember { mutableIntStateOf(0) }
     AivoraScaffold(title = "Groups", onBack = onBack) {
-        InfoBanner("Choose who can add you to groups.")
+        Spacer(Modifier.height(8.dp))
+        SettingsSectionLabel("Who can add me to groups")
         RadioGroup(
             options = listOf(
-            "Everyone" to null,
-            "My contacts" to null,
-            "My contacts except…" to "Hide from selected contacts",
-            "Nobody" to null
+                "Everyone" to null,
+                "My contacts" to null,
+                "My contacts except…" to null,
             ),
             selected = selected,
             onSelect = { selected = it },
+            navigableIndices = setOf(2),
+        )
+        SettingsFootnote(
+            "Admins who can’t add you to a group will have the option of inviting you privately instead.",
         )
     }
 }
@@ -354,18 +431,26 @@ fun SettingsPrivacyCallsScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var selected by remember { mutableIntStateOf(0) }
+    var silence by remember { mutableStateOf(true) }
     AivoraScaffold(title = "Calls", onBack = onBack) {
-        InfoBanner("Blocked contacts can't call you or send you messages.")
-        RadioGroup(
-            options = listOf(
-            "Everyone" to null,
-            "My contacts" to null,
-            "My contacts except…" to "Hide from selected contacts",
-            "Nobody" to null
-            ),
-            selected = selected,
-            onSelect = { selected = it },
+        Spacer(Modifier.height(8.dp))
+        Column(
+            modifier = Modifier
+                .padding(horizontal = AivoraDimens.CardHorizontal)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                .background(AivoraColors.SurfaceMuted),
+        ) {
+            SettingsRow(
+                SettingsItem(
+                    "Silence unknown callers",
+                    toggle = silence,
+                    onToggle = { silence = it },
+                ),
+            )
+        }
+        SettingsFootnote(
+            "Calls from unknown numbers won’t ring, but will still appear in your Calls list and notifications.\n\nSilencing a caller doesn’t block them from calling or messaging you.",
         )
     }
 }
@@ -376,18 +461,29 @@ fun SettingsPrivacyDefaultTimerScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var selected by remember { mutableIntStateOf(0) }
+    var selected by remember { mutableIntStateOf(2) }
     AivoraScaffold(title = "Default message timer", onBack = onBack) {
-        InfoBanner("Start new chats with a disappearing message timer.")
+        Spacer(Modifier.height(8.dp))
+        SettingsSectionLabel("Disappearing messages")
+        Text(
+            "Start new individual chats with messages that disappear after your chosen duration.",
+            style = MaterialTheme.typography.bodySmall,
+            color = AivoraColors.TextSecondary,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+        )
+        Spacer(Modifier.height(8.dp))
         RadioGroup(
             options = listOf(
-            "Off" to null,
-            "24 hours" to null,
-            "7 days" to null,
-            "90 days" to null
+                "Off" to null,
+                "24 hours" to null,
+                "7 days" to null,
+                "90 days" to null,
             ),
             selected = selected,
             onSelect = { selected = it },
+        )
+        SettingsFootnote(
+            "This won’t delete existing message history or change existing chats. You can change the timer in each chat.",
         )
     }
 }
@@ -420,17 +516,15 @@ fun SettingsStarredScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("No starred messages", "Search starred messages", Icons.Default.Star, onClick = { }),
-            SettingsItem("Delete starred messages", "Remove stars from all your starred messages. The messages will remain.", Icons.Default.Delete, danger = true, onClick = { }),
-        ),
-    )
-
     AivoraScaffold(title = "Starred messages", onBack = onBack) {
-        InfoBanner("Messages you star will show up here.")
-        SettingsList(sections)
+        EmptyState(
+            title = "No starred messages",
+            body = "Press and hold a message in chat, then choose Star.",
+            icon = Icons.Default.StarBorder,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxSize(),
+        )
     }
 }
 
@@ -475,18 +569,42 @@ fun SettingsTwoStepScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Enable", "Two-step verification is enabled", Icons.Default.VpnKey, onClick = { onNavigate(Routes.SettingsAccountTwoStepNewPin) }),
-            SettingsItem("Change PIN", "Two-step verification PIN", Icons.Default.Key, onClick = { onNavigate(Routes.SettingsAccountTwoStepNewPin) }),
-            SettingsItem("Recovery email", "Add a recovery email", Icons.Default.Email, onClick = { onNavigate(Routes.SettingsAccountEmail) }),
-        ),
-    )
-
     AivoraScaffold(title = "Two-step verification", onBack = onBack) {
-        InfoBanner("Set up two-step verification")
-        SettingsList(sections)
+        SettingsHeroIntro(
+            icon = Icons.Default.Lock,
+            title = "Two-step verification is enabled",
+            body = "Your six-digit account PIN adds a verification step when you register your phone number again.",
+        )
+        SettingsList(
+            listOf(
+                null to listOf(
+                    SettingsItem(
+                        "Recovery email",
+                        subtitle = "leslie@example.com",
+                        icon = Icons.Default.Email,
+                        onClick = { onNavigate(Routes.SettingsAccountEmail) },
+                    ),
+                ),
+                null to listOf(
+                    SettingsItem(
+                        "Change PIN",
+                        icon = Icons.Default.Edit,
+                        onClick = { onNavigate(Routes.SettingsAccountTwoStepNewPin) },
+                    ),
+                    SettingsItem(
+                        "Change email",
+                        icon = Icons.Default.Email,
+                        onClick = { onNavigate(Routes.SettingsAccountEmail) },
+                    ),
+                    SettingsItem(
+                        "Disable",
+                        icon = Icons.Default.Lock,
+                        danger = true,
+                        onClick = { },
+                    ),
+                ),
+            ),
+        )
     }
 }
 
@@ -496,17 +614,43 @@ fun SettingsBlockedScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Add blocked contact", "Choose a contact to block", Icons.Default.Block, onClick = { }),
-            SettingsItem("Blocked · Tap to unblock", "Sample blocked contact", Icons.Default.Person, onClick = { }),
-        ),
-    )
-
     AivoraScaffold(title = "Blocked contacts", onBack = onBack) {
-        InfoBanner("Blocked contacts can't call you or send you messages.")
-        SettingsList(sections)
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier
+                .padding(horizontal = AivoraDimens.CardHorizontal)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                .background(AivoraColors.SurfaceMuted)
+                .clickable { }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.PersonAdd, contentDescription = null, tint = AivoraColors.Primary)
+            Spacer(Modifier.size(14.dp))
+            Text(
+                "Add blocked contact",
+                color = AivoraColors.Primary,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                painter = painterResource(AivoraIcons.ChevronRight),
+                contentDescription = null,
+                tint = AivoraColors.IconSecondary,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        PersonRow(
+            name = "Sarah Beth",
+            subtitle = "Blocked · Tap to unblock",
+            onClick = { },
+        )
+        Spacer(Modifier.weight(1f))
+        SettingsFootnote(
+            "Blocked contacts can’t call or message you, or see your status updates. Blocking doesn’t delete chat history or erase earlier messages.",
+        )
     }
 }
 
@@ -717,17 +861,18 @@ fun SettingsAccountPasskeysScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Create passkey", "Your passkey is ready", Icons.Default.Fingerprint, onClick = { }),
-            SettingsItem("Delete passkey", "Other sign-in verification remains available, even if you delete this passkey.", Icons.Default.Delete, danger = true, onClick = { }),
-        ),
-    )
-
     AivoraScaffold(title = "Passkeys", onBack = onBack) {
-        InfoBanner("Sign in with a passkey")
-        SettingsList(sections)
+        SettingsHeroIntro(
+            icon = Icons.Default.Key,
+            title = "Sign in with a passkey",
+            body = "Use your face, fingerprint or device passcode to verify it’s you when signing in to Aivora.\n\nCreate a passkey using your device’s authentication. Other sign-in verification methods remain available.",
+        )
+        Spacer(Modifier.weight(1f))
+        PrimaryButton(
+            text = "Create passkey",
+            onClick = { },
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+        )
     }
 }
 
@@ -756,23 +901,31 @@ fun SettingsAccountSecurityNotificationsScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
     var show by remember { mutableStateOf(true) }
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Show security notifications", null, Icons.Default.Security, toggle = show, onToggle = { show = it }),
-            SettingsItem("Request account info", "Download a copy of your account information", Icons.Default.Info, onClick = { onNavigate(Routes.SettingsAccountRequestInfo) }),
-            SettingsItem("Passkeys", null, Icons.Default.Fingerprint, onClick = { onNavigate(Routes.SettingsAccountPasskeys) }),
-            SettingsItem("Email", null, Icons.Default.Email, onClick = { onNavigate(Routes.SettingsAccountEmail) }),
-            SettingsItem("Change number", null, Icons.Default.Phone, onClick = { onNavigate(Routes.SettingsAccountChangeNumber) }),
-            SettingsItem("Two-step verification", null, Icons.Default.VpnKey, onClick = { onNavigate(Routes.SettingsTwoStep) }),
-            SettingsItem("Delete account", null, Icons.Default.Delete, danger = true, onClick = { onNavigate(Routes.SettingsDeleteAccount) }),
-        ),
-    )
-
     AivoraScaffold(title = "Security notifications", onBack = onBack) {
-        InfoBanner("Get notified when your security code changes.")
-        SettingsList(sections)
+        SettingsHeroIntro(
+            icon = Icons.Default.Security,
+            title = "Your chats are end-to-end encrypted",
+            body = "End-to-end encryption keeps your personal messages and calls between you and the people you choose. Not even Aivora can read or listen to them.",
+        )
+        Column(
+            modifier = Modifier
+                .padding(horizontal = AivoraDimens.CardHorizontal)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                .background(AivoraColors.SurfaceMuted),
+        ) {
+            SettingsRow(
+                SettingsItem(
+                    "Show security notifications on this device",
+                    toggle = show,
+                    onToggle = { show = it },
+                ),
+            )
+        }
+        SettingsFootnote(
+            "Get notified when your security code changes for a contact’s phone. If you have multiple devices, turn this on for each one.",
+        )
     }
 }
 
@@ -822,28 +975,95 @@ fun SettingsChatsBackupScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    var videos by remember { mutableStateOf(true) }
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Back up now", "Backup complete", Icons.Default.Folder, onClick = { }),
-            SettingsItem("Automatic backups", "Automatic backups start once you choose where to save them.", Icons.Default.Timer, onClick = { onNavigate(Routes.SettingsChatsBackupFrequency) }),
-            SettingsItem("Backup location", "Internal storage", Icons.Default.Folder, onClick = { onNavigate(Routes.SettingsChatsBackupLocation) }),
-            SettingsItem("End-to-end encrypted backup", null, Icons.Default.Lock, onClick = { onNavigate(Routes.SettingsChatsBackupEncrypted) }),
-            SettingsItem("Include videos", null, Icons.Default.Photo, toggle = videos, onToggle = { videos = it }),
-            SettingsItem("Open backup", null, Icons.Default.Folder, onClick = { onNavigate(Routes.SettingsChatsBackupOpen) }),
-            SettingsItem("Chat history", null, Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsChatsHistory) }),
-            SettingsItem("Font size", null, Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsChatsFontSize) }),
-            SettingsItem("Export chat", null, Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsChatsExport) }),
-            SettingsItem("Chat transfer", null, Icons.Default.Devices, onClick = { onNavigate(Routes.SettingsChatsTransfer) }),
-            SettingsItem("Archived chats", null, Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsChatsArchived) }),
-            SettingsItem("Transcripts", null, Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsChatsTranscripts) }),
-        ),
-    )
-
+    var videos by remember { mutableStateOf(false) }
+    var wifiOnly by remember { mutableStateOf(true) }
     AivoraScaffold(title = "Chat backup", onBack = onBack) {
-        InfoBanner("Back up your chats and media.")
-        SettingsList(sections)
+        SettingsHeroIntro(
+            icon = Icons.Default.CloudUpload,
+            title = "Chat backup",
+            body = "Back up your chats and media to your cloud account so you can restore them on a new phone.",
+        )
+        Column(
+            modifier = Modifier
+                .padding(horizontal = AivoraDimens.CardHorizontal)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                .background(AivoraColors.SurfaceMuted),
+        ) {
+            SettingsRow(
+                SettingsItem(
+                    "Last successful backup",
+                    subtitle = "9 October 2026 at 8:00 AM",
+                ),
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 16.dp),
+                color = AivoraColors.Divider,
+            )
+            SettingsRow(SettingsItem("Total size", trailing = "1.2 GB"))
+        }
+        PrimaryButton(
+            text = "Back up",
+            onClick = { },
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+        )
+        Column(
+            modifier = Modifier
+                .padding(horizontal = AivoraDimens.CardHorizontal)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                .background(AivoraColors.SurfaceMuted),
+        ) {
+            SettingsRow(
+                SettingsItem(
+                    "Backup account",
+                    subtitle = "leslie@example.com",
+                    onClick = { onNavigate(Routes.SettingsChatsBackupLocation) },
+                ),
+            )
+            HorizontalDivider(modifier = Modifier.padding(start = 16.dp), color = AivoraColors.Divider)
+            SettingsRow(
+                SettingsItem(
+                    "Automatic backups",
+                    trailing = "Daily",
+                    onClick = { onNavigate(Routes.SettingsChatsBackupFrequency) },
+                ),
+            )
+            HorizontalDivider(modifier = Modifier.padding(start = 16.dp), color = AivoraColors.Divider)
+            SettingsRow(
+                SettingsItem(
+                    "Include videos",
+                    toggle = videos,
+                    onToggle = { videos = it },
+                ),
+            )
+            HorizontalDivider(modifier = Modifier.padding(start = 16.dp), color = AivoraColors.Divider)
+            SettingsRow(
+                SettingsItem(
+                    "Wi-Fi only",
+                    toggle = wifiOnly,
+                    onToggle = { wifiOnly = it },
+                ),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Column(
+            modifier = Modifier
+                .padding(horizontal = AivoraDimens.CardHorizontal)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                .background(AivoraColors.SurfaceMuted),
+        ) {
+            SettingsRow(
+                SettingsItem(
+                    "End-to-end encrypted backup",
+                    subtitle = "Off",
+                    icon = Icons.Default.Lock,
+                    onClick = { onNavigate(Routes.SettingsChatsBackupEncrypted) },
+                ),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
