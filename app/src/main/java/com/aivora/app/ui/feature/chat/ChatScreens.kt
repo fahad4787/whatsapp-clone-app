@@ -39,11 +39,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.LinkButton
+import com.aivora.app.ui.media.rememberMediaActions
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 
@@ -54,10 +56,14 @@ fun ChatIdScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = LocalContext.current
     val chat = remember(chatId) { InMemoryChatStore.chat(chatId) }
     val messages by InMemoryChatStore.messages(chatId).collectAsState()
     var text by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val media = rememberMediaActions(context) { uri ->
+        InMemoryChatStore.sendMedia(chatId, uri.toString())
+    }
 
     LaunchedEffect(chatId) {
         InMemoryChatStore.markRead(chatId)
@@ -144,8 +150,10 @@ fun ChatIdScreen(
                 shape = RoundedCornerShape(24.dp),
                 trailingIcon = {
                     Row {
-                        IconButton(onClick = { }) { Icon(Icons.Default.AttachFile, contentDescription = "File") }
-                        IconButton(onClick = { onNavigate(Routes.NewStatus) }) {
+                        IconButton(onClick = media.pickGallery) {
+                            Icon(Icons.Default.AttachFile, contentDescription = "Gallery")
+                        }
+                        IconButton(onClick = media.takePhoto) {
                             Icon(Icons.Default.CameraAlt, contentDescription = "Camera")
                         }
                     }

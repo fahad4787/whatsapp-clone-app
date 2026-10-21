@@ -95,7 +95,7 @@ fun HomeScreen(
                             Icon(Icons.Default.Close, contentDescription = "Close search")
                         }
                     } else {
-                        IconButton(onClick = { onNavigate(Routes.NewStatus) }) {
+                        IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
                             Icon(Icons.Default.CameraAlt, contentDescription = "Camera")
                         }
                         IconButton(onClick = { searching = true }) {

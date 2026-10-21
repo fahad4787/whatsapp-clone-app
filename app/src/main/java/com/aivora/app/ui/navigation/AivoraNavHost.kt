@@ -7,24 +7,26 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.aivora.app.ui.feature.auth.LoginScreen
+import com.aivora.app.ui.feature.auth.ProfileSetupScreen
+import com.aivora.app.ui.feature.calls.NewCallScreen
+import com.aivora.app.ui.feature.calls.ScheduledCallsScreen
+import com.aivora.app.ui.feature.camera.CameraCaptureScreen
 import com.aivora.app.ui.feature.channels.ChannelSlugScreen
 import com.aivora.app.ui.feature.channels.ChannelsScreen
 import com.aivora.app.ui.feature.chat.ChatIdScreen
+import com.aivora.app.ui.feature.chat.MessageInfoChatMessageScreen
+import com.aivora.app.ui.feature.chat.NewChatScreen
 import com.aivora.app.ui.feature.community.CommunityIdScreen
+import com.aivora.app.ui.feature.community.NewGroupScreen
 import com.aivora.app.ui.feature.events.EventCreateChatScreen
 import com.aivora.app.ui.feature.events.EventDetailsChatMessageScreen
 import com.aivora.app.ui.feature.events.EventEditChatMessageScreen
 import com.aivora.app.ui.feature.home.HomeScreen
 import com.aivora.app.ui.feature.locked.LockedChatsScreen
-import com.aivora.app.ui.feature.auth.LoginScreen
-import com.aivora.app.ui.feature.chat.MessageInfoChatMessageScreen
-import com.aivora.app.ui.feature.calls.NewCallScreen
-import com.aivora.app.ui.feature.chat.NewChatScreen
-import com.aivora.app.ui.feature.community.NewGroupScreen
-import com.aivora.app.ui.feature.status.NewStatusScreen
 import com.aivora.app.ui.feature.profile.ProfileIdScreen
-import com.aivora.app.ui.feature.auth.ProfileSetupScreen
-import com.aivora.app.ui.feature.calls.ScheduledCallsScreen
+import com.aivora.app.ui.feature.profile.YourDetailsScreen
+import com.aivora.app.ui.feature.status.NewStatusScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountAddScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountChangeNumberScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountDeletedScreen
@@ -75,7 +77,6 @@ import com.aivora.app.ui.feature.settings.SettingsStarredScreen
 import com.aivora.app.ui.feature.settings.SettingsStorageScreen
 import com.aivora.app.ui.feature.settings.SettingsTwoStepScreen
 import com.aivora.app.ui.feature.transfer.TransferNewPhoneScreen
-import com.aivora.app.ui.feature.profile.YourDetailsScreen
 
 @Composable
 fun AivoraNavHost(
@@ -103,6 +104,17 @@ fun AivoraNavHost(
         }
         composable(Routes.Channels) {
             ChannelsScreen(onBack = back, onNavigate = go)
+        }
+        composable(
+            route = Routes.Camera,
+            arguments = listOf(navArgument("target") { type = NavType.StringType }),
+        ) { entry ->
+            val raw = entry.arguments?.getString("target").orEmpty()
+            CameraCaptureScreen(
+                target = android.net.Uri.decode(raw),
+                onBack = back,
+                onNavigate = go,
+            )
         }
         composable(
             route = Routes.ChatId,

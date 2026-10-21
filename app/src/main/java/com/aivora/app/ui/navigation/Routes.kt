@@ -13,6 +13,7 @@ object Routes {
     const val LockedChats = "locked-chats"
     const val Login = "login"
     const val MessageInfoChatMessage = "message-info/{chat}/{message}"
+    const val Camera = "camera/{target}"
     const val NewCall = "new-call"
     const val NewChat = "new-chat"
     const val NewGroup = "new-group"
@@ -71,4 +72,7 @@ object Routes {
     const val SettingsTwoStep = "settings/two-step"
     const val TransferNewPhone = "transfer/new-phone"
     const val YourDetails = "your-details"
+
+    fun camera(target: String = "status"): String =
+        Camera.replace("{target}", android.net.Uri.encode(target))
 }

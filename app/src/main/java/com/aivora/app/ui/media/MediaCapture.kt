@@ -1,7 +1,92 @@
 package com.aivora.app.ui.media
 
-/**
- * Camera / gallery capture helpers live here.
- * Wired in the media module (Photo Picker + TakePicture).
- */
-object MediaCapture
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import java.io.File
+
+data class MediaActions(
+    val takePhoto: () -> Unit,
+    val pickGallery: () -> Unit,
+)
+
+fun Context.createCaptureUri(): Uri {
+    val dir = File(cacheDir, "capture").apply { mkdirs() }
+    val file = File(dir, "capture_${System.currentTimeMillis()}.jpg")
+    return FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
+}
+
+fun Context.hasCameraPermission(): Boolean =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+        PackageManager.PERMISSION_GRANTED
+
+fun Context.hasReadMediaPermission(): Boolean {
+    val permission = if (Build.VERSION.SDK_INT >= 33) {
+        Manifest.permission.READ_MEDIA_IMAGES
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+    return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+}
+
+@Composable
+fun rememberMediaActions(
+    context: Context,
+    onImage: (Uri) -> Unit,
+): MediaActions {
+    var pendingCapture by remember { mutableStateOf<Uri?>(null) }
+
+    val takePicture = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { ok ->
+        val uri = pendingCapture
+        pendingCapture = null
+        if (ok && uri != null) onImage(uri)
+    }
+
+    val pickVisual = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) onImage(uri)
+    }
+
+    val requestCamera = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            val uri = context.createCaptureUri()
+            pendingCapture = uri
+            takePicture.launch(uri)
+        }
+    }
+
+    return MediaActions(
+        takePhoto = {
+            if (context.hasCameraPermission()) {
+                val uri = context.createCaptureUri()
+                pendingCapture = uri
+                takePicture.launch(uri)
+            } else {
+                requestCamera.launch(Manifest.permission.CAMERA)
+            }
+        },
+        pickGallery = {
+            pickVisual.launch(
+                androidx.activity.result.PickVisualMediaRequest(
+                    ActivityResultContracts.PickVisualMedia.ImageOnly,
+                ),
+            )
+        },
+    )
+}
