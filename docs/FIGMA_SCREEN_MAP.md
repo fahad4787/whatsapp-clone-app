@@ -15,11 +15,11 @@ Status: `todo` | `wip` | `pass` | `deferred`
 | 2 · Home shells | My Profile · Mobile | `160:11428` | `home` | `Routes.Home` | wip |
 | 3 · Conversation | Conversation · Mobile | `33:3379` | `chat` | `Routes.ChatId` | wip |
 | 3 · Conversation | Group Conversation · Mobile | `106:9702` | `chat` | `Routes.ChatId` | wip |
-| 4 · Calls deep | Schedule · Empty state | `213:12906` | `calls` | `Routes.ScheduledCalls` | todo |
-| 4 · Calls deep | Schedule · New call | `213:12847` | `calls` | `Routes.ScheduledCalls` | todo |
-| 4 · Calls deep | Keypad · Voice dialer | `213:13580` | `calls` | `Routes.NewCall` | todo |
-| 4 · Calls deep | Audio call · Mobile | `49:2801` | `calls` | `(add in-call)` | todo |
-| 4 · Calls deep | Video call · Mobile | `49:2883` | `calls` | `(add in-call)` | todo |
+| 4 · Calls deep | Schedule · Empty state | `213:12906` | `calls` | `Routes.ScheduledCalls` | wip |
+| 4 · Calls deep | Schedule · New call | `213:12847` | `calls` | `Routes.ScheduledCalls` | wip |
+| 4 · Calls deep | Keypad · Voice dialer | `213:13580` | `calls` | `Routes.NewCall` | wip |
+| 4 · Calls deep | Audio call · Mobile | `49:2801` | `calls` | `Routes.AudioCall` | wip |
+| 4 · Calls deep | Video call · Mobile | `49:2883` | `calls` | `Routes.VideoCall` | wip |
 | 5 · Profile edit | Profile details · Mobile | `160:11871` | `profile` | `Routes.YourDetails` | todo |
 | 5 · Profile edit | Edit profile picture · Mobile | `160:11747` | `profile` | `Routes.YourDetails` | todo |
 | 6 · Settings hubs | Appearance · Overview | `412:11908` | `settings` | `Routes.SettingsAppearance` | todo |

@@ -49,6 +49,7 @@ import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.theme.AivoraColors
+import com.aivora.app.ui.theme.AivoraDimens
 
 @Composable
 fun ScheduledCallsScreen(
@@ -143,27 +144,39 @@ private fun EmptyScheduleState(onSchedule: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .clickable(onClick = onSchedule)
-            .padding(horizontal = 32.dp),
+            .padding(horizontal = AivoraDimens.ScreenHorizontal),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Box(
             modifier = Modifier
-                .size(88.dp)
+                .size(100.dp)
                 .clip(CircleShape)
-                .background(AivoraColors.Primary.copy(alpha = 0.14f)),
+                .background(Color(0xFFEEF9F1)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Default.Event, null, tint = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(36.dp))
+            Icon(
+                painter = androidx.compose.ui.res.painterResource(com.aivora.app.ui.icons.AivoraIcons.CalendarAdd),
+                contentDescription = null,
+                tint = AivoraColors.Ink,
+                modifier = Modifier.size(44.dp),
+            )
         }
-        Spacer(modifier = Modifier.height(18.dp))
-        Text("No calls scheduled yet", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(
+            "No calls scheduled yet",
+            fontWeight = FontWeight.Medium,
+            fontSize = 24.sp,
+            color = AivoraColors.InkMuted,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
             "Make time for your people. Choose who to call and a time that works for you.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = AivoraColors.TextSecondary,
             textAlign = TextAlign.Center,
-            fontSize = 14.sp,
+            fontSize = 16.sp,
+            lineHeight = 22.sp,
         )
     }
 }
@@ -322,9 +335,10 @@ private fun SegmentedTabs(options: List<String>, selected: Int, onSelect: (Int) 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space2)
+            .height(44.dp)
+            .clip(RoundedCornerShape(AivoraDimens.RadiusSm))
+            .background(AivoraColors.SurfaceMuted)
             .padding(4.dp),
     ) {
         options.forEachIndexed { index, label ->
@@ -332,16 +346,17 @@ private fun SegmentedTabs(options: List<String>, selected: Int, onSelect: (Int) 
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (on) MaterialTheme.colorScheme.surface else Color.Transparent)
-                    .clickable { onSelect(index) }
-                    .padding(vertical = 10.dp),
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (on) Color.White else Color.Transparent)
+                    .clickable { onSelect(index) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     label,
-                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (on) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (on) FontWeight.Medium else FontWeight.Normal,
+                    fontSize = 14.sp,
+                    color = if (on) AivoraColors.InkMuted else AivoraColors.TextSecondary,
                 )
             }
         }

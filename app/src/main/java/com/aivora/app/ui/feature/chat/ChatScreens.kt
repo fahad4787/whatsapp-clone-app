@@ -149,8 +149,8 @@ fun ChatIdScreen(
                 haptics.tick()
                 onBack?.invoke()
             },
-            onCall = { onNavigate(Routes.NewCall) },
-            onVideo = { onNavigate(Routes.NewCall) },
+            onCall = { onNavigate(Routes.audioCall(chat.title)) },
+            onVideo = { onNavigate(Routes.videoCall(chat.title)) },
             onOpenProfile = { onNavigate(Routes.ProfileId.replace("{id}", chatId)) },
         )
 

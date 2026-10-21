@@ -11,8 +11,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.aivora.app.ui.feature.auth.LoginScreen
 import com.aivora.app.ui.feature.auth.ProfileSetupScreen
+import com.aivora.app.ui.feature.calls.AudioCallScreen
 import com.aivora.app.ui.feature.calls.NewCallScreen
 import com.aivora.app.ui.feature.calls.ScheduledCallsScreen
+import com.aivora.app.ui.feature.calls.VideoCallScreen
+import android.net.Uri
 import com.aivora.app.ui.feature.camera.CameraCaptureScreen
 import com.aivora.app.ui.feature.channels.ChannelSlugScreen
 import com.aivora.app.ui.feature.channels.ChannelsScreen
@@ -225,6 +228,24 @@ fun AivoraNavHost(
         }
         composable(Routes.NewCall) {
             NewCallScreen(onBack = back, onNavigate = go)
+        }
+        composable(
+            route = Routes.AudioCall,
+            arguments = listOf(navArgument("name") { type = NavType.StringType }),
+        ) { entry ->
+            AudioCallScreen(
+                name = Uri.decode(entry.arguments?.getString("name").orEmpty()).ifBlank { "Contact" },
+                onEnd = back,
+            )
+        }
+        composable(
+            route = Routes.VideoCall,
+            arguments = listOf(navArgument("name") { type = NavType.StringType }),
+        ) { entry ->
+            VideoCallScreen(
+                name = Uri.decode(entry.arguments?.getString("name").orEmpty()).ifBlank { "Contact" },
+                onEnd = back,
+            )
         }
         composable(
             route = Routes.NewChat,

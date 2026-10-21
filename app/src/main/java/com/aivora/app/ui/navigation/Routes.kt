@@ -15,6 +15,8 @@ object Routes {
     const val MessageInfoChatMessage = "message-info/{chat}/{message}"
     const val Camera = "camera/{target}"
     const val NewCall = "new-call"
+    const val AudioCall = "call/audio/{name}"
+    const val VideoCall = "call/video/{name}"
     const val NewChat = "new-chat"
     const val NewGroup = "new-group"
     const val NewStatus = "new-status"
@@ -80,4 +82,10 @@ object Routes {
         Camera.replace("{target}", android.net.Uri.encode(target))
 
     fun status(id: String): String = StatusId.replace("{id}", id)
+
+    fun audioCall(name: String = "Contact"): String =
+        AudioCall.replace("{name}", android.net.Uri.encode(name))
+
+    fun videoCall(name: String = "Contact"): String =
+        VideoCall.replace("{name}", android.net.Uri.encode(name))
 }

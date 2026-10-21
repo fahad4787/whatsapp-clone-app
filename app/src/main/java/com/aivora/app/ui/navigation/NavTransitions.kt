@@ -30,6 +30,7 @@ fun isSlideRoute(route: String?): Boolean {
     return when {
         base == Routes.Home || base == Routes.Login || base == Routes.ProfileSetup -> false
         base.startsWith("chat/") -> true
+        base.startsWith("call/") -> true
         base.startsWith("settings/") -> true
         base.startsWith("profile/") -> true
         base.startsWith("status/") -> true

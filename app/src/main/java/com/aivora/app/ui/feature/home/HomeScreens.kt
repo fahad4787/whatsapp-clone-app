@@ -906,7 +906,11 @@ private fun CallsTab(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onNavigate(Routes.NewCall) }
+                        .clickable {
+                            onNavigate(
+                                if (row.video) Routes.videoCall(row.name) else Routes.audioCall(row.name),
+                            )
+                        }
                         .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

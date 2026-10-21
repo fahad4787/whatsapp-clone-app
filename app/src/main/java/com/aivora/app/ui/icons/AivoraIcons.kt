@@ -40,4 +40,5 @@ object AivoraIcons {
     @DrawableRes val Camera = R.drawable.ic_aivora_camera
     @DrawableRes val MicFab = R.drawable.ic_aivora_mic_fab
     @DrawableRes val Play = R.drawable.ic_aivora_play
+    @DrawableRes val CalendarAdd = R.drawable.ic_aivora_calendar_add
 }
