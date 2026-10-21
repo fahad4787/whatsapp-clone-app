@@ -10,15 +10,15 @@ import androidx.compose.ui.graphics.Color
 private val LightScheme = lightColorScheme(
     primary = AivoraColors.Primary,
     onPrimary = AivoraColors.OnPrimary,
-    primaryContainer = AivoraColors.Primary.copy(alpha = 0.14f),
+    primaryContainer = AivoraColors.PrimarySoft,
     secondary = AivoraColors.Blue,
     background = AivoraColors.LightBackground,
     surface = AivoraColors.LightSurface,
-    surfaceVariant = Color(0xFFE3EDE7),
+    surfaceVariant = AivoraColors.SurfaceMuted,
     onBackground = AivoraColors.Ink,
     onSurface = AivoraColors.Ink,
-    onSurfaceVariant = Color(0xFF5B6B63),
-    outlineVariant = Color(0xFFD5E0D9),
+    onSurfaceVariant = AivoraColors.TextSecondary,
+    outlineVariant = AivoraColors.Divider,
     error = AivoraColors.Danger,
 )
 
