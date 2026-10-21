@@ -126,19 +126,17 @@ fun SettingsAccountScreen(
     onNavigate: (String) -> Unit = {},
 ) {
     val sections = listOf(
-        null to listOf(
-            SettingsItem("Security notifications", null, Icons.Default.Security, onClick = { onNavigate(Routes.SettingsAccountSecurityNotifications) }),
-            SettingsItem("Passkeys", null, Icons.Default.Key, onClick = { onNavigate(Routes.SettingsAccountPasskeys) }),
-            SettingsItem("Email address", "Not added", Icons.Default.Email, onClick = { onNavigate(Routes.SettingsAccountEmail) }),
-            SettingsItem("Two-step verification", "Off", Icons.Default.Lock, onClick = { onNavigate(Routes.SettingsTwoStep) }),
+        "Security" to listOf(
+            SettingsItem("Security notifications", onClick = { onNavigate(Routes.SettingsAccountSecurityNotifications) }),
+            SettingsItem("Passkeys", onClick = { onNavigate(Routes.SettingsAccountPasskeys) }),
+            SettingsItem("Email address", trailing = "Not added", onClick = { onNavigate(Routes.SettingsAccountEmail) }),
+            SettingsItem("Two-step verification", trailing = "Off", onClick = { onNavigate(Routes.SettingsTwoStep) }),
         ),
-        null to listOf(
-            SettingsItem("Change number", null, Icons.Default.Phone, onClick = { onNavigate(Routes.SettingsAccountChangeNumber) }),
-            SettingsItem("Request account info", null, Icons.Default.Folder, onClick = { onNavigate(Routes.SettingsAccountRequestInfo) }),
-            SettingsItem("Add account", null, Icons.Default.PersonAdd, onClick = { onNavigate(Routes.SettingsAccountAdd) }),
-        ),
-        null to listOf(
-            SettingsItem("Delete account", null, Icons.Default.Delete, danger = true, onClick = { onNavigate(Routes.SettingsDeleteAccount) }),
+        "Account" to listOf(
+            SettingsItem("Change number", onClick = { onNavigate(Routes.SettingsAccountChangeNumber) }),
+            SettingsItem("Request account info", onClick = { onNavigate(Routes.SettingsAccountRequestInfo) }),
+            SettingsItem("Add account", onClick = { onNavigate(Routes.SettingsAccountAdd) }),
+            SettingsItem("Delete account", danger = true, onClick = { onNavigate(Routes.SettingsDeleteAccount) }),
         ),
     )
     AivoraScaffold(title = "Account", onBack = onBack) {
@@ -151,15 +149,48 @@ fun SettingsChatsScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    var enterIsSend by remember { mutableStateOf(false) }
+    var mediaVisibility by remember { mutableStateOf(true) }
     val sections = listOf(
-        null to listOf(
-            SettingsItem("Archived chats", null, Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsChatsArchived) }),
-            SettingsItem("Chat backup", "Google Drive / local", Icons.Default.Storage, onClick = { onNavigate(Routes.SettingsChatsBackup) }),
-            SettingsItem("Chat history", "Clear, export, or transfer", Icons.Default.Folder, onClick = { onNavigate(Routes.SettingsChatsHistory) }),
-            SettingsItem("Export chat", null, Icons.Default.Folder, onClick = { onNavigate(Routes.SettingsChatsExport) }),
-            SettingsItem("Transfer chats", "Move to a new phone", Icons.Default.Devices, onClick = { onNavigate(Routes.SettingsChatsTransfer) }),
-            SettingsItem("Font size", null, Icons.Default.Edit, onClick = { onNavigate(Routes.SettingsChatsFontSize) }),
-            SettingsItem("Chat transcripts", null, Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsChatsTranscripts) }),
+        "Display" to listOf(
+            SettingsItem(
+                "Theme",
+                subtitle = "Light",
+                onClick = { onNavigate(Routes.SettingsAppearance) },
+            ),
+            SettingsItem(
+                "Default chat theme",
+                subtitle = "Default · Green",
+                onClick = { onNavigate(Routes.SettingsAppearance) },
+            ),
+            SettingsItem(
+                "Chat font size",
+                trailing = "Medium",
+                onClick = { onNavigate(Routes.SettingsChatsFontSize) },
+            ),
+        ),
+        "Chat settings" to listOf(
+            SettingsItem(
+                "Enter is send",
+                subtitle = "Enter key sends your message",
+                toggle = enterIsSend,
+                onToggle = { enterIsSend = it },
+            ),
+            SettingsItem(
+                "Media visibility",
+                subtitle = "Show newly downloaded media in your phone’s gallery",
+                toggle = mediaVisibility,
+                onToggle = { mediaVisibility = it },
+            ),
+            SettingsItem("Keep chats archived", subtitle = "Archived chats stay archived when new messages arrive", onClick = { onNavigate(Routes.SettingsChatsArchived) }),
+        ),
+        "Chat history" to listOf(
+            SettingsItem("Chat backup", onClick = { onNavigate(Routes.SettingsChatsBackup) }),
+            SettingsItem("Transfer chats", onClick = { onNavigate(Routes.SettingsChatsTransfer) }),
+            SettingsItem("Chat history", onClick = { onNavigate(Routes.SettingsChatsHistory) }),
+            SettingsItem("Export chat", onClick = { onNavigate(Routes.SettingsChatsExport) }),
+            SettingsItem("Clear all chats", danger = true, onClick = { onNavigate(Routes.SettingsChatsHistory) }),
+            SettingsItem("Delete all chats", danger = true, onClick = { onNavigate(Routes.SettingsChatsHistory) }),
         ),
     )
     AivoraScaffold(title = "Chats", onBack = onBack) {
@@ -174,38 +205,31 @@ fun SettingsPrivacyScreen(
     onNavigate: (String) -> Unit = {},
 ) {
     var readReceipts by remember { mutableStateOf(true) }
-    var findable by remember { mutableStateOf(true) }
 
     val sections = listOf(
-        null to listOf(
-            SettingsItem("Last seen and online", null, onClick = { onNavigate(Routes.SettingsPrivacyLastSeen) }),
-            SettingsItem("Profile photo", null, onClick = { onNavigate(Routes.SettingsPrivacyProfilePhoto) }),
-            SettingsItem("About", null, onClick = { onNavigate(Routes.SettingsPrivacyAbout) }),
-            SettingsItem("Status", null, onClick = { onNavigate(Routes.SettingsPrivacyStatus) }),
-            SettingsItem("Groups", null, onClick = { onNavigate(Routes.SettingsPrivacyGroups) }),
+        "Who can…" to listOf(
+            SettingsItem("Last seen and online", trailing = "Everyone", onClick = { onNavigate(Routes.SettingsPrivacyLastSeen) }),
+            SettingsItem("Profile photo", trailing = "Everyone", onClick = { onNavigate(Routes.SettingsPrivacyProfilePhoto) }),
+            SettingsItem("About", trailing = "Everyone", onClick = { onNavigate(Routes.SettingsPrivacyAbout) }),
+            SettingsItem("Links", trailing = "My contacts", onClick = { }),
+            SettingsItem("Status", trailing = "My contacts", onClick = { onNavigate(Routes.SettingsPrivacyStatus) }),
             SettingsItem(
                 "Read receipts",
-                trailing = if (readReceipts) "On" else "Off",
+                subtitle = "If turned off, you won’t send or receive read receipts",
                 toggle = readReceipts,
                 onToggle = { readReceipts = it },
             ),
         ),
         null to listOf(
-            SettingsItem(
-                "Let people find me",
-                toggle = findable,
-                onToggle = { findable = it },
-            ),
-        ),
-        null to listOf(
-            SettingsItem("Default message timer", trailing = "Off", onClick = { onNavigate(Routes.SettingsPrivacyDefaultTimer) }),
-            SettingsItem("Calls", trailing = "Silence Off", onClick = { onNavigate(Routes.SettingsPrivacyCalls) }),
-            SettingsItem("Blocked contacts", trailing = "None", onClick = { onNavigate(Routes.SettingsBlocked) }),
+            SettingsItem("Disappearing messages", trailing = "Off", onClick = { onNavigate(Routes.SettingsPrivacyDefaultTimer) }),
+            SettingsItem("Groups", trailing = "Everyone", onClick = { onNavigate(Routes.SettingsPrivacyGroups) }),
             SettingsItem("Live location", trailing = "None", onClick = { onNavigate(Routes.SettingsPrivacyLiveLocation) }),
-            SettingsItem("App lock", trailing = "Off", onClick = { onNavigate(Routes.SettingsPrivacyAppLock) }),
-            SettingsItem("Chat lock", trailing = "Off", onClick = { onNavigate(Routes.SettingsPrivacyChatLock) }),
-            SettingsItem("Advanced", null, onClick = { onNavigate(Routes.SettingsPrivacyAdvanced) }),
-            SettingsItem("Privacy checkup", null, onClick = { onNavigate(Routes.SettingsPrivacyCheckup) }),
+            SettingsItem("Calls", trailing = "Silence unknown callers", onClick = { onNavigate(Routes.SettingsPrivacyCalls) }),
+            SettingsItem("App lock", onClick = { onNavigate(Routes.SettingsPrivacyAppLock) }),
+            SettingsItem("Chat lock", onClick = { onNavigate(Routes.SettingsPrivacyChatLock) }),
+            SettingsItem("Advanced", onClick = { onNavigate(Routes.SettingsPrivacyAdvanced) }),
+            SettingsItem("Privacy checkup", onClick = { onNavigate(Routes.SettingsPrivacyCheckup) }),
+            SettingsItem("Blocked contacts", trailing = "None", onClick = { onNavigate(Routes.SettingsBlocked) }),
         ),
     )
 
@@ -416,23 +440,31 @@ fun SettingsStorageScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
     var lessData by remember { mutableStateOf(false) }
     val sections = listOf(
-        "Storage" to listOf(
-            SettingsItem("Manage storage", "Photos, videos, documents", Icons.Default.Storage, onClick = { }),
-            SettingsItem("Network usage", null, Icons.Default.Storage, onClick = { }),
-            SettingsItem("Use less data for calls", null, Icons.Default.Phone, toggle = lessData, onToggle = { lessData = it }),
+        null to listOf(
+            SettingsItem("Manage storage", subtitle = "2.4 GB", onClick = { }),
+        ),
+        "Network" to listOf(
+            SettingsItem("Network usage", subtitle = "0 MB sent · 0 MB received", onClick = { }),
+            SettingsItem(
+                "Use less data for calls",
+                toggle = lessData,
+                onToggle = { lessData = it },
+            ),
+            SettingsItem("Proxy", trailing = "Off", onClick = { }),
         ),
         "Media auto-download" to listOf(
-            SettingsItem("When using mobile data", "Photos", Icons.Default.Photo, onClick = { }),
-            SettingsItem("When connected on Wi-Fi", "All", Icons.Default.Photo, onClick = { }),
-            SettingsItem("When roaming", "No media", Icons.Default.Photo, onClick = { }),
+            SettingsItem("When using mobile data", trailing = "Photos", onClick = { }),
+            SettingsItem("When connected on Wi-Fi", trailing = "Photos", onClick = { }),
+            SettingsItem("When roaming", trailing = "No media", onClick = { }),
+        ),
+        "Media upload quality" to listOf(
+            SettingsItem("Photo upload quality", trailing = "Auto (recommended)", onClick = { }),
         ),
     )
 
     AivoraScaffold(title = "Storage and data", onBack = onBack) {
-        InfoBanner("Free up storage")
         SettingsList(sections)
     }
 }
@@ -1201,24 +1233,35 @@ fun SettingsAppearanceScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var theme by remember { mutableIntStateOf(0) }
     AivoraScaffold(title = "Appearance", onBack = onBack) {
-        Spacer(modifier = Modifier.height(8.dp))
-        RadioGroup(
-            options = listOf(
-                "System default" to null,
-                "Light" to null,
-                "Dark" to null,
+        SettingsList(
+            listOf(
+                null to listOf(
+                    SettingsItem("Theme", trailing = "Light", onClick = { }),
+                ),
+                "Chat display" to listOf(
+                    SettingsItem(
+                        "Default chat theme",
+                        subtitle = "Default · Green",
+                        onClick = { },
+                    ),
+                    SettingsItem(
+                        "Chat font size",
+                        trailing = "Medium",
+                        onClick = { onNavigate(Routes.SettingsChatsFontSize) },
+                    ),
+                ),
             ),
-            selected = theme,
-            onSelect = { theme = it },
+            modifier = Modifier.weight(1f),
         )
         Text(
-            "System default follows your phone's dark theme setting.",
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            "Manage chat display in Chats settings.",
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = AivoraColors.TextSecondary,
         )
+        LinkButton(text = "Reset appearance", onClick = { })
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
@@ -1227,54 +1270,61 @@ fun SettingsNotificationsScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    var conversationTones by remember { mutableStateOf(true) }
+    var highPriority by remember { mutableStateOf(true) }
     var reactions by remember { mutableStateOf(true) }
+    var showPreview by remember { mutableStateOf(true) }
+
     AivoraScaffold(title = "Notifications", onBack = onBack) {
         SettingsList(
             listOf(
-                null to listOf(
-                    SettingsItem("Notifications", trailing = "On", icon = Icons.Default.Notifications, onClick = { }),
-                    SettingsItem("Messages", trailing = "On", icon = Icons.Default.Chat, onClick = { }),
-                    SettingsItem("Calls", trailing = "On", icon = Icons.Default.Call, onClick = { }),
-                    SettingsItem("Missed calls", trailing = "On", icon = Icons.Default.Phone, onClick = { }),
-                ),
-            ),
-        )
-        Text(
-            "Sound, vibration and pop-ups are set for each of these in Android's own settings.",
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SettingsList(
-            listOf(
-                null to listOf(
+                "Conversation tones" to listOf(
                     SettingsItem(
-                        "Reaction notifications",
-                        toggle = reactions,
-                        onToggle = { reactions = it },
-                        icon = Icons.Default.Notifications,
+                        "Conversation tones",
+                        subtitle = "Play sound for incoming and outgoing messages",
+                        toggle = conversationTones,
+                        onToggle = { conversationTones = it },
                     ),
                 ),
-            ),
-        )
-        Text(
-            "Tell me when someone reacts to my message.",
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SettingsList(
-            listOf(
+                "Messages" to listOf(
+                    SettingsItem("Notification tone", trailing = "Default", onClick = { }),
+                    SettingsItem("Vibrate", trailing = "Default", onClick = { }),
+                    SettingsItem(
+                        "High priority notifications",
+                        subtitle = "Show previews at the top of the screen",
+                        toggle = highPriority,
+                        onToggle = { highPriority = it },
+                    ),
+                    SettingsItem(
+                        "Reaction notifications",
+                        subtitle = "Show notifications when someone reacts",
+                        toggle = reactions,
+                        onToggle = { reactions = it },
+                    ),
+                ),
+                "Groups" to listOf(
+                    SettingsItem("Notification tone", trailing = "Default", onClick = { }),
+                    SettingsItem("Vibrate", trailing = "Default", onClick = { }),
+                ),
+                "Calls" to listOf(
+                    SettingsItem("Ringtone", trailing = "Default", onClick = { }),
+                    SettingsItem("Vibrate", trailing = "Default", onClick = { }),
+                ),
+                "Status" to listOf(
+                    SettingsItem(
+                        "Show previews",
+                        toggle = showPreview,
+                        onToggle = { showPreview = it },
+                    ),
+                    SettingsItem("Reactions", trailing = "Default", onClick = { }),
+                ),
                 null to listOf(
-                    SettingsItem("Permissions", null, Icons.Default.Security, onClick = { onNavigate(Routes.SettingsPermissions) }),
+                    SettingsItem("Permissions", onClick = { onNavigate(Routes.SettingsPermissions) }),
                 ),
             ),
+            modifier = Modifier.weight(1f),
         )
-        Text(
-            "If calls or notifications don't arrive, look here first.",
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        LinkButton(text = "Reset notification settings", onClick = { })
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }

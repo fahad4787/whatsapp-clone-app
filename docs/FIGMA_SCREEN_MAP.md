@@ -22,12 +22,12 @@ Status: `todo` | `wip` | `pass` | `deferred`
 | 4 · Calls deep | Video call · Mobile | `49:2883` | `calls` | `Routes.VideoCall` | wip |
 | 5 · Profile edit | Profile details · Mobile | `160:11871` | `profile` | `Routes.YourDetails` | wip |
 | 5 · Profile edit | Edit profile picture · Mobile | `160:11747` | `profile` | `Routes.YourDetails` | wip |
-| 6 · Settings hubs | Appearance · Overview | `412:11908` | `settings` | `Routes.SettingsAppearance` | todo |
-| 6 · Settings hubs | Notifications · Overview | `412:13285` | `settings` | `Routes.SettingsNotifications` | todo |
-| 6 · Settings hubs | Account · Overview | `412:8851` | `settings` | `Routes.SettingsAccount` | todo |
-| 6 · Settings hubs | Privacy · Overview | `412:10040` | `settings` | `Routes.SettingsPrivacy` | todo |
-| 6 · Settings hubs | Chats settings · Overview | `412:10147` | `settings` | `Routes.SettingsChats` | todo |
-| 6 · Settings hubs | Storage and data · Overview | `412:14733` | `settings` | `Routes.SettingsStorage` | todo |
+| 6 · Settings hubs | Appearance · Overview | `412:11908` | `settings` | `Routes.SettingsAppearance` | wip |
+| 6 · Settings hubs | Notifications · Overview | `412:13285` | `settings` | `Routes.SettingsNotifications` | wip |
+| 6 · Settings hubs | Account · Overview | `412:8851` | `settings` | `Routes.SettingsAccount` | wip |
+| 6 · Settings hubs | Privacy · Overview | `412:10040` | `settings` | `Routes.SettingsPrivacy` | wip |
+| 6 · Settings hubs | Chats settings · Overview | `412:10147` | `settings` | `Routes.SettingsChats` | wip |
+| 6 · Settings hubs | Storage and data · Overview | `412:14733` | `settings` | `Routes.SettingsStorage` | wip |
 | 8 · Attachments & create | Create · Camera | `22:8320` | `camera` | `Routes.Camera` | todo |
 | 8 · Attachments & create | Create · Photos and videos | `22:8455` | `camera` | `Routes.Camera` | todo |
 | 8 · Attachments & create | Poll · Create poll | `412:5262` | `events` | `(poll create)` | todo |
