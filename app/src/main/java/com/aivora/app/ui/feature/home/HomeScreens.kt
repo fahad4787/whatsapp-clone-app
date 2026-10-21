@@ -1,14 +1,8 @@
 package com.aivora.app.ui.feature.home
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -16,9 +10,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -65,7 +61,6 @@ import com.aivora.app.ui.components.PersonRow
 import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.components.SearchField
 import com.aivora.app.ui.components.StatusRingAvatar
-import com.aivora.app.ui.motion.AivoraTweenFast
 import com.aivora.app.ui.motion.rememberAivoraHaptics
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
@@ -171,31 +166,22 @@ fun HomeScreen(
                     containerColor = AivoraColors.Primary,
                     contentColor = AivoraColors.OnPrimary,
                 ) {
-                    AnimatedContent(
-                        targetState = tab == 1,
-                        transitionSpec = {
-                            (fadeIn(AivoraTweenFast) + scaleIn(animationSpec = AivoraTweenFast)) togetherWith
-                                (fadeOut(AivoraTweenFast) + scaleOut(animationSpec = AivoraTweenFast))
-                        },
-                        label = "fabIcon",
-                    ) { camera ->
-                        Icon(
-                            if (camera) Icons.Default.CameraAlt else Icons.Default.Add,
-                            contentDescription = null,
-                        )
-                    }
+                    Icon(
+                        if (tab == 1) Icons.Default.CameraAlt else Icons.Default.Add,
+                        contentDescription = null,
+                    )
                 }
             }
         },
     ) { padding ->
-        AnimatedContent(
-            targetState = if (searching) 0 else tab,
-            modifier = Modifier.padding(padding),
-            transitionSpec = {
-                fadeIn(AivoraTweenFast) togetherWith fadeOut(AivoraTweenFast)
-            },
-            label = "homeTab",
-        ) { current ->
+        val current = if (searching) 0 else tab
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding(),
+        ) {
             when {
                 searching || current == 0 -> Column(modifier = Modifier.fillMaxSize()) {
                     if (searching) {
