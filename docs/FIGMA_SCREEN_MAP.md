@@ -13,8 +13,8 @@ Status: `todo` | `wip` | `pass` | `deferred`
 | 2 · Home shells | Updates · Browse | `22:7920` | `home` | `Routes.Home` | wip |
 | 2 · Home shells | Calls · Mobile | `55:6764` | `home` | `Routes.Home` | wip |
 | 2 · Home shells | My Profile · Mobile | `160:11428` | `home` | `Routes.Home` | wip |
-| 3 · Conversation | Conversation · Mobile | `33:3379` | `chat` | `Routes.ChatId` | todo |
-| 3 · Conversation | Group Conversation · Mobile | `106:9702` | `chat` | `Routes.ChatId` | todo |
+| 3 · Conversation | Conversation · Mobile | `33:3379` | `chat` | `Routes.ChatId` | wip |
+| 3 · Conversation | Group Conversation · Mobile | `106:9702` | `chat` | `Routes.ChatId` | wip |
 | 4 · Calls deep | Schedule · Empty state | `213:12906` | `calls` | `Routes.ScheduledCalls` | todo |
 | 4 · Calls deep | Schedule · New call | `213:12847` | `calls` | `Routes.ScheduledCalls` | todo |
 | 4 · Calls deep | Keypad · Voice dialer | `213:13580` | `calls` | `Routes.NewCall` | todo |

@@ -30,10 +30,14 @@ object AivoraColors {
     val SearchFill = Color(0xFFF4F4F4)
     val Divider = Color(0xFFEEEEF0)
     val BorderLight = Color(0xFFF5F5F5)
-    val ChatWallpaperLight = Color(0xFFEAF9EE)
+    val ChatWallpaperLight = Color(0xFFF8FAF8)
     val ChatWallpaperDark = Color(0xFF0F1C18)
-    val BubbleMine = Color(0xFF00BE3C)
+    val ChatDivider = Color(0xFFE8EDE9)
+    val ComposerFill = Color(0xFFF6F7F6)
+    /** Outgoing bubble fill from Figma (soft mint, dark ink text). */
+    val BubbleMine = Color(0xFFE7F8ED)
     val BubbleOtherLight = Color(0xFFFFFFFF)
     val BubbleOtherDark = Color(0xFF1F2C34)
+    val Online = Color(0xFF07833A)
     val OnPrimary = Color(0xFFFFFFFF)
 }

@@ -30,4 +30,14 @@ object AivoraIcons {
     @DrawableRes val NavUpdatesIdle = R.drawable.ic_aivora_nav_updates_idle
     @DrawableRes val NavCalls = R.drawable.ic_aivora_nav_calls
     @DrawableRes val NavCallsIdle = R.drawable.ic_aivora_nav_calls_idle
+
+    @DrawableRes val Back = R.drawable.ic_aivora_back
+    @DrawableRes val Call = R.drawable.ic_aivora_call
+    @DrawableRes val Video = R.drawable.ic_aivora_video
+    @DrawableRes val Ticks = R.drawable.ic_aivora_ticks
+    @DrawableRes val TicksRead = R.drawable.ic_aivora_ticks_read
+    @DrawableRes val Attach = R.drawable.ic_aivora_attach
+    @DrawableRes val Camera = R.drawable.ic_aivora_camera
+    @DrawableRes val MicFab = R.drawable.ic_aivora_mic_fab
+    @DrawableRes val Play = R.drawable.ic_aivora_play
 }

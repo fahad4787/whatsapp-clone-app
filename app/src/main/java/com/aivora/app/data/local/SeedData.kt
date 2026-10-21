@@ -17,6 +17,7 @@ data class LocalMessage(
     val body: String,
     val time: String,
     val mediaUri: String? = null,
+    val senderName: String? = null,
 )
 
 /** Seed data for the in-memory store (no persistence). */
@@ -37,15 +38,16 @@ object SeedData {
 
     fun messagesFor(chatId: String): List<LocalMessage> = when (chatId) {
         "2" -> listOf(
-            LocalMessage("m1", false, "Who's bringing dessert?", "7:58 PM"),
+            LocalMessage("m1", false, "Who's bringing dessert?", "7:58 PM", senderName = "George"),
             LocalMessage("m2", true, "I can pick something up.", "8:01 PM"),
-            LocalMessage("m3", false, "Fatima: See you tomorrow", "8:12 PM"),
+            LocalMessage("m3", false, "See you tomorrow", "8:12 PM", senderName = "Fatima"),
         )
         else -> listOf(
-            LocalMessage("m1", false, "Assalam o Alaikum!", "9:38 PM"),
-            LocalMessage("m2", true, "Walikum Assalam — how's it going?", "9:39 PM"),
-            LocalMessage("m3", false, "All good. Are we still on for the call?", "9:40 PM"),
-            LocalMessage("m4", true, "Yes, joining in 5.", "9:41 PM"),
+            LocalMessage("m1", false, "Hey! Found a spot for our Sunday catch-up?", "4:24 PM"),
+            LocalMessage("m2", true, "Yes! Chai and a long walk?", "4:25 PM"),
+            LocalMessage("m3", true, "This view + chai. Sunday sorted?", "4:26 PM"),
+            LocalMessage("m4", false, "Perfect. See you at 5!", "4:28 PM"),
+            LocalMessage("m5", true, "Yes, joining in 5.", "4:28 PM"),
         )
     }
 
