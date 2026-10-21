@@ -51,20 +51,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.motion.pressScale
 import com.aivora.app.ui.theme.AivoraColors
+import com.aivora.app.ui.theme.AivoraDimens
 
 data class SettingsItem(
     val title: String,
     val subtitle: String? = null,
     val icon: ImageVector? = null,
+    @DrawableRes val iconRes: Int? = null,
     val trailing: String? = null,
+    val badge: String? = null,
     val toggle: Boolean? = null,
     val selected: Boolean = false,
     val danger: Boolean = false,
@@ -145,27 +151,39 @@ fun SettingsRow(item: SettingsItem) {
         modifier = Modifier
             .fillMaxWidth()
             .then(if (click != null) Modifier.clickable(onClick = click) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .height(AivoraDimens.SettingsRowHeight)
+            .padding(horizontal = AivoraDimens.Space4),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (item.icon != null) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(AivoraColors.Primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(item.icon, contentDescription = null, tint = AivoraColors.Primary, modifier = Modifier.size(22.dp))
+        when {
+            item.iconRes != null -> {
+                Icon(
+                    painter = painterResource(item.iconRes),
+                    contentDescription = null,
+                    tint = AivoraColors.Ink,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(Modifier.width(14.dp))
             }
-            Spacer(Modifier.width(14.dp))
+            item.icon != null -> {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(AivoraColors.Primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(item.icon, contentDescription = null, tint = AivoraColors.Primary, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.width(14.dp))
+            }
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 item.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = if (item.danger) AivoraColors.Danger else MaterialTheme.colorScheme.onBackground,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Normal,
+                color = if (item.danger) AivoraColors.Danger else AivoraColors.Ink,
             )
             if (item.subtitle != null) {
                 Text(
@@ -174,6 +192,23 @@ fun SettingsRow(item: SettingsItem) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (item.badge != null) {
+            Box(
+                modifier = Modifier
+                    .padding(end = 8.dp)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(AivoraColors.Primary),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    item.badge,
+                    color = AivoraColors.OnPrimary,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
@@ -192,9 +227,10 @@ fun SettingsRow(item: SettingsItem) {
             item.selected -> Icon(Icons.Default.Check, contentDescription = null, tint = AivoraColors.Primary)
             item.trailing != null -> Text(item.trailing, color = MaterialTheme.colorScheme.onSurfaceVariant)
             click != null -> Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                painter = painterResource(AivoraIcons.ChevronRight),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = AivoraColors.IconSecondary,
+                modifier = Modifier.size(20.dp),
             )
         }
     }
@@ -206,11 +242,12 @@ fun SettingsList(
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            horizontal = AivoraDimens.CardHorizontal,
+            vertical = AivoraDimens.Space2,
+        ),
+        verticalArrangement = Arrangement.spacedBy(AivoraDimens.Space2),
     ) {
         sections.forEach { (header, items) ->
             item {
@@ -227,15 +264,17 @@ fun SettingsList(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surface),
+                            .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                            .background(AivoraColors.SurfaceMuted),
                     ) {
                         items.forEachIndexed { index, row ->
                             SettingsRow(row)
                             if (index < items.lastIndex) {
                                 HorizontalDivider(
-                                    modifier = Modifier.padding(start = if (row.icon != null) 70.dp else 16.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(0.35f),
+                                    modifier = Modifier.padding(
+                                        start = if (row.iconRes != null || row.icon != null) 54.dp else 16.dp,
+                                    ),
+                                    color = AivoraColors.Divider,
                                 )
                             }
                         }
@@ -318,18 +357,18 @@ fun ThemeFilterChip(
         border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
             enabled = true,
             selected = selected,
-            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-            selectedBorderColor = AivoraColors.Primary.copy(alpha = 0.4f),
+            borderColor = AivoraColors.Divider,
+            selectedBorderColor = Color.Transparent,
             borderWidth = 1.dp,
-            selectedBorderWidth = 1.dp,
+            selectedBorderWidth = 0.dp,
         ),
         colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            selectedContainerColor = AivoraColors.Primary.copy(alpha = 0.14f),
-            selectedLabelColor = AivoraColors.Primary,
+            containerColor = Color.Transparent,
+            labelColor = AivoraColors.TextSecondary,
+            selectedContainerColor = AivoraColors.LightSurface,
+            selectedLabelColor = AivoraColors.Ink,
         ),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(AivoraDimens.RadiusFull),
     )
 }
 

@@ -178,8 +178,9 @@ fun HomeScreen(
                 title = {
                     Text(
                         "Aivora",
+                        style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
-                        color = if (settled == 0) AivoraColors.Primary else MaterialTheme.colorScheme.onBackground,
+                        color = AivoraColors.Ink,
                     )
                 },
                 actions = {
@@ -269,7 +270,7 @@ fun HomeScreen(
         },
         floatingActionButton = {
             when (settled) {
-                0 -> HomeFab(Icons.Default.Edit, "New chat") {
+                0 -> HomeFabRes(AivoraIcons.Edit, "New chat") {
                     haptics.tick()
                     onNavigate(Routes.NewChat)
                 }
@@ -347,10 +348,36 @@ private fun HomeFab(icon: ImageVector, contentDescription: String, onClick: () -
             defaultElevation = 4.dp,
             pressedElevation = 8.dp,
         ),
-        modifier = Modifier.size(56.dp),
+        modifier = Modifier.size(AivoraDimens.FabSize),
         shape = CircleShape,
     ) {
         Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
+private fun HomeFabRes(
+    @androidx.annotation.DrawableRes iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    FloatingActionButton(
+        onClick = onClick,
+        containerColor = AivoraColors.Primary,
+        contentColor = AivoraColors.OnPrimary,
+        elevation = FloatingActionButtonDefaults.elevation(
+            defaultElevation = 4.dp,
+            pressedElevation = 8.dp,
+        ),
+        modifier = Modifier.size(AivoraDimens.FabSize),
+        shape = CircleShape,
+    ) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = contentDescription,
+            tint = AivoraColors.OnPrimary,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 
@@ -435,22 +462,21 @@ private fun ChatsTab(
                         .padding(horizontal = 14.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(chat.title, size = 44, modifier = avatarMod)
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Avatar(chat.title, size = 48, modifier = avatarMod)
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             chat.title,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            color = AivoraColors.Ink,
                         )
                         Text(
                             chat.preview,
                             style = MaterialTheme.typography.bodyMedium,
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = AivoraColors.TextSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -868,20 +894,61 @@ private fun ProfileTab(
     val filteredSections = remember(query) {
         val all = listOf(
             null to listOf(
-                SettingsItem("Lists", null, Icons.Default.GroupAdd, onClick = { onNavigate(Routes.SettingsListsNew) }),
-                SettingsItem("Starred", null, Icons.Default.Star, onClick = { onNavigate(Routes.SettingsStarred) }),
+                SettingsItem(
+                    title = "Lists",
+                    iconRes = AivoraIcons.Group,
+                    onClick = { onNavigate(Routes.SettingsListsNew) },
+                ),
+                SettingsItem(
+                    title = "Starred",
+                    iconRes = AivoraIcons.Star,
+                    onClick = { onNavigate(Routes.SettingsStarred) },
+                ),
             ),
             null to listOf(
-                SettingsItem("Account", null, Icons.Default.Key, onClick = { onNavigate(Routes.SettingsAccount) }),
-                SettingsItem("Privacy", null, Icons.Default.Lock, onClick = { onNavigate(Routes.SettingsPrivacy) }),
-                SettingsItem("Chats", null, Icons.Default.Edit, onClick = { onNavigate(Routes.SettingsChats) }),
-                SettingsItem("Appearance", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsAppearance) }),
-                SettingsItem("Notifications", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsNotifications) }),
-                SettingsItem("Storage and data", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsStorage) }),
+                SettingsItem(
+                    title = "Account",
+                    iconRes = AivoraIcons.Key,
+                    onClick = { onNavigate(Routes.SettingsAccount) },
+                ),
+                SettingsItem(
+                    title = "Privacy",
+                    iconRes = AivoraIcons.Lock,
+                    onClick = { onNavigate(Routes.SettingsPrivacy) },
+                ),
+                SettingsItem(
+                    title = "Chats",
+                    iconRes = AivoraIcons.Chat,
+                    badge = "1",
+                    onClick = { onNavigate(Routes.SettingsChats) },
+                ),
+                SettingsItem(
+                    title = "Appearance",
+                    iconRes = AivoraIcons.Palette,
+                    onClick = { onNavigate(Routes.SettingsAppearance) },
+                ),
+                SettingsItem(
+                    title = "Notifications",
+                    iconRes = AivoraIcons.Notifications,
+                    onClick = { onNavigate(Routes.SettingsNotifications) },
+                ),
+                SettingsItem(
+                    title = "Storage and data",
+                    iconRes = AivoraIcons.Storage,
+                    onClick = { onNavigate(Routes.SettingsStorage) },
+                ),
             ),
             null to listOf(
-                SettingsItem("Help and feedback", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsPermissions) }),
-                SettingsItem("Invite a friend", null, Icons.Default.GroupAdd, onClick = { }),
+                SettingsItem(
+                    title = "Help and feedback",
+                    iconRes = AivoraIcons.Help,
+                    onClick = { onNavigate(Routes.SettingsPermissions) },
+                ),
+                SettingsItem(
+                    title = "Invite a friend",
+                    iconRes = AivoraIcons.Favorite,
+                    onClick = { },
+                ),
             ),
         )
         if (query.isBlank()) all
@@ -900,60 +967,81 @@ private fun ProfileTab(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 "My Profile",
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = AivoraColors.Ink,
                 modifier = Modifier.weight(1f),
             )
             IconButton(
                 onClick = { onNavigate(Routes.SettingsQr) },
                 modifier = Modifier
                     .size(40.dp)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+                    .clip(CircleShape)
+                    .background(AivoraColors.SurfaceMuted),
             ) {
-                Icon(Icons.Default.QrCode, contentDescription = "QR code")
+                Icon(
+                    painter = painterResource(AivoraIcons.Qr),
+                    contentDescription = "QR code",
+                    tint = AivoraColors.Ink,
+                )
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(AivoraDimens.Space2))
             IconButton(
                 onClick = { onNavigate(Routes.YourDetails) },
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(AivoraColors.Primary.copy(alpha = 0.15f)),
+                    .background(AivoraColors.PrimarySoft),
             ) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = AivoraColors.Primary)
+                Icon(
+                    painter = painterResource(AivoraIcons.Edit),
+                    contentDescription = "Edit",
+                    tint = AivoraColors.Primary,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
         Row(
             modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .align(Alignment.CenterHorizontally)
+                .clip(RoundedCornerShape(AivoraDimens.RadiusFull))
+                .background(AivoraColors.SurfaceMuted)
                 .clickable { }
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .padding(horizontal = 14.dp, vertical = AivoraDimens.Space2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 "Right now I’m…",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                color = AivoraColors.TextSecondary,
             )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("+", fontWeight = FontWeight.Bold, color = AivoraColors.Primary)
+            Spacer(modifier = Modifier.width(AivoraDimens.Space2))
+            Icon(
+                painter = painterResource(AivoraIcons.Add),
+                contentDescription = null,
+                tint = AivoraColors.TextSecondary,
+                modifier = Modifier.size(16.dp),
+            )
         }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 18.dp),
+                .padding(vertical = AivoraDimens.Space4),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Avatar("You", size = 88)
+            Avatar("Leslie", size = 96)
             Spacer(modifier = Modifier.height(10.dp))
-            Text("You", fontWeight = FontWeight.Bold, fontSize = 22.sp)
+            Text(
+                "Leslie",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = AivoraColors.Ink,
+            )
         }
         SettingsList(filteredSections, modifier = Modifier.weight(1f))
     }

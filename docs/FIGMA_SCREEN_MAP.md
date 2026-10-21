@@ -9,10 +9,10 @@ Status: `todo` | `wip` | `pass` | `deferred`
 
 | Wave | Frame | nodeId | Feature | Route | Status |
 |------|-------|--------|---------|-------|--------|
-| 2 · Home shells | Chats · Mobile | `15:885` | `home` | `Routes.Home` | todo |
+| 2 · Home shells | Chats · Mobile | `15:885` | `home` | `Routes.Home` | wip |
 | 2 · Home shells | Updates · Browse | `22:7920` | `home` | `Routes.Home` | todo |
 | 2 · Home shells | Calls · Mobile | `55:6764` | `home` | `Routes.Home` | todo |
-| 2 · Home shells | My Profile · Mobile | `160:11428` | `home` | `Routes.Home` | todo |
+| 2 · Home shells | My Profile · Mobile | `160:11428` | `home` | `Routes.Home` | wip |
 | 3 · Conversation | Conversation · Mobile | `33:3379` | `chat` | `Routes.ChatId` | todo |
 | 3 · Conversation | Group Conversation · Mobile | `106:9702` | `chat` | `Routes.ChatId` | todo |
 | 4 · Calls deep | Schedule · Empty state | `213:12906` | `calls` | `Routes.ScheduledCalls` | todo |
