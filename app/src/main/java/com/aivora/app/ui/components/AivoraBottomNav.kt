@@ -28,11 +28,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -40,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -49,11 +52,16 @@ import com.aivora.app.ui.theme.AivoraColors
 
 private data class NavDest(
     val label: String,
-    val icon: ImageVector,
+    val iconSelected: ImageVector,
+    val iconIdle: ImageVector,
 )
 
+private val IdleGray = Color(0xFF8A9499)
+private val IdleGrayDark = Color(0xFF6B757A)
+
 /**
- * Floating pill dock with a spring-sliding selection glow.
+ * Floating dock — sliding pill only (no circular ripple).
+ * Idle icons stay soft gray; selected uses brand green + filled glyph.
  */
 @Composable
 fun AivoraBottomNav(
@@ -64,30 +72,31 @@ fun AivoraBottomNav(
 ) {
     val destinations = remember {
         listOf(
-            NavDest("Chats", Icons.Default.Chat),
-            NavDest("Updates", Icons.Outlined.Update),
-            NavDest("Calls", Icons.Default.Call),
-            NavDest("Profile", Icons.Default.Person),
+            NavDest("Chats", Icons.Filled.Chat, Icons.Outlined.Chat),
+            NavDest("Updates", Icons.Outlined.Update, Icons.Outlined.Update),
+            NavDest("Calls", Icons.Filled.Call, Icons.Outlined.Call),
+            NavDest("Profile", Icons.Filled.Person, Icons.Outlined.Person),
         )
     }
-    val shape = RoundedCornerShape(28.dp)
+    val shape = RoundedCornerShape(26.dp)
     val surface = MaterialTheme.colorScheme.surface
+    val idleTint = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) IdleGrayDark else IdleGray
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 6.dp),
     ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(62.dp)
+                .height(58.dp)
                 .shadow(
-                    elevation = 16.dp,
+                    elevation = 12.dp,
                     shape = shape,
-                    ambientColor = AivoraColors.Ink.copy(alpha = 0.12f),
-                    spotColor = AivoraColors.Primary.copy(alpha = 0.18f),
+                    ambientColor = AivoraColors.Ink.copy(alpha = 0.08f),
+                    spotColor = AivoraColors.Ink.copy(alpha = 0.1f),
                 )
                 .clip(shape)
                 .background(surface),
@@ -101,24 +110,15 @@ fun AivoraBottomNav(
                 ),
                 label = "navIndicatorX",
             )
-            val indicatorWidth by animateDpAsState(
-                targetValue = slotWidth - 10.dp,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMedium,
-                ),
-                label = "navIndicatorW",
-            )
 
-            // Sliding selection pill
             Box(
                 modifier = Modifier
-                    .offset(x = indicatorOffset + 5.dp)
-                    .width(indicatorWidth)
+                    .offset(x = indicatorOffset + 6.dp)
+                    .width(slotWidth - 12.dp)
                     .fillMaxHeight()
-                    .padding(vertical = 7.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(AivoraColors.Primary.copy(alpha = 0.14f)),
+                    .padding(vertical = 6.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(AivoraColors.Primary.copy(alpha = 0.10f)),
             )
 
             Row(modifier = Modifier.fillMaxSize()) {
@@ -126,22 +126,21 @@ fun AivoraBottomNav(
                     val selectedNow = selected == index
                     val interaction = remember { MutableInteractionSource() }
                     val scale by animateFloatAsState(
-                        targetValue = if (selectedNow) 1.08f else 1f,
+                        targetValue = if (selectedNow) 1.04f else 1f,
                         animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            dampingRatio = Spring.DampingRatioNoBouncy,
                             stiffness = Spring.StiffnessMedium,
                         ),
                         label = "navIconScale$index",
                     )
                     val tint by animateColorAsState(
-                        targetValue = if (selectedNow) AivoraColors.Primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        targetValue = if (selectedNow) AivoraColors.Primary else idleTint,
                         animationSpec = spring(stiffness = Spring.StiffnessMedium),
                         label = "navIconTint$index",
                     )
-                    val labelWeight by animateFloatAsState(
-                        targetValue = if (selectedNow) 1f else 0.85f,
-                        label = "navLabelWeight$index",
+                    val labelAlpha by animateFloatAsState(
+                        targetValue = if (selectedNow) 1f else 0.72f,
+                        label = "navLabelAlpha$index",
                     )
 
                     Box(
@@ -150,7 +149,7 @@ fun AivoraBottomNav(
                             .fillMaxHeight()
                             .clickable(
                                 interactionSource = interaction,
-                                indication = ripple(bounded = false, radius = 28.dp),
+                                indication = null,
                                 onClick = { onSelect(index) },
                             ),
                         contentAlignment = Alignment.Center,
@@ -158,7 +157,7 @@ fun AivoraBottomNav(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(contentAlignment = Alignment.TopEnd) {
                                 Icon(
-                                    dest.icon,
+                                    imageVector = if (selectedNow) dest.iconSelected else dest.iconIdle,
                                     contentDescription = dest.label,
                                     tint = tint,
                                     modifier = Modifier
@@ -171,8 +170,8 @@ fun AivoraBottomNav(
                                 if (index == 0 && unreadCount > 0) {
                                     Box(
                                         modifier = Modifier
-                                            .offset(x = 8.dp, y = (-4).dp)
-                                            .size(16.dp)
+                                            .offset(x = 7.dp, y = (-3).dp)
+                                            .size(15.dp)
                                             .clip(CircleShape)
                                             .background(AivoraColors.Primary),
                                         contentAlignment = Alignment.Center,
@@ -190,10 +189,9 @@ fun AivoraBottomNav(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 dest.label,
-                                color = tint,
+                                color = tint.copy(alpha = labelAlpha),
                                 fontSize = 10.sp,
-                                fontWeight = if (selectedNow) FontWeight.SemiBold else FontWeight.Medium,
-                                modifier = Modifier.graphicsLayer { alpha = 0.55f + 0.45f * labelWeight },
+                                fontWeight = if (selectedNow) FontWeight.SemiBold else FontWeight.Normal,
                             )
                         }
                     }
@@ -201,4 +199,11 @@ fun AivoraBottomNav(
             }
         }
     }
+}
+
+private fun Color.luminance(): Float {
+    val r = red
+    val g = green
+    val b = blue
+    return 0.2126f * r + 0.7152f * g + 0.0722f * b
 }

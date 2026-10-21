@@ -51,13 +51,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -92,7 +92,7 @@ fun HomeScreen(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val haptics = rememberAivoraHaptics()
-    var tab by remember { mutableIntStateOf(0) }
+    val tab = HomeShellState.selectedTab
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(ChatFilter.All) }
     val allChats by InMemoryChatStore.chats.collectAsState()
@@ -147,7 +147,7 @@ fun HomeScreen(
                 onSelect = { index ->
                     if (tab != index) {
                         haptics.tick()
-                        tab = index
+                        HomeShellState.selectedTab = index
                     }
                 },
             )
@@ -261,16 +261,32 @@ private fun ChatsTab(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             ChatFilter.entries.forEach { option ->
+                val selected = filter == option
                 FilterChip(
-                    selected = filter == option,
+                    selected = selected,
                     onClick = { onFilterChange(option) },
                     label = {
-                        Text(option.label, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            option.label,
+                            fontSize = 12.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        )
                     },
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = selected,
+                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                        selectedBorderColor = AivoraColors.Primary.copy(alpha = 0.35f),
+                        borderWidth = 1.dp,
+                        selectedBorderWidth = 1.dp,
+                    ),
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AivoraColors.Primary.copy(alpha = 0.16f),
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        labelColor = Color(0xFF8A9499),
+                        selectedContainerColor = AivoraColors.Primary.copy(alpha = 0.12f),
                         selectedLabelColor = AivoraColors.Primary,
                     ),
+                    shape = RoundedCornerShape(20.dp),
                 )
             }
         }
