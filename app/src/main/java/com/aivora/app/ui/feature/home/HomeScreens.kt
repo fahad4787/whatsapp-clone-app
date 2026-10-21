@@ -177,7 +177,10 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Aivora",
+                        when (settled) {
+                            1 -> "Updates"
+                            else -> "Aivora"
+                        },
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = AivoraColors.Ink,
@@ -185,7 +188,7 @@ fun HomeScreen(
                 },
                 actions = {
                     when (settled) {
-                        0, 1 -> {
+                        0 -> {
                             IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
                                 Icon(Icons.Default.CameraAlt, contentDescription = "Camera")
                             }
@@ -215,6 +218,25 @@ fun HomeScreen(
                                         OverflowMenuItem("Linked devices", Icons.Outlined.Devices) {
                                             onNavigate(Routes.SettingsDevices)
                                         },
+                                        OverflowMenuItem("Settings", Icons.Default.Settings) {
+                                            onNavigate(Routes.SettingsProfile)
+                                        },
+                                    ),
+                                )
+                            }
+                        }
+                        1 -> {
+                            Box {
+                                IconButton(onClick = { menuOpen = true }) {
+                                    Icon(
+                                        painter = painterResource(AivoraIcons.More),
+                                        contentDescription = "Menu",
+                                    )
+                                }
+                                AivoraOverflowMenu(
+                                    expanded = menuOpen,
+                                    onDismiss = { menuOpen = false },
+                                    items = listOf(
                                         OverflowMenuItem("Settings", Icons.Default.Settings) {
                                             onNavigate(Routes.SettingsProfile)
                                         },
@@ -632,13 +654,8 @@ private fun StatusTab(
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
-            HomeSearchBar(
-                value = query,
-                onValueChange = onQueryChange,
-                placeholder = "Search updates",
-            )
             val subtitle = mine.firstOrNull()?.let { "Just posted · ${it.timeLabel}" }
-                ?: "Tap to add status update"
+                ?: "Share a moment with your contacts"
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -647,48 +664,60 @@ private fun StatusTab(
                         if (first != null) onNavigate(Routes.status(first.id))
                         else onNavigate(Routes.NewStatus)
                     }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                StatusRingAvatar("Me", hasUnseen = mine.isNotEmpty(), size = 48.dp)
-                Spacer(modifier = Modifier.width(10.dp))
+                StatusRingAvatar("Me", hasUnseen = mine.isNotEmpty(), size = 52.dp)
+                Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("My status", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                    Text(subtitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "My status",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AivoraColors.Ink,
+                    )
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AivoraColors.TextSecondary,
+                    )
                 }
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
             Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space2),
+                horizontalArrangement = Arrangement.spacedBy(AivoraDimens.Space2),
             ) {
                 StatusActionPill(
                     icon = Icons.Default.PhotoLibrary,
                     label = "Gallery",
+                    modifier = Modifier.weight(1f),
                     onClick = { onNavigate(Routes.camera("status")) },
                 )
                 StatusActionPill(
-                    icon = Icons.Default.Edit,
+                    iconRes = AivoraIcons.Edit,
                     label = "Text",
+                    modifier = Modifier.weight(1f),
                     onClick = { onNavigate(Routes.NewStatus) },
                 )
             }
             Text(
                 "Recent",
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(
+                    horizontal = AivoraDimens.ScreenHorizontal,
+                    vertical = AivoraDimens.Space3,
+                ),
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
+                color = AivoraColors.Ink,
             )
             if (recent.isEmpty() && viewed.isEmpty()) {
                 Text(
                     "Status updates from people you have saved appear here for 24 hours.",
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = 4.dp),
+                    color = AivoraColors.TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
         }
@@ -699,12 +728,28 @@ private fun StatusTab(
         }
         if (viewed.isNotEmpty()) {
             item {
-                Text(
-                    "Viewed updates",
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = AivoraDimens.ScreenHorizontal,
+                            vertical = AivoraDimens.Space2,
+                        ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Viewed",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AivoraColors.Ink,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "${viewed.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = AivoraColors.TextSecondary,
+                    )
+                }
             }
             items(viewed, key = { it.id }) { status ->
                 StatusRow(status.authorName, status.timeLabel, unseen = false) {
@@ -717,18 +762,39 @@ private fun StatusTab(
 }
 
 @Composable
-private fun StatusActionPill(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun StatusActionPill(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    @androidx.annotation.DrawableRes iconRes: Int? = null,
+) {
     Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(AivoraColors.Primary.copy(alpha = 0.12f))
+        modifier = modifier
+            .clip(RoundedCornerShape(AivoraDimens.RadiusFull))
+            .background(AivoraColors.PrimarySoft)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, null, tint = AivoraColors.Primary, modifier = Modifier.size(18.dp))
-        Text(label, color = AivoraColors.Primary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        if (iconRes != null) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = AivoraColors.Primary,
+                modifier = Modifier.size(18.dp),
+            )
+        } else if (icon != null) {
+            Icon(icon, null, tint = AivoraColors.Primary, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(6.dp))
+        Text(
+            label,
+            color = AivoraColors.Primary,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 
@@ -738,15 +804,26 @@ private fun StatusRow(name: String, time: String, unseen: Boolean, onClick: () -
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
+            .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StatusRingAvatar(name, hasUnseen = unseen, size = 48.dp)
-        Spacer(modifier = Modifier.width(10.dp))
-        Column {
-            Text(name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-            Text(time, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        StatusRingAvatar(name, hasUnseen = unseen, size = 52.dp)
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = AivoraColors.Ink,
+            )
+            Text(time, style = MaterialTheme.typography.bodyMedium, color = AivoraColors.TextSecondary)
         }
+        Icon(
+            painter = painterResource(AivoraIcons.ChevronRight),
+            contentDescription = null,
+            tint = AivoraColors.IconSecondary,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
@@ -830,32 +907,40 @@ private fun CallsTab(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onNavigate(Routes.NewCall) }
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(row.name, size = 44)
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Avatar(row.name, size = 48)
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             row.name,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
-                            color = if (row.missed) Color(0xFFD32F2F) else MaterialTheme.colorScheme.onBackground,
+                            color = if (row.missed) AivoraColors.Danger else AivoraColors.Ink,
                         )
                         Text(
-                            "${row.detail} · ${row.time}",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            row.detail,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AivoraColors.TextSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    Icon(
-                        if (row.video) Icons.Default.Videocam else Icons.Default.Call,
-                        contentDescription = null,
-                        tint = AivoraColors.Primary,
-                        modifier = Modifier.size(22.dp),
-                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            row.time,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AivoraColors.TextSecondary,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Icon(
+                            if (row.video) Icons.Default.Videocam else Icons.Default.Call,
+                            contentDescription = null,
+                            tint = AivoraColors.Primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
             item { Spacer(Modifier.height(24.dp)) }
