@@ -9,25 +9,25 @@ Status: `todo` | `wip` | `pass` | `deferred`
 
 | Wave | Frame | nodeId | Feature | Route | Status |
 |------|-------|--------|---------|-------|--------|
-| 2 · Home shells | Chats · Mobile | `15:885` | `home` | `Routes.Home` | wip |
-| 2 · Home shells | Updates · Browse | `22:7920` | `home` | `Routes.Home` | wip |
-| 2 · Home shells | Calls · Mobile | `55:6764` | `home` | `Routes.Home` | wip |
-| 2 · Home shells | My Profile · Mobile | `160:11428` | `home` | `Routes.Home` | wip |
-| 3 · Conversation | Conversation · Mobile | `33:3379` | `chat` | `Routes.ChatId` | wip |
-| 3 · Conversation | Group Conversation · Mobile | `106:9702` | `chat` | `Routes.ChatId` | wip |
-| 4 · Calls deep | Schedule · Empty state | `213:12906` | `calls` | `Routes.ScheduledCalls` | wip |
-| 4 · Calls deep | Schedule · New call | `213:12847` | `calls` | `Routes.ScheduledCalls` | wip |
-| 4 · Calls deep | Keypad · Voice dialer | `213:13580` | `calls` | `Routes.NewCall` | wip |
-| 4 · Calls deep | Audio call · Mobile | `49:2801` | `calls` | `Routes.AudioCall` | wip |
-| 4 · Calls deep | Video call · Mobile | `49:2883` | `calls` | `Routes.VideoCall` | wip |
-| 5 · Profile edit | Profile details · Mobile | `160:11871` | `profile` | `Routes.YourDetails` | wip |
-| 5 · Profile edit | Edit profile picture · Mobile | `160:11747` | `profile` | `Routes.YourDetails` | wip |
-| 6 · Settings hubs | Appearance · Overview | `412:11908` | `settings` | `Routes.SettingsAppearance` | wip |
-| 6 · Settings hubs | Notifications · Overview | `412:13285` | `settings` | `Routes.SettingsNotifications` | wip |
-| 6 · Settings hubs | Account · Overview | `412:8851` | `settings` | `Routes.SettingsAccount` | wip |
-| 6 · Settings hubs | Privacy · Overview | `412:10040` | `settings` | `Routes.SettingsPrivacy` | wip |
-| 6 · Settings hubs | Chats settings · Overview | `412:10147` | `settings` | `Routes.SettingsChats` | wip |
-| 6 · Settings hubs | Storage and data · Overview | `412:14733` | `settings` | `Routes.SettingsStorage` | wip |
+| 2 · Home shells | Chats · Mobile | `15:885` | `home` | `Routes.Home` | pass |
+| 2 · Home shells | Updates · Browse | `22:7920` | `home` | `Routes.Home` | pass |
+| 2 · Home shells | Calls · Mobile | `55:6764` | `home` | `Routes.Home` | pass |
+| 2 · Home shells | My Profile · Mobile | `160:11428` | `home` | `Routes.Home` | pass |
+| 3 · Conversation | Conversation · Mobile | `33:3379` | `chat` | `Routes.ChatId` | pass |
+| 3 · Conversation | Group Conversation · Mobile | `106:9702` | `chat` | `Routes.ChatId` | pass |
+| 4 · Calls deep | Schedule · Empty state | `213:12906` | `calls` | `Routes.ScheduledCalls` | pass |
+| 4 · Calls deep | Schedule · New call | `213:12847` | `calls` | `Routes.ScheduledCalls` | pass |
+| 4 · Calls deep | Keypad · Voice dialer | `213:13580` | `calls` | `Routes.NewCall` | pass |
+| 4 · Calls deep | Audio call · Mobile | `49:2801` | `calls` | `Routes.AudioCall` | pass |
+| 4 · Calls deep | Video call · Mobile | `49:2883` | `calls` | `Routes.VideoCall` | pass |
+| 5 · Profile edit | Profile details · Mobile | `160:11871` | `profile` | `Routes.YourDetails` | pass |
+| 5 · Profile edit | Edit profile picture · Mobile | `160:11747` | `profile` | `Routes.YourDetails` | pass |
+| 6 · Settings hubs | Appearance · Overview | `412:11908` | `settings` | `Routes.SettingsAppearance` | pass |
+| 6 · Settings hubs | Notifications · Overview | `412:13285` | `settings` | `Routes.SettingsNotifications` | pass |
+| 6 · Settings hubs | Account · Overview | `412:8851` | `settings` | `Routes.SettingsAccount` | pass |
+| 6 · Settings hubs | Privacy · Overview | `412:10040` | `settings` | `Routes.SettingsPrivacy` | pass |
+| 6 · Settings hubs | Chats settings · Overview | `412:10147` | `settings` | `Routes.SettingsChats` | pass |
+| 6 · Settings hubs | Storage and data · Overview | `412:14733` | `settings` | `Routes.SettingsStorage` | pass |
 | 8 · Attachments & create | Create · Camera | `22:8320` | `camera` | `Routes.Camera` | wip |
 | 8 · Attachments & create | Create · Photos and videos | `22:8455` | `camera` | `Routes.Gallery` | wip |
 | 8 · Attachments & create | Poll · Create poll | `412:5262` | `chat` | `Routes.PollCreate` | wip |
