@@ -41,12 +41,10 @@ import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Videocam
@@ -96,7 +94,9 @@ import com.aivora.app.ui.components.StatusRingAvatar
 import com.aivora.app.ui.components.ThemeFilterChip
 import com.aivora.app.ui.motion.rememberAivoraHaptics
 import com.aivora.app.ui.navigation.Routes
+import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.theme.AivoraColors
+import com.aivora.app.ui.theme.AivoraDimens
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -190,7 +190,10 @@ fun HomeScreen(
                             }
                             Box {
                                 IconButton(onClick = { menuOpen = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                                    Icon(
+                                        painter = painterResource(AivoraIcons.More),
+                                        contentDescription = "Menu",
+                                    )
                                 }
                                 AivoraOverflowMenu(
                                     expanded = menuOpen,
@@ -221,7 +224,7 @@ fun HomeScreen(
                         2 -> {
                             Box {
                                 IconButton(onClick = { menuOpen = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                                    Icon(painter = painterResource(AivoraIcons.More), contentDescription = "Menu")
                                 }
                                 AivoraOverflowMenu(
                                     expanded = menuOpen,
@@ -239,7 +242,7 @@ fun HomeScreen(
                         }
                         else -> {
                             IconButton(onClick = { onNavigate(Routes.SettingsQr) }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                                Icon(painter = painterResource(AivoraIcons.More), contentDescription = "Menu")
                             }
                         }
                     }
@@ -513,25 +516,36 @@ private fun HomeSearchBar(
         onValueChange = onValueChange,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .height(48.dp),
+            .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space1)
+            .height(AivoraDimens.SearchHeight),
         placeholder = { Text(placeholder, fontSize = 14.sp) },
         leadingIcon = {
-            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+            Icon(
+                painter = painterResource(AivoraIcons.Search),
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = AivoraColors.TextTertiary,
+            )
         },
         trailingIcon = {
             IconButton(onClick = onSpeakClick, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Mic, contentDescription = "Speak", modifier = Modifier.size(20.dp))
+                Icon(
+                    painter = painterResource(AivoraIcons.Mic),
+                    contentDescription = "Speak",
+                    modifier = Modifier.size(22.dp),
+                    tint = AivoraColors.TextTertiary,
+                )
             }
         },
         singleLine = true,
-        textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-        shape = RoundedCornerShape(22.dp),
+        textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+        shape = RoundedCornerShape(AivoraDimens.RadiusSm),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-            focusedBorderColor = AivoraColors.Primary.copy(alpha = 0.3f),
-            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+            focusedContainerColor = AivoraColors.SearchFill.copy(alpha = 0.7f),
+            unfocusedContainerColor = AivoraColors.SearchFill.copy(alpha = 0.7f),
+            focusedBorderColor = AivoraColors.Primary.copy(alpha = 0.25f),
+            unfocusedBorderColor = Color.Transparent,
+            disabledBorderColor = Color.Transparent,
         ),
     )
 }

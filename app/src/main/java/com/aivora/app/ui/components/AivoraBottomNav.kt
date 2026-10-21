@@ -1,5 +1,6 @@
 package com.aivora.app.ui.components
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,14 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.Call
-import androidx.compose.material.icons.outlined.Chat
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,20 +30,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.theme.AivoraColors
+import com.aivora.app.ui.theme.AivoraDimens
 import kotlin.math.roundToInt
 
 private data class NavDest(
     val label: String,
-    val iconSelected: ImageVector,
-    val iconIdle: ImageVector,
+    @DrawableRes val iconSelected: Int,
+    @DrawableRes val iconIdle: Int,
+    val tintSelected: Boolean = true,
 )
 
-private val IdleGray = Color(0xFF8A9499)
+private val IdleGray = Color(0xFF9B9B9B)
 private val IdleGrayDark = Color(0xFF6B757A)
 
 /**
@@ -67,13 +63,13 @@ fun AivoraBottomNav(
 ) {
     val destinations = remember {
         listOf(
-            NavDest("Chats", Icons.Filled.Chat, Icons.Outlined.Chat),
-            NavDest("Updates", Icons.Outlined.Update, Icons.Outlined.Update),
-            NavDest("Calls", Icons.Filled.Call, Icons.Outlined.Call),
-            NavDest("My Profile", Icons.Filled.Person, Icons.Outlined.Person),
+            NavDest("Chats", AivoraIcons.NavChatsSelected, AivoraIcons.NavChatsIdle, tintSelected = false),
+            NavDest("Updates", AivoraIcons.NavUpdates, AivoraIcons.NavUpdatesIdle),
+            NavDest("Calls", AivoraIcons.NavCalls, AivoraIcons.NavCallsIdle),
+            NavDest("My Profile", 0, 0),
         )
     }
-    val shape = RoundedCornerShape(26.dp)
+    val shape = RoundedCornerShape(AivoraDimens.RadiusMd)
     val surface = MaterialTheme.colorScheme.surface
     val idleTint = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) IdleGrayDark else IdleGray
     val activeIndex = selectionProgress.roundToInt().coerceIn(0, destinations.lastIndex)
@@ -132,11 +128,13 @@ fun AivoraBottomNav(
                                 if (index == 3) {
                                     Avatar(name = "You", size = 22)
                                 } else {
+                                    val res = if (selectedNow) dest.iconSelected else dest.iconIdle
+                                    val applyTint = !(selectedNow && !dest.tintSelected)
                                     Icon(
-                                        imageVector = if (selectedNow) dest.iconSelected else dest.iconIdle,
+                                        painter = painterResource(res),
                                         contentDescription = dest.label,
-                                        tint = tint,
-                                        modifier = Modifier.size(22.dp),
+                                        tint = if (applyTint) tint else Color.Unspecified,
+                                        modifier = Modifier.size(AivoraDimens.BottomNavIcon),
                                     )
                                 }
                                 if (index == 0 && unreadCount > 0) {
@@ -162,8 +160,8 @@ fun AivoraBottomNav(
                             Text(
                                 dest.label,
                                 color = tint.copy(alpha = if (selectedNow) 1f else 0.72f),
-                                fontSize = 10.sp,
-                                fontWeight = if (selectedNow) FontWeight.SemiBold else FontWeight.Normal,
+                                fontSize = 10.6.sp,
+                                fontWeight = if (selectedNow) FontWeight.Medium else FontWeight.Normal,
                             )
                         }
                     }

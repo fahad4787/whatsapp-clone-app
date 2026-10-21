@@ -9,9 +9,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.ui.unit.IntOffset
 import androidx.navigation.NavBackStackEntry
+import com.aivora.app.ui.motion.AivoraNavFadeMs
+import com.aivora.app.ui.motion.AivoraNavSlideMs
 
-private const val FadeMs = 180
-private const val SlideMs = 300
+private const val FadeMs = AivoraNavFadeMs
+private const val SlideMs = AivoraNavSlideMs
 
 /** Material 3 emphasized — decelerate into place, accelerate out. */
 private val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)

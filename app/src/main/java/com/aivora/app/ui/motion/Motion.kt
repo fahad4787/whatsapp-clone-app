@@ -24,6 +24,10 @@ val AivoraSnap = spring<Float>(
 val AivoraTweenFast = tween<Float>(durationMillis = 140, easing = FastOutSlowInEasing)
 val AivoraTweenMed = tween<Float>(durationMillis = 180, easing = FastOutSlowInEasing)
 
+/** Nav push slide / fade — keep NavTransitions in sync with these. */
+const val AivoraNavFadeMs = 180
+const val AivoraNavSlideMs = 300
+
 @Composable
 fun rememberReducedMotion(): Boolean {
     val context = LocalContext.current
