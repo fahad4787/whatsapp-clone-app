@@ -40,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import com.aivora.app.ui.components.AivoraLogo
 import com.aivora.app.ui.components.LinkButton
 import com.aivora.app.ui.components.PrimaryButton
-import com.aivora.app.ui.motion.enterFadeSlide
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 
@@ -75,8 +74,7 @@ fun LoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp)
-                .enterFadeSlide(key = "login"),
+                .padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
