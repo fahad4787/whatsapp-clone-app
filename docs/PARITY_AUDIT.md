@@ -40,6 +40,33 @@ Mapped and implemented as **wip** shells (settings deep batches, create/attach, 
 - Some settings child screens still use Material icons where Figma uses custom glyphs; chrome icons for home/nav are local drawables.
 - Emulator side-by-side pixel pass recommended before production polish.
 
+## Gap inventory (final check vs ~294 Figma mobile frames)
+
+Plan primaries for Waves 2–9 are covered. Full Design canvas still has many state/dialog frames not built as 1:1 screens.
+
+### High-value missing or thin vs Figma
+
+| Area | Figma | App today | Priority |
+|------|-------|-----------|----------|
+| Lists hub | `Lists · Overview` `412:7283` | Routes exist; UI not Figma-aligned | High |
+| Friend / contact profile | `Friend profile · Mobile` | `Routes.ProfileId` stub | High |
+| Media, links and docs | 3 frames | No screen | High |
+| Network usage / Proxy | Overview frames | Rows only on Storage hub | Medium |
+| Group audio/video call | Group call frames | 1:1 call shells only | Medium |
+| Move and scale (crop) | `160:11715` | Folded into photo edit | Medium |
+| Chat history / Privacy checkup | Overview frames | Generic settings lists | Medium |
+| Status / story viewer polish | My status viewers | Partial `StatusId` / `NewStatus` | Medium |
+| Notifications children | Device on/off, reset | Hub only | Low |
+| Report contact | Report frames | Missing | Low |
+| Multi-step change number / delete / backup | Many children | Intro shells only | Low |
+| Login / onboarding | (other pages) | Custom Aivora flow — not in Wave map | N/A |
+
+### Hygiene re-check
+
+- Zero `Bolta` in `app/src`
+- Zero Figma CDN URLs in `app/src`
+- `assembleDebug` PASS
+
 ## Sign-off
 
-Frontend Figma parity plan Tasks 0–12 complete for **core waves (2–6)** + hygiene. Ready for **backend phase** per plan.
+Frontend Figma parity plan Tasks 0–12 complete for **core waves (2–6)** + hygiene. Ready for **backend phase** per plan. Remaining gaps above are polish / deep children, not blockers for starting backend.
