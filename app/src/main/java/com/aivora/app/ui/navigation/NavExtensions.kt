@@ -2,10 +2,14 @@ package com.aivora.app.ui.navigation
 
 import androidx.navigation.NavHostController
 
-/** Navigate without stacking duplicate destinations. */
+/**
+ * Navigate forward. Slide destinations skip launchSingleTop so enter/exit
+ * animations always run (reopening the same chat still slides).
+ */
 fun NavHostController.navigateSingleTop(route: String) {
+    val base = route.substringBefore('?')
     navigate(route) {
-        launchSingleTop = true
+        launchSingleTop = !isSlideRoute(base)
     }
 }
 

@@ -484,18 +484,28 @@ fun SettingsDevicesScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Link a device", "Scan QR on your other device", Icons.Default.Devices, onClick = { onNavigate(Routes.SettingsDevicesLink) }),
-            SettingsItem("This phone", "Active now · Android", Icons.Default.Phone, onClick = { }),
-            SettingsItem("Device authentication", null, Icons.Default.Fingerprint, onClick = { }),
-        ),
-    )
-
     AivoraScaffold(title = "Linked devices", onBack = onBack) {
-        InfoBanner("Link a device")
-        SettingsList(sections)
+        SettingsList(
+            listOf(
+                null to listOf(
+                    SettingsItem(
+                        "Link a device",
+                        "Scan the code on Aivora Web",
+                        Icons.Default.QrCode,
+                        onClick = { onNavigate(Routes.SettingsDevicesLink) },
+                    ),
+                ),
+            ),
+        )
+        SettingsList(
+            listOf(
+                null to listOf(
+                    SettingsItem("V2440", "android · last active now · this device", Icons.Default.Phone, onClick = { }),
+                    SettingsItem("Chrome on macOS", "web · last active Yesterday", Icons.Default.Devices, trailing = "Sign out", onClick = { }),
+                    SettingsItem("V2440", "android · last active Mon", Icons.Default.Phone, trailing = "Sign out", onClick = { }),
+                ),
+            ),
+        )
     }
 }
 
@@ -1183,5 +1193,88 @@ fun SettingsPrivacyLiveLocationScreen(
     AivoraScaffold(title = "Live location", onBack = onBack) {
         InfoBanner("Live location sharing stopped")
         SettingsList(sections)
+    }
+}
+
+@Composable
+fun SettingsAppearanceScreen(
+    onBack: (() -> Unit)? = null,
+    onNavigate: (String) -> Unit = {},
+) {
+    var theme by remember { mutableIntStateOf(0) }
+    AivoraScaffold(title = "Appearance", onBack = onBack) {
+        Spacer(modifier = Modifier.height(8.dp))
+        RadioGroup(
+            options = listOf(
+                "System default" to null,
+                "Light" to null,
+                "Dark" to null,
+            ),
+            selected = theme,
+            onSelect = { theme = it },
+        )
+        Text(
+            "System default follows your phone's dark theme setting.",
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+fun SettingsNotificationsScreen(
+    onBack: (() -> Unit)? = null,
+    onNavigate: (String) -> Unit = {},
+) {
+    var reactions by remember { mutableStateOf(true) }
+    AivoraScaffold(title = "Notifications", onBack = onBack) {
+        SettingsList(
+            listOf(
+                null to listOf(
+                    SettingsItem("Notifications", trailing = "On", icon = Icons.Default.Notifications, onClick = { }),
+                    SettingsItem("Messages", trailing = "On", icon = Icons.Default.Chat, onClick = { }),
+                    SettingsItem("Calls", trailing = "On", icon = Icons.Default.Call, onClick = { }),
+                    SettingsItem("Missed calls", trailing = "On", icon = Icons.Default.Phone, onClick = { }),
+                ),
+            ),
+        )
+        Text(
+            "Sound, vibration and pop-ups are set for each of these in Android's own settings.",
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SettingsList(
+            listOf(
+                null to listOf(
+                    SettingsItem(
+                        "Reaction notifications",
+                        toggle = reactions,
+                        onToggle = { reactions = it },
+                        icon = Icons.Default.Notifications,
+                    ),
+                ),
+            ),
+        )
+        Text(
+            "Tell me when someone reacts to my message.",
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SettingsList(
+            listOf(
+                null to listOf(
+                    SettingsItem("Permissions", null, Icons.Default.Security, onClick = { onNavigate(Routes.SettingsPermissions) }),
+                ),
+            ),
+        )
+        Text(
+            "If calls or notifications don't arrive, look here first.",
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

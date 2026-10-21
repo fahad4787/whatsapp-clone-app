@@ -70,6 +70,8 @@ object Routes {
     const val SettingsQr = "settings/qr"
     const val SettingsStarred = "settings/starred"
     const val SettingsStorage = "settings/storage"
+    const val SettingsAppearance = "settings/appearance"
+    const val SettingsNotifications = "settings/notifications"
     const val SettingsTwoStep = "settings/two-step"
     const val TransferNewPhone = "transfer/new-phone"
     const val YourDetails = "your-details"

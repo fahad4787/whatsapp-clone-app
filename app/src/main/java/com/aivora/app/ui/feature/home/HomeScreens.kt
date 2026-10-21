@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
@@ -48,8 +51,6 @@ import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -62,11 +63,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,9 +88,12 @@ import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
 import com.aivora.app.ui.components.StatusRingAvatar
+import com.aivora.app.ui.components.ThemeFilterChip
 import com.aivora.app.ui.motion.rememberAivoraHaptics
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 private enum class ChatFilter(val label: String) {
     All("All"),
@@ -111,7 +118,12 @@ fun HomeScreen(
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val haptics = rememberAivoraHaptics()
-    val tab = HomeShellState.selectedTab
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(
+        initialPage = HomeShellState.selectedTab.coerceIn(0, 3),
+        pageCount = { 4 },
+    )
+    val tab = pagerState.currentPage
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(ChatFilter.All) }
     var callFilter by remember { mutableStateOf(CallFilter.All) }
@@ -119,6 +131,23 @@ fun HomeScreen(
     val allChats by InMemoryChatStore.chats.collectAsState()
     val unreadTotal = remember(allChats) {
         allChats.filterNot { it.archived }.sumOf { it.unread }
+    }
+
+    LaunchedEffect(Unit) {
+        snapshotFlow { pagerState.currentPage }
+            .distinctUntilChanged()
+            .collect { page ->
+                if (HomeShellState.selectedTab != page) {
+                    HomeShellState.selectedTab = page
+                    query = ""
+                }
+            }
+    }
+    LaunchedEffect(HomeShellState.selectedTab) {
+        val target = HomeShellState.selectedTab.coerceIn(0, 3)
+        if (pagerState.currentPage != target && !pagerState.isScrollInProgress) {
+            pagerState.animateScrollToPage(target)
+        }
     }
 
     Scaffold(
@@ -196,6 +225,7 @@ fun HomeScreen(
                         haptics.tick()
                         query = ""
                         HomeShellState.selectedTab = index
+                        scope.launch { pagerState.animateScrollToPage(index) }
                     }
                 },
             )
@@ -217,14 +247,16 @@ fun HomeScreen(
             }
         },
     ) { padding ->
-        Box(
+        HorizontalPager(
+            state = pagerState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .consumeWindowInsets(padding)
                 .imePadding(),
-        ) {
-            when (tab) {
+            beyondViewportPageCount = 1,
+        ) { page ->
+            when (page) {
                 0 -> ChatsTab(
                     allChats = allChats,
                     query = query,
@@ -361,32 +393,10 @@ private fun ChatsTab(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             ChatFilter.entries.forEach { option ->
-                val selected = filter == option
-                FilterChip(
-                    selected = selected,
+                ThemeFilterChip(
+                    selected = filter == option,
                     onClick = { onFilterChange(option) },
-                    label = {
-                        Text(
-                            option.label,
-                            fontSize = 12.sp,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                    },
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = selected,
-                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                        selectedBorderColor = AivoraColors.Primary.copy(alpha = 0.35f),
-                        borderWidth = 1.dp,
-                        selectedBorderWidth = 1.dp,
-                    ),
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        labelColor = Color(0xFF8A9499),
-                        selectedContainerColor = AivoraColors.Primary.copy(alpha = 0.12f),
-                        selectedLabelColor = AivoraColors.Primary,
-                    ),
-                    shape = RoundedCornerShape(20.dp),
+                    label = option.label,
                 )
             }
         }
@@ -760,32 +770,10 @@ private fun CallsTab(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             CallFilter.entries.forEach { option ->
-                val selected = filter == option
-                FilterChip(
-                    selected = selected,
+                ThemeFilterChip(
+                    selected = filter == option,
                     onClick = { onFilterChange(option) },
-                    label = {
-                        Text(
-                            option.label,
-                            fontSize = 12.sp,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                    },
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = selected,
-                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                        selectedBorderColor = AivoraColors.Primary.copy(alpha = 0.35f),
-                        borderWidth = 1.dp,
-                        selectedBorderWidth = 1.dp,
-                    ),
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        labelColor = Color(0xFF8A9499),
-                        selectedContainerColor = MaterialTheme.colorScheme.surface,
-                        selectedLabelColor = MaterialTheme.colorScheme.onBackground,
-                    ),
-                    shape = RoundedCornerShape(20.dp),
+                    label = option.label,
                 )
             }
         }
@@ -863,17 +851,15 @@ private fun ProfileTab(
                 SettingsItem("Starred", null, Icons.Default.Star, onClick = { onNavigate(Routes.SettingsStarred) }),
             ),
             null to listOf(
-                SettingsItem("Account", null, Icons.Default.Lock, onClick = { onNavigate(Routes.SettingsAccount) }),
+                SettingsItem("Account", null, Icons.Default.Key, onClick = { onNavigate(Routes.SettingsAccount) }),
                 SettingsItem("Privacy", null, Icons.Default.Lock, onClick = { onNavigate(Routes.SettingsPrivacy) }),
                 SettingsItem("Chats", null, Icons.Default.Edit, onClick = { onNavigate(Routes.SettingsChats) }),
-            ),
-            null to listOf(
-                SettingsItem("Appearance", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsChats) }),
-                SettingsItem("Notifications", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsAccountSecurityNotifications) }),
+                SettingsItem("Appearance", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsAppearance) }),
+                SettingsItem("Notifications", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsNotifications) }),
                 SettingsItem("Storage and data", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsStorage) }),
             ),
             null to listOf(
-                SettingsItem("Help", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsPermissions) }),
+                SettingsItem("Help and feedback", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsPermissions) }),
                 SettingsItem("Invite a friend", null, Icons.Default.GroupAdd, onClick = { }),
             ),
         )

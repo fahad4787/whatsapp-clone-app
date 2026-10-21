@@ -39,6 +39,7 @@ import com.aivora.app.ui.feature.settings.SettingsAccountRequestInfoScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountSecurityNotificationsScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountTwoStepNewPinScreen
+import com.aivora.app.ui.feature.settings.SettingsAppearanceScreen
 import com.aivora.app.ui.feature.settings.SettingsBlockedScreen
 import com.aivora.app.ui.feature.settings.SettingsChatsArchivedScreen
 import com.aivora.app.ui.feature.settings.SettingsChatsBackupEncryptedScreen
@@ -59,6 +60,7 @@ import com.aivora.app.ui.feature.settings.SettingsDevicesScreen
 import com.aivora.app.ui.feature.settings.SettingsListsEditIdScreen
 import com.aivora.app.ui.feature.settings.SettingsListsNewScreen
 import com.aivora.app.ui.feature.settings.SettingsListsReorderScreen
+import com.aivora.app.ui.feature.settings.SettingsNotificationsScreen
 import com.aivora.app.ui.feature.settings.SettingsPermissionsScreen
 import com.aivora.app.ui.feature.settings.SettingsPrivacyAboutScreen
 import com.aivora.app.ui.feature.settings.SettingsPrivacyAdvancedScreen
@@ -95,10 +97,10 @@ fun AivoraNavHost(
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        enterTransition = FadeEnter,
-        exitTransition = FadeExit,
-        popEnterTransition = FadePopEnter,
-        popExitTransition = FadePopExit,
+        enterTransition = NavEnter,
+        exitTransition = NavExit,
+        popEnterTransition = NavPopEnter,
+        popExitTransition = NavPopExit,
     ) {
         composable(
             route = Routes.ChannelSlug,
@@ -127,10 +129,6 @@ fun AivoraNavHost(
         composable(
             route = Routes.ChatId,
             arguments = listOf(navArgument("id") { type = NavType.StringType }),
-            enterTransition = SlideFromRightEnter,
-            exitTransition = StayPutExit,
-            popEnterTransition = StayPutPopEnter,
-            popExitTransition = SlideToRightExit,
         ) { entry ->
             ChatIdScreen(
                 chatId = entry.arguments?.getString("id").orEmpty(),
@@ -197,10 +195,6 @@ fun AivoraNavHost(
         }
         composable(
             route = Routes.LockedChats,
-            enterTransition = SlideFromRightEnter,
-            exitTransition = StayPutExit,
-            popEnterTransition = StayPutPopEnter,
-            popExitTransition = SlideToRightExit,
         ) {
             LockedChatsScreen(onBack = back, onNavigate = go)
         }
@@ -234,19 +228,11 @@ fun AivoraNavHost(
         }
         composable(
             route = Routes.NewChat,
-            enterTransition = SlideFromRightEnter,
-            exitTransition = StayPutExit,
-            popEnterTransition = StayPutPopEnter,
-            popExitTransition = SlideToRightExit,
         ) {
             NewChatScreen(onBack = back, onNavigate = go)
         }
         composable(
             route = Routes.NewGroup,
-            enterTransition = SlideFromRightEnter,
-            exitTransition = StayPutExit,
-            popEnterTransition = StayPutPopEnter,
-            popExitTransition = SlideToRightExit,
         ) {
             NewGroupScreen(onBack = back, onNavigate = go)
         }
@@ -273,10 +259,6 @@ fun AivoraNavHost(
         composable(
             route = Routes.ProfileId,
             arguments = listOf(navArgument("id") { type = NavType.StringType }),
-            enterTransition = SlideFromRightEnter,
-            exitTransition = StayPutExit,
-            popEnterTransition = StayPutPopEnter,
-            popExitTransition = SlideToRightExit,
         ) { entry ->
             ProfileIdScreen(
                 profileId = entry.arguments?.getString("id").orEmpty(),
@@ -289,10 +271,6 @@ fun AivoraNavHost(
         }
         composable(
             route = Routes.SettingsAccount,
-            enterTransition = SlideFromRightEnter,
-            exitTransition = StayPutExit,
-            popEnterTransition = StayPutPopEnter,
-            popExitTransition = SlideToRightExit,
         ) {
             SettingsAccountScreen(onBack = back, onNavigate = go)
         }
@@ -392,10 +370,6 @@ fun AivoraNavHost(
         }
         composable(
             route = Routes.SettingsPrivacy,
-            enterTransition = SlideFromRightEnter,
-            exitTransition = StayPutExit,
-            popEnterTransition = StayPutPopEnter,
-            popExitTransition = SlideToRightExit,
         ) {
             SettingsPrivacyScreen(onBack = back, onNavigate = go)
         }
@@ -440,10 +414,6 @@ fun AivoraNavHost(
         }
         composable(
             route = Routes.SettingsProfile,
-            enterTransition = SlideFromRightEnter,
-            exitTransition = StayPutExit,
-            popEnterTransition = StayPutPopEnter,
-            popExitTransition = SlideToRightExit,
         ) {
             SettingsProfileScreen(onBack = back, onNavigate = go)
         }
@@ -455,6 +425,12 @@ fun AivoraNavHost(
         }
         composable(Routes.SettingsStorage) {
             SettingsStorageScreen(onBack = back, onNavigate = go)
+        }
+        composable(Routes.SettingsAppearance) {
+            SettingsAppearanceScreen(onBack = back, onNavigate = go)
+        }
+        composable(Routes.SettingsNotifications) {
+            SettingsNotificationsScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.SettingsTwoStep) {
             SettingsTwoStepScreen(onBack = back, onNavigate = go)

@@ -2,6 +2,7 @@ package com.aivora.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +55,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -116,12 +119,42 @@ fun AivoraScaffold(
         floatingActionButton = fab,
         bottomBar = bottomBar,
     ) { padding ->
+        val density = LocalDensity.current
+        val edgePx = with(density) { 28.dp.toPx() }
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .consumeWindowInsets(padding)
-                .imePadding(),
+                .imePadding()
+                .then(
+                    if (onBack != null) {
+                        Modifier.pointerInput(onBack) {
+                            var dragged = 0f
+                            var fromEdge = false
+                            detectHorizontalDragGestures(
+                                onDragStart = { offset ->
+                                    fromEdge = offset.x <= edgePx
+                                    dragged = 0f
+                                },
+                                onDragEnd = {
+                                    if (fromEdge && dragged > size.width * 0.22f) onBack()
+                                    dragged = 0f
+                                    fromEdge = false
+                                },
+                                onDragCancel = {
+                                    dragged = 0f
+                                    fromEdge = false
+                                },
+                                onHorizontalDrag = { _, amount ->
+                                    if (fromEdge && amount > 0f) dragged += amount
+                                },
+                            )
+                        }
+                    } else {
+                        Modifier
+                    },
+                ),
             content = content,
         )
     }
@@ -181,7 +214,13 @@ fun SettingsRow(item: SettingsItem) {
             item.toggle != null -> Switch(
                 checked = item.toggle,
                 onCheckedChange = { item.onToggle?.invoke(it) },
-                colors = SwitchDefaults.colors(checkedTrackColor = AivoraColors.Primary),
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = AivoraColors.OnPrimary,
+                    checkedTrackColor = AivoraColors.Primary,
+                    checkedBorderColor = AivoraColors.Primary,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
             )
             item.selected -> Icon(Icons.Default.Check, contentDescription = null, tint = AivoraColors.Primary)
             item.trailing != null -> Text(item.trailing, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -247,30 +286,84 @@ fun RadioGroup(
     selected: Int,
     onSelect: (Int) -> Unit,
 ) {
-    Column {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface),
+    ) {
         options.forEachIndexed { index, (title, subtitle) ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onSelect(index) }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Column(modifier = Modifier.weight(1f).padding(vertical = 10.dp)) {
+                    Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    if (subtitle != null) {
+                        Text(
+                            subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 RadioButton(
                     selected = selected == index,
                     onClick = { onSelect(index) },
-                    colors = RadioButtonDefaults.colors(selectedColor = AivoraColors.Primary),
+                    colors = RadioButtonDefaults.colors(
+                        selectedColor = AivoraColors.Primary,
+                        unselectedColor = MaterialTheme.colorScheme.outline,
+                    ),
                 )
-                Column(modifier = Modifier.padding(start = 4.dp, end = 16.dp, top = 10.dp, bottom = 10.dp)) {
-                    Text(title, style = MaterialTheme.typography.bodyLarge)
-                    if (subtitle != null) {
-                        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(0.4f))
+            if (index < options.lastIndex) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(0.4f),
+                )
+            }
         }
     }
+}
+
+/** Themed filter chip — selected state always uses brand green. */
+@Composable
+fun ThemeFilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.material3.FilterChip(
+        selected = selected,
+        onClick = onClick,
+        modifier = modifier,
+        label = {
+            Text(
+                label,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        },
+        border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = selected,
+            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+            selectedBorderColor = AivoraColors.Primary.copy(alpha = 0.4f),
+            borderWidth = 1.dp,
+            selectedBorderWidth = 1.dp,
+        ),
+        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            selectedContainerColor = AivoraColors.Primary.copy(alpha = 0.14f),
+            selectedLabelColor = AivoraColors.Primary,
+        ),
+        shape = RoundedCornerShape(20.dp),
+    )
 }
 
 @Composable
