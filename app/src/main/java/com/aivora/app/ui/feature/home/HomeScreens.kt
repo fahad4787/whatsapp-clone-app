@@ -34,18 +34,14 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Update
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -65,9 +61,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.InMemoryStatusStore
 import com.aivora.app.data.local.LocalChat
+import com.aivora.app.ui.components.AivoraBottomNav
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.PersonRow
 import com.aivora.app.ui.components.PrimaryButton
@@ -139,52 +137,20 @@ fun HomeScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                expandedHeight = 52.dp,
             )
         },
         bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = tab == 0,
-                    onClick = { if (tab != 0) { haptics.tick(); tab = 0 } },
-                    icon = {
-                        if (unreadTotal > 0) {
-                            BadgedBox(
-                                badge = {
-                                    Badge(containerColor = AivoraColors.Primary) {
-                                        Text(
-                                            if (unreadTotal > 99) "99+" else "$unreadTotal",
-                                            color = AivoraColors.OnPrimary,
-                                        )
-                                    }
-                                },
-                            ) {
-                                Icon(Icons.Default.Chat, contentDescription = null)
-                            }
-                        } else {
-                            Icon(Icons.Default.Chat, contentDescription = null)
-                        }
-                    },
-                    label = { Text("Chats") },
-                )
-                NavigationBarItem(
-                    selected = tab == 1,
-                    onClick = { if (tab != 1) { haptics.tick(); tab = 1 } },
-                    icon = { Icon(Icons.Outlined.Update, contentDescription = null) },
-                    label = { Text("Updates") },
-                )
-                NavigationBarItem(
-                    selected = tab == 2,
-                    onClick = { if (tab != 2) { haptics.tick(); tab = 2 } },
-                    icon = { Icon(Icons.Default.Call, contentDescription = null) },
-                    label = { Text("Calls") },
-                )
-                NavigationBarItem(
-                    selected = tab == 3,
-                    onClick = { if (tab != 3) { haptics.tick(); tab = 3 } },
-                    icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    label = { Text("Profile") },
-                )
-            }
+            AivoraBottomNav(
+                selected = tab,
+                unreadCount = unreadTotal,
+                onSelect = { index ->
+                    if (tab != index) {
+                        haptics.tick()
+                        tab = index
+                    }
+                },
+            )
         },
         floatingActionButton = {
             if (tab != 3) {
@@ -199,6 +165,11 @@ fun HomeScreen(
                     },
                     containerColor = AivoraColors.Primary,
                     contentColor = AivoraColors.OnPrimary,
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp,
+                    ),
+                    modifier = Modifier.size(52.dp),
                 ) {
                     Icon(
                         when (tab) {
@@ -207,6 +178,7 @@ fun HomeScreen(
                             else -> Icons.Default.Add
                         },
                         contentDescription = null,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
@@ -285,14 +257,16 @@ private fun ChatsTab(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 12.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             ChatFilter.entries.forEach { option ->
                 FilterChip(
                     selected = filter == option,
                     onClick = { onFilterChange(option) },
-                    label = { Text(option.label) },
+                    label = {
+                        Text(option.label, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = AivoraColors.Primary.copy(alpha = 0.16f),
                         selectedLabelColor = AivoraColors.Primary,
@@ -302,13 +276,13 @@ private fun ChatsTab(
         }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = 4.dp),
+            contentPadding = PaddingValues(top = 2.dp, bottom = 8.dp),
         ) {
             if (chats.isEmpty()) {
                 item {
                     Text(
                         "No chats here",
-                        modifier = Modifier.padding(24.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -323,22 +297,24 @@ private fun ChatsTab(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onOpenChat(chat.id) }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(chat.title, modifier = avatarMod)
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Avatar(chat.title, size = 44, modifier = avatarMod)
+                    Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             chat.title,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             chat.preview,
                             style = MaterialTheme.typography.bodyMedium,
+                            fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -348,11 +324,12 @@ private fun ChatsTab(
                         Text(
                             chat.time,
                             style = MaterialTheme.typography.labelMedium,
+                            fontSize = 11.sp,
                             color = if (chat.unread > 0) AivoraColors.Primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         if (chat.unread > 0) {
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(3.dp))
                             UnreadBadge(chat.unread)
                         }
                     }
@@ -382,21 +359,25 @@ private fun HomeSearchBar(
         onValueChange = onValueChange,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        placeholder = { Text("Search") },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .height(48.dp),
+        placeholder = { Text("Search", fontSize = 14.sp) },
+        leadingIcon = {
+            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+        },
         trailingIcon = {
-            IconButton(onClick = onSpeakClick) {
-                Icon(Icons.Default.Mic, contentDescription = "Speak")
+            IconButton(onClick = onSpeakClick, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Mic, contentDescription = "Speak", modifier = Modifier.size(20.dp))
             }
         },
         singleLine = true,
-        shape = RoundedCornerShape(28.dp),
+        textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+        shape = RoundedCornerShape(22.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-            focusedBorderColor = AivoraColors.Primary.copy(alpha = 0.35f),
-            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            focusedBorderColor = AivoraColors.Primary.copy(alpha = 0.3f),
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
         ),
     )
 }
@@ -421,16 +402,17 @@ private fun homeSharedAvatar(
 private fun UnreadBadge(count: Int) {
     Box(
         modifier = Modifier
-            .size(20.dp)
+            .size(18.dp)
             .clip(CircleShape)
             .background(AivoraColors.Primary),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             "$count",
-            style = MaterialTheme.typography.labelMedium,
+            fontSize = 10.sp,
             color = AivoraColors.OnPrimary,
             fontWeight = FontWeight.Bold,
+            lineHeight = 10.sp,
         )
     }
 }
@@ -454,14 +436,14 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
                         if (first != null) onNavigate(Routes.status(first.id))
                         else onNavigate(Routes.NewStatus)
                     }
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                StatusRingAvatar("Me", hasUnseen = mine.isNotEmpty())
-                Spacer(modifier = Modifier.width(12.dp))
+                StatusRingAvatar("Me", hasUnseen = mine.isNotEmpty(), size = 48.dp)
+                Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("My status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("My status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
                     Icon(Icons.Default.CameraAlt, null, tint = AivoraColors.Primary)
@@ -469,7 +451,7 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
             }
             Text(
                 "Recent updates",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                 style = MaterialTheme.typography.labelLarge,
                 color = AivoraColors.Primary,
             )
@@ -479,21 +461,21 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onNavigate(Routes.status(status.id)) }
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                StatusRingAvatar(status.authorName, hasUnseen = true)
-                Spacer(modifier = Modifier.width(12.dp))
+                StatusRingAvatar(status.authorName, hasUnseen = true, size = 48.dp)
+                Spacer(modifier = Modifier.width(10.dp))
                 Column {
-                    Text(status.authorName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(status.timeLabel, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(status.authorName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text(status.timeLabel, style = MaterialTheme.typography.bodyMedium, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
         item {
             Text(
                 "Viewed updates",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -503,23 +485,23 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onNavigate(Routes.status(status.id)) }
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                StatusRingAvatar(status.authorName, hasUnseen = false)
-                Spacer(modifier = Modifier.width(12.dp))
+                StatusRingAvatar(status.authorName, hasUnseen = false, size = 48.dp)
+                Spacer(modifier = Modifier.width(10.dp))
                 Column {
-                    Text(status.authorName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(status.timeLabel, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(status.authorName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text(status.timeLabel, style = MaterialTheme.typography.bodyMedium, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
         item {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             PrimaryButton(
                 "Status privacy",
                 onClick = { onNavigate(Routes.SettingsPrivacyStatus) },
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             )
         }
     }
