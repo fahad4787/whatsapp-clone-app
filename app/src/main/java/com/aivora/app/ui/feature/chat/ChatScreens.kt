@@ -1,6 +1,10 @@
 package com.aivora.app.ui.feature.chat
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -13,11 +17,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -50,34 +56,45 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.aivora.app.data.local.InMemoryChatStore
+import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraScaffold
+import com.aivora.app.ui.components.TypingIndicatorBubble
 import com.aivora.app.ui.media.rememberMediaActions
-import com.aivora.app.ui.motion.enterFadeSlide
+import com.aivora.app.ui.motion.AivoraTweenFast
+import com.aivora.app.ui.motion.rememberAivoraHaptics
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
+import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun ChatIdScreen(
     chatId: String = "1",
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val context = LocalContext.current
     val dark = isSystemInDarkTheme()
+    val haptics = rememberAivoraHaptics()
     val chat = remember(chatId) { InMemoryChatStore.chat(chatId) }
     val messages by InMemoryChatStore.messages(chatId).collectAsState()
     var text by remember { mutableStateOf("") }
+    var peerTyping by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val media = rememberMediaActions(context) { uri ->
+        haptics.confirm()
         InMemoryChatStore.sendMedia(chatId, uri.toString())
+        peerTyping = true
     }
 
     LaunchedEffect(chatId) {
@@ -86,13 +103,51 @@ fun ChatIdScreen(
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.lastIndex)
+            listState.animateScrollToItem(messages.lastIndex + if (peerTyping) 1 else 0)
         }
     }
 
+    LaunchedEffect(peerTyping) {
+        if (!peerTyping) return@LaunchedEffect
+        delay(1400)
+        peerTyping = false
+        delay(200)
+        InMemoryChatStore.sendText(chatId, "Got it 👍", mine = false)
+    }
+
+    val avatarModifier = sharedAvatarModifier(
+        sharedTransitionScope,
+        animatedVisibilityScope,
+        chatId,
+    )
+
     AivoraScaffold(
         title = chat.title,
-        onBack = onBack,
+        onBack = {
+            haptics.tick()
+            onBack?.invoke()
+        },
+        titleContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Avatar(chat.title, size = 36, modifier = avatarModifier)
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        chat.title,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    AnimatedVisibility(visible = peerTyping, enter = fadeIn(AivoraTweenFast), exit = fadeOut(AivoraTweenFast)) {
+                        Text(
+                            "typing…",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AivoraColors.Primary,
+                        )
+                    }
+                }
+            }
+        },
         actions = {
             IconButton(onClick = { onNavigate(Routes.NewCall) }) {
                 Icon(Icons.Default.Videocam, contentDescription = "Video call")
@@ -121,21 +176,17 @@ fun ChatIdScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
                 items(messages, key = { it.id }) { msg ->
-                    val fromX = if (msg.mine) 28f else -28f
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .enterFadeSlide(key = msg.id, fromX = fromX, fromY = 10f),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = if (msg.mine) Arrangement.End else Arrangement.Start,
                     ) {
                         Column(
                             modifier = Modifier
                                 .widthIn(max = 320.dp)
-                                .shadow(2.dp, bubbleShape(msg.mine), clip = false)
                                 .clip(bubbleShape(msg.mine))
                                 .background(
                                     if (msg.mine) AivoraColors.BubbleMine
@@ -172,12 +223,18 @@ fun ChatIdScreen(
                         }
                     }
                 }
+                if (peerTyping) {
+                    item(key = "typing") {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                            TypingIndicatorBubble()
+                        }
+                    }
+                }
             }
         }
 
         Surface(
-            tonalElevation = 3.dp,
-            shadowElevation = 6.dp,
+            tonalElevation = 2.dp,
             color = MaterialTheme.colorScheme.surface,
         ) {
             Row(
@@ -207,8 +264,8 @@ fun ChatIdScreen(
                 AnimatedContent(
                     targetState = text.isNotBlank(),
                     transitionSpec = {
-                        (fadeIn() + scaleIn(initialScale = 0.7f)) togetherWith
-                            (fadeOut() + scaleOut(targetScale = 0.7f))
+                        (fadeIn(AivoraTweenFast) + scaleIn(initialScale = 0.85f, animationSpec = AivoraTweenFast)) togetherWith
+                            (fadeOut(AivoraTweenFast) + scaleOut(targetScale = 0.85f, animationSpec = AivoraTweenFast))
                     },
                     label = "sendMic",
                 ) { canSend ->
@@ -224,8 +281,12 @@ fun ChatIdScreen(
                             onClick = {
                                 val body = text.trim()
                                 if (body.isNotEmpty()) {
+                                    haptics.confirm()
                                     InMemoryChatStore.sendText(chatId, body)
                                     text = ""
+                                    peerTyping = true
+                                } else {
+                                    haptics.tick()
                                 }
                             },
                         ) {
@@ -239,6 +300,22 @@ fun ChatIdScreen(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun sharedAvatarModifier(
+    scope: SharedTransitionScope?,
+    visibility: AnimatedVisibilityScope?,
+    chatId: String,
+): Modifier {
+    if (scope == null || visibility == null) return Modifier
+    return with(scope) {
+        Modifier.sharedElement(
+            state = rememberSharedContentState(key = "chat-avatar-$chatId"),
+            animatedVisibilityScope = visibility,
+        )
     }
 }
 
