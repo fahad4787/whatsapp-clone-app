@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.profile
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -85,27 +85,34 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
 
 @Composable
-fun CommunityIdScreen(
-    communityId: String = "",
+fun ProfileIdScreen(
+    profileId: String = "",
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    val title = when (communityId) {
-        "1" -> "Local Neighbors"
-        "2" -> "Office Community"
-        else -> "Community"
-    }
-    AivoraScaffold(title = title, onBack = onBack) {
-        InfoBanner("A community keeps related groups together with one announcement group.")
+    val chat = com.aivora.app.data.local.MockData.chat(profileId.ifBlank { "1" })
+    AivoraScaffold(title = "Contact info", onBack = onBack) {
+        Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Avatar(chat.title, size = 96)
+            Spacer(Modifier.height(12.dp))
+            Text(chat.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("+92 300 1234567", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         SettingsList(
             listOf(
-                "Announcement" to listOf(
-                    SettingsItem("Community announcements", "Everyone in the community", Icons.Default.Groups, onClick = { onNavigate(Routes.ChatId.replace("{id}", "ann")) }),
-                ),
-                "Groups" to listOf(
-                    SettingsItem("General", "128 members", Icons.Default.Groups, onClick = { onNavigate(Routes.ChatId.replace("{id}", "g1")) }),
-                    SettingsItem("Events", "42 members", Icons.Default.Event, onClick = { onNavigate(Routes.ChatId.replace("{id}", "g2")) }),
-                ),
+                null to listOf(
+                    SettingsItem("Audio call", null, Icons.Default.Call, onClick = { onNavigate(Routes.NewCall) }),
+                    SettingsItem("Video call", null, Icons.Default.Videocam, onClick = { onNavigate(Routes.NewCall) }),
+                    SettingsItem("Search in chat", null, Icons.Default.Search, onClick = { }),
+                    SettingsItem("Media, links, and docs", null, Icons.Default.Photo, onClick = { }),
+                    SettingsItem("Starred messages", null, Icons.Default.Star, onClick = { onNavigate(Routes.SettingsStarred) }),
+                    SettingsItem("Notifications", null, Icons.Default.Notifications, onClick = { }),
+                    SettingsItem("Disappearing messages", "Off", Icons.Default.Timer, onClick = { onNavigate(Routes.SettingsPrivacyDefaultTimer) }),
+                    SettingsItem("Advanced chat privacy", null, Icons.Default.Security, onClick = { onNavigate(Routes.SettingsPrivacyAdvanced) }),
+                    SettingsItem("Encryption", "Messages and calls are end-to-end encrypted.", Icons.Default.Lock, onClick = { }),
+                    SettingsItem("Block", null, Icons.Default.Block, danger = true, onClick = { onNavigate(Routes.SettingsBlocked) }),
+                    SettingsItem("Report", null, Icons.Default.Info, danger = true, onClick = { }),
+                )
             )
         )
     }

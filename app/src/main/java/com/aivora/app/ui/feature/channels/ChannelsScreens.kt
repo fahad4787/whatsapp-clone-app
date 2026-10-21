@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.channels
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -85,27 +85,32 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
 
 @Composable
-fun MessageInfoChatMessageScreen(
-    chatId: String = "",
-    messageId: String = "",
+fun ChannelsScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    AivoraScaffold(title = "Message info", onBack = onBack) {
-        InfoBanner("Read receipts and delivery details for this message.")
-        SettingsList(
-            listOf(
-                "Read by" to listOf(
-                    SettingsItem("Ahmad Khan", "Today, 9:41 PM", Icons.Default.Person, onClick = { }),
-                ),
-                "Delivered to" to listOf(
-                    SettingsItem("Fatima Ali", "Today, 9:40 PM", Icons.Default.Person, onClick = { }),
-                ),
-                null to listOf(
-                    SettingsItem("Star", null, Icons.Default.Star, onClick = { }),
-                    SettingsItem("Delete for everyone", null, Icons.Default.Delete, danger = true, onClick = { }),
-                ),
-            )
-        )
+    var query by remember { mutableStateOf("") }
+    val channels = listOf(
+        "Aivora News" to "Verified · 12.4k followers",
+        "Aivora Updates" to "Listed channel",
+        "Tech Daily" to "1.2k followers",
+    ).filter { query.isBlank() || it.first.contains(query, true) }
+    AivoraScaffold(
+        title = "Channels",
+        onBack = onBack,
+        fab = {
+            FloatingActionButton(onClick = { onNavigate(Routes.ChannelSlug.replace("{slug}", "new")) }, containerColor = AivoraColors.Primary, contentColor = AivoraColors.OnPrimary) {
+                Icon(Icons.Default.Add, null)
+            }
+        },
+    ) {
+        InfoBanner("Find channels")
+        SearchField(query, { query = it }, "Search channels")
+        if (channels.isEmpty()) EmptyState("No channels match.", "Try a different search.")
+        LazyColumn {
+            items(channels) { (n, s) ->
+                PersonRow(n, s, onClick = { onNavigate(Routes.ChannelSlug.replace("{slug}", n.lowercase().replace(" ", "-"))) })
+            }
+        }
     }
 }

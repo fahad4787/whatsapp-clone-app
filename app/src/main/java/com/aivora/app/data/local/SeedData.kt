@@ -1,4 +1,4 @@
-package com.aivora.app.ui.mock
+package com.aivora.app.data.local
 
 data class MockChat(
     val id: String,

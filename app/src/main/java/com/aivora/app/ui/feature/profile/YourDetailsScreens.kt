@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.profile
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -83,45 +83,45 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
-
 @Composable
-fun ChannelSlugScreen(
-    slug: String = "",
+fun YourDetailsScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    val title = slug.ifBlank { "channel" }.replace('-', ' ').replaceFirstChar { it.uppercase() }
-    AivoraScaffold(
-        title = title,
-        onBack = onBack,
-        actions = {
-            IconButton(onClick = { }) { Icon(Icons.Default.Search, null) }
-            IconButton(onClick = { }) { Icon(Icons.Default.MoreVert, null) }
-        },
-        fab = {
-            FloatingActionButton(onClick = { }, containerColor = AivoraColors.Primary, contentColor = AivoraColors.OnPrimary) {
-                Icon(Icons.Default.Edit, contentDescription = "New channel post")
-            }
-        },
-    ) {
-        InfoBanner("New channel post")
-        val posts = listOf(
-            "Welcome to the channel — follow for updates.",
-            "Today's briefing is live.",
-            "Tap follow to get notified.",
+    var f0 by remember { mutableStateOf("") }
+    var f1 by remember { mutableStateOf("") }
+    var f2 by remember { mutableStateOf("") }
+    AivoraScaffold(title = "Edit profile", onBack = onBack) {
+        InfoBanner("Add your name")
+        OutlinedTextField(
+            value = f0,
+            onValueChange = { f0 = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            label = { Text("Name") },
+            placeholder = { Text("Add your name") },
+            singleLine = true,
         )
-        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(posts) { p ->
-                Column(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                    Text(p, style = MaterialTheme.typography.bodyLarge)
-                    Text("View count · Reactions", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            item {
-                PrimaryButton("Follow channel", onClick = { })
-                Spacer(Modifier.height(8.dp))
-                LinkButton("Report this channel") { }
-            }
-        }
+        OutlinedTextField(
+            value = f1,
+            onValueChange = { f1 = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            label = { Text("About") },
+            placeholder = { Text("Hey there! I am using Aivora.") },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = f2,
+            onValueChange = { f2 = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            label = { Text("Username") },
+            placeholder = { Text("Choose a username") },
+            singleLine = true,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        PrimaryButton(
+            text = "Save",
+            onClick = { onNavigate(Routes.SettingsProfile) },
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
     }
 }

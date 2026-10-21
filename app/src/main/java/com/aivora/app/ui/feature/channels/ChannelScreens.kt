@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.channels
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -85,28 +85,43 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
 
 @Composable
-fun NewCallScreen(
+fun ChannelSlugScreen(
+    slug: String = "",
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    AivoraScaffold(title = "Calls", onBack = onBack, fab = {
-        FloatingActionButton(onClick = { }, containerColor = AivoraColors.Primary, contentColor = AivoraColors.OnPrimary) {
-            Icon(Icons.Default.Add, null)
-        }
-    }) {
-        InfoBanner("Audio call · A call can have up to many participants.")
-        SettingsList(
-            listOf(
-                null to listOf(
-                    SettingsItem("Create call link", "Anyone with the link can join this call — no chat needed.", Icons.Default.Call, onClick = { }),
-                    SettingsItem("Scheduled calls", null, Icons.Default.Event, onClick = { onNavigate(Routes.ScheduledCalls) }),
-                    SettingsItem("New call", "Add to call", Icons.Default.Call, onClick = { onNavigate(Routes.NewChat) }),
-                ),
-                "Recent" to listOf(
-                    SettingsItem("Ahmad Khan", "Outgoing · Yesterday", Icons.Default.Call, onClick = { }),
-                    SettingsItem("Fatima Ali", "Missed · 2 days ago", Icons.Default.Videocam, onClick = { }),
-                ),
-            )
+    val title = slug.ifBlank { "channel" }.replace('-', ' ').replaceFirstChar { it.uppercase() }
+    AivoraScaffold(
+        title = title,
+        onBack = onBack,
+        actions = {
+            IconButton(onClick = { }) { Icon(Icons.Default.Search, null) }
+            IconButton(onClick = { }) { Icon(Icons.Default.MoreVert, null) }
+        },
+        fab = {
+            FloatingActionButton(onClick = { }, containerColor = AivoraColors.Primary, contentColor = AivoraColors.OnPrimary) {
+                Icon(Icons.Default.Edit, contentDescription = "New channel post")
+            }
+        },
+    ) {
+        InfoBanner("New channel post")
+        val posts = listOf(
+            "Welcome to the channel — follow for updates.",
+            "Today's briefing is live.",
+            "Tap follow to get notified.",
         )
+        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(posts) { p ->
+                Column(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+                    Text(p, style = MaterialTheme.typography.bodyLarge)
+                    Text("View count · Reactions", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            item {
+                PrimaryButton("Follow channel", onClick = { })
+                Spacer(Modifier.height(8.dp))
+                LinkButton("Report this channel") { }
+            }
+        }
     }
 }

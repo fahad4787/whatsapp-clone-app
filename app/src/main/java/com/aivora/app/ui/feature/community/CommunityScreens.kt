@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.community
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -85,23 +85,27 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
 
 @Composable
-fun ScheduledCallsScreen(
+fun CommunityIdScreen(
+    communityId: String = "",
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    AivoraScaffold(title = "Scheduled calls", onBack = onBack, fab = {
-        FloatingActionButton(onClick = { }, containerColor = AivoraColors.Primary, contentColor = AivoraColors.OnPrimary) {
-            Icon(Icons.Default.Add, null)
-        }
-    }) {
-        InfoBanner("A scheduled call is starting soon")
+    val title = when (communityId) {
+        "1" -> "Local Neighbors"
+        "2" -> "Office Community"
+        else -> "Community"
+    }
+    AivoraScaffold(title = title, onBack = onBack) {
+        InfoBanner("A community keeps related groups together with one announcement group.")
         SettingsList(
             listOf(
-                null to listOf(
-                    SettingsItem("Team standup", "Tomorrow · 10:00 · Audio", Icons.Default.Call, onClick = { }),
-                    SettingsItem("Family catch-up", "Friday · Video", Icons.Default.Videocam, onClick = { }),
-                    SettingsItem("Back to scheduled calls", null, Icons.Default.Event, onClick = { }),
-                )
+                "Announcement" to listOf(
+                    SettingsItem("Community announcements", "Everyone in the community", Icons.Default.Groups, onClick = { onNavigate(Routes.ChatId.replace("{id}", "ann")) }),
+                ),
+                "Groups" to listOf(
+                    SettingsItem("General", "128 members", Icons.Default.Groups, onClick = { onNavigate(Routes.ChatId.replace("{id}", "g1")) }),
+                    SettingsItem("Events", "42 members", Icons.Default.Event, onClick = { onNavigate(Routes.ChatId.replace("{id}", "g2")) }),
+                ),
             )
         )
     }

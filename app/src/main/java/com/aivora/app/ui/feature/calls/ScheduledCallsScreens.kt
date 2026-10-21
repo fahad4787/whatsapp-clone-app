@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.calls
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -85,17 +85,22 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
 
 @Composable
-fun TransferNewPhoneScreen(
+fun ScheduledCallsScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    AivoraScaffold(title = "Transfer chats", onBack = onBack) {
-        InfoBanner("Aivora needs the camera to scan your new phone’s QR code.")
+    AivoraScaffold(title = "Scheduled calls", onBack = onBack, fab = {
+        FloatingActionButton(onClick = { }, containerColor = AivoraColors.Primary, contentColor = AivoraColors.OnPrimary) {
+            Icon(Icons.Default.Add, null)
+        }
+    }) {
+        InfoBanner("A scheduled call is starting soon")
         SettingsList(
             listOf(
                 null to listOf(
-                    SettingsItem("Scan QR code", "Camera access lets this phone scan the QR code your new phone shows.", Icons.Default.QrCode, onClick = { }),
-                    SettingsItem("Continue", null, Icons.Default.Devices, onClick = { onNavigate(Routes.Home) }),
+                    SettingsItem("Team standup", "Tomorrow · 10:00 · Audio", Icons.Default.Call, onClick = { }),
+                    SettingsItem("Family catch-up", "Friday · Video", Icons.Default.Videocam, onClick = { }),
+                    SettingsItem("Back to scheduled calls", null, Icons.Default.Event, onClick = { }),
                 )
             )
         )

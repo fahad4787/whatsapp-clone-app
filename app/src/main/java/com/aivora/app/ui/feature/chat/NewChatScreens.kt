@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.chat
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -63,6 +63,7 @@ import com.aivora.app.ui.components.RadioGroup
 import com.aivora.app.ui.components.SearchField
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
+import com.aivora.app.data.local.MockData
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 import androidx.compose.material.icons.filled.AccountCircle
@@ -83,37 +84,51 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileIdScreen(
-    profileId: String = "",
+fun NewChatScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    val chat = com.aivora.app.ui.mock.MockData.chat(profileId.ifBlank { "1" })
-    AivoraScaffold(title = "Contact info", onBack = onBack) {
-        Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Avatar(chat.title, size = 96)
-            Spacer(Modifier.height(12.dp))
-            Text(chat.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("+92 300 1234567", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        SettingsList(
-            listOf(
-                null to listOf(
-                    SettingsItem("Audio call", null, Icons.Default.Call, onClick = { onNavigate(Routes.NewCall) }),
-                    SettingsItem("Video call", null, Icons.Default.Videocam, onClick = { onNavigate(Routes.NewCall) }),
-                    SettingsItem("Search in chat", null, Icons.Default.Search, onClick = { }),
-                    SettingsItem("Media, links, and docs", null, Icons.Default.Photo, onClick = { }),
-                    SettingsItem("Starred messages", null, Icons.Default.Star, onClick = { onNavigate(Routes.SettingsStarred) }),
-                    SettingsItem("Notifications", null, Icons.Default.Notifications, onClick = { }),
-                    SettingsItem("Disappearing messages", "Off", Icons.Default.Timer, onClick = { onNavigate(Routes.SettingsPrivacyDefaultTimer) }),
-                    SettingsItem("Advanced chat privacy", null, Icons.Default.Security, onClick = { onNavigate(Routes.SettingsPrivacyAdvanced) }),
-                    SettingsItem("Encryption", "Messages and calls are end-to-end encrypted.", Icons.Default.Lock, onClick = { }),
-                    SettingsItem("Block", null, Icons.Default.Block, danger = true, onClick = { onNavigate(Routes.SettingsBlocked) }),
-                    SettingsItem("Report", null, Icons.Default.Info, danger = true, onClick = { }),
+    var query by remember { mutableStateOf("") }
+    val people = MockData.contacts.filter {
+        query.isBlank() || it.first.contains(query, true) || it.second.contains(query, true)
+    }
+    AivoraScaffold(
+        title = "New chat",
+        onBack = onBack,
+        fab = { 
+        FloatingActionButton(
+            onClick = { onNavigate(Routes.NewGroup) },
+            containerColor = AivoraColors.Primary,
+            contentColor = AivoraColors.OnPrimary,
+        ) { Icon(Icons.Default.Add, contentDescription = null) }
+ },
+    ) {
+        InfoBanner("Allow access to your contacts")
+        SearchField(query, { query = it }, "Search")
+        LazyColumn {
+            item {
+                PersonRow(
+                    name = "New group",
+                    subtitle = "Create a group with friends",
+                    onClick = { onNavigate(Routes.NewGroup) },
                 )
-            )
-        )
+                PersonRow(
+                    name = "New contact",
+                    subtitle = "Add someone by number",
+                    onClick = { onNavigate(Routes.SettingsAccountAdd) },
+                )
+            }
+            items(people) { (n, s) ->
+                val id = (MockData.chats.find { it.title == n }?.id)
+                    ?: (kotlin.math.abs(n.hashCode()) % 1000).toString()
+                PersonRow(
+                    name = n,
+                    subtitle = s,
+                    onClick = { onNavigate(Routes.ChatId.replace("{id}", id)) },
+                )
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.locked
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -85,23 +85,13 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
 
 @Composable
-fun EventDetailsChatMessageScreen(
-    chatId: String = "",
-    messageId: String = "",
+fun LockedChatsScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    AivoraScaffold(title = "Event details", onBack = onBack) {
-        SettingsList(
-            listOf(
-                null to listOf(
-                    SettingsItem("Going", null, Icons.Default.Check, onClick = { }),
-                    SettingsItem("Maybe", null, Icons.Default.Info, onClick = { }),
-                    SettingsItem("Can't go", null, Icons.Default.Close, onClick = { }),
-                    SettingsItem("Edit event", null, Icons.Default.Edit, onClick = { onNavigate(Routes.EventEditChatMessage.replace("{chat}", "1").replace("{message}", "1")) }),
-                    SettingsItem("Cancel event", "Cancel this event?", Icons.Default.Delete, danger = true, onClick = { }),
-                )
-            )
-        )
+    AivoraScaffold(title = "Locked chats", onBack = onBack) {
+        InfoBanner("Authenticate to unlock")
+        EmptyState("No locked chats", "Turn on chat lock from Privacy settings.")
+        PrimaryButton("Open chat lock settings", onClick = { onNavigate(Routes.SettingsPrivacyChatLock) }, modifier = Modifier.padding(16.dp))
     }
 }

@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.events
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -83,15 +83,47 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
-
 @Composable
-fun LockedChatsScreen(
+fun EventEditChatMessageScreen(
+    chatId: String = "",
+    messageId: String = "",
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    AivoraScaffold(title = "Locked chats", onBack = onBack) {
-        InfoBanner("Authenticate to unlock")
-        EmptyState("No locked chats", "Turn on chat lock from Privacy settings.")
-        PrimaryButton("Open chat lock settings", onClick = { onNavigate(Routes.SettingsPrivacyChatLock) }, modifier = Modifier.padding(16.dp))
+    var f0 by remember { mutableStateOf("") }
+    var f1 by remember { mutableStateOf("") }
+    var f2 by remember { mutableStateOf("") }
+    AivoraScaffold(title = "Edit event", onBack = onBack) {
+        InfoBanner("Discard this event?")
+        OutlinedTextField(
+            value = f0,
+            onValueChange = { f0 = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            label = { Text("Title") },
+            placeholder = { Text("Event title *") },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = f1,
+            onValueChange = { f1 = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            label = { Text("Description") },
+            placeholder = { Text("Optional") },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = f2,
+            onValueChange = { f2 = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            label = { Text("Location") },
+            placeholder = { Text("Add a place or address") },
+            singleLine = true,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        PrimaryButton(
+            text = "Save",
+            onClick = { onNavigate(Routes.Home) },
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
     }
 }

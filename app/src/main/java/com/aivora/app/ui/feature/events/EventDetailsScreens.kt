@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.events
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -63,7 +63,6 @@ import com.aivora.app.ui.components.RadioGroup
 import com.aivora.app.ui.components.SearchField
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
-import com.aivora.app.ui.mock.MockData
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 import androidx.compose.material.icons.filled.AccountCircle
@@ -84,51 +83,25 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
-fun NewChatScreen(
+fun EventDetailsChatMessageScreen(
+    chatId: String = "",
+    messageId: String = "",
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var query by remember { mutableStateOf("") }
-    val people = MockData.contacts.filter {
-        query.isBlank() || it.first.contains(query, true) || it.second.contains(query, true)
-    }
-    AivoraScaffold(
-        title = "New chat",
-        onBack = onBack,
-        fab = { 
-        FloatingActionButton(
-            onClick = { onNavigate(Routes.NewGroup) },
-            containerColor = AivoraColors.Primary,
-            contentColor = AivoraColors.OnPrimary,
-        ) { Icon(Icons.Default.Add, contentDescription = null) }
- },
-    ) {
-        InfoBanner("Allow access to your contacts")
-        SearchField(query, { query = it }, "Search")
-        LazyColumn {
-            item {
-                PersonRow(
-                    name = "New group",
-                    subtitle = "Create a group with friends",
-                    onClick = { onNavigate(Routes.NewGroup) },
+    AivoraScaffold(title = "Event details", onBack = onBack) {
+        SettingsList(
+            listOf(
+                null to listOf(
+                    SettingsItem("Going", null, Icons.Default.Check, onClick = { }),
+                    SettingsItem("Maybe", null, Icons.Default.Info, onClick = { }),
+                    SettingsItem("Can't go", null, Icons.Default.Close, onClick = { }),
+                    SettingsItem("Edit event", null, Icons.Default.Edit, onClick = { onNavigate(Routes.EventEditChatMessage.replace("{chat}", "1").replace("{message}", "1")) }),
+                    SettingsItem("Cancel event", "Cancel this event?", Icons.Default.Delete, danger = true, onClick = { }),
                 )
-                PersonRow(
-                    name = "New contact",
-                    subtitle = "Add someone by number",
-                    onClick = { onNavigate(Routes.SettingsAccountAdd) },
-                )
-            }
-            items(people) { (n, s) ->
-                val id = (MockData.chats.find { it.title == n }?.id)
-                    ?: (kotlin.math.abs(n.hashCode()) % 1000).toString()
-                PersonRow(
-                    name = n,
-                    subtitle = s,
-                    onClick = { onNavigate(Routes.ChatId.replace("{id}", id)) },
-                )
-            }
-        }
+            )
+        )
     }
 }

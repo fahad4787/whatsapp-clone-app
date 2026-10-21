@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.calls
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -83,47 +83,30 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
+
 @Composable
-fun EventEditChatMessageScreen(
-    chatId: String = "",
-    messageId: String = "",
+fun NewCallScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var f0 by remember { mutableStateOf("") }
-    var f1 by remember { mutableStateOf("") }
-    var f2 by remember { mutableStateOf("") }
-    AivoraScaffold(title = "Edit event", onBack = onBack) {
-        InfoBanner("Discard this event?")
-        OutlinedTextField(
-            value = f0,
-            onValueChange = { f0 = it },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-            label = { Text("Title") },
-            placeholder = { Text("Event title *") },
-            singleLine = true,
-        )
-        OutlinedTextField(
-            value = f1,
-            onValueChange = { f1 = it },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-            label = { Text("Description") },
-            placeholder = { Text("Optional") },
-            singleLine = true,
-        )
-        OutlinedTextField(
-            value = f2,
-            onValueChange = { f2 = it },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-            label = { Text("Location") },
-            placeholder = { Text("Add a place or address") },
-            singleLine = true,
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        PrimaryButton(
-            text = "Save",
-            onClick = { onNavigate(Routes.Home) },
-            modifier = Modifier.padding(horizontal = 16.dp),
+    AivoraScaffold(title = "Calls", onBack = onBack, fab = {
+        FloatingActionButton(onClick = { }, containerColor = AivoraColors.Primary, contentColor = AivoraColors.OnPrimary) {
+            Icon(Icons.Default.Add, null)
+        }
+    }) {
+        InfoBanner("Audio call · A call can have up to many participants.")
+        SettingsList(
+            listOf(
+                null to listOf(
+                    SettingsItem("Create call link", "Anyone with the link can join this call — no chat needed.", Icons.Default.Call, onClick = { }),
+                    SettingsItem("Scheduled calls", null, Icons.Default.Event, onClick = { onNavigate(Routes.ScheduledCalls) }),
+                    SettingsItem("New call", "Add to call", Icons.Default.Call, onClick = { onNavigate(Routes.NewChat) }),
+                ),
+                "Recent" to listOf(
+                    SettingsItem("Ahmad Khan", "Outgoing · Yesterday", Icons.Default.Call, onClick = { }),
+                    SettingsItem("Fatima Ali", "Missed · 2 days ago", Icons.Default.Videocam, onClick = { }),
+                ),
+            )
         )
     }
 }

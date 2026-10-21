@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -51,7 +51,7 @@ import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.PersonRow
 import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.components.SearchField
-import com.aivora.app.ui.mock.MockData
+import com.aivora.app.data.local.MockData
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 

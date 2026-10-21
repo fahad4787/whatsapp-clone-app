@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -40,8 +40,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.LinkButton
-import com.aivora.app.ui.mock.MockData
-import com.aivora.app.ui.mock.MockMessage
+import com.aivora.app.data.local.MockData
+import com.aivora.app.data.local.MockMessage
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 

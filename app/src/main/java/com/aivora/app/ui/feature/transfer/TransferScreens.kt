@@ -1,4 +1,4 @@
-package com.aivora.app.ui.screens
+package com.aivora.app.ui.feature.transfer
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -83,45 +83,21 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
+
 @Composable
-fun YourDetailsScreen(
+fun TransferNewPhoneScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var f0 by remember { mutableStateOf("") }
-    var f1 by remember { mutableStateOf("") }
-    var f2 by remember { mutableStateOf("") }
-    AivoraScaffold(title = "Edit profile", onBack = onBack) {
-        InfoBanner("Add your name")
-        OutlinedTextField(
-            value = f0,
-            onValueChange = { f0 = it },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-            label = { Text("Name") },
-            placeholder = { Text("Add your name") },
-            singleLine = true,
-        )
-        OutlinedTextField(
-            value = f1,
-            onValueChange = { f1 = it },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-            label = { Text("About") },
-            placeholder = { Text("Hey there! I am using Aivora.") },
-            singleLine = true,
-        )
-        OutlinedTextField(
-            value = f2,
-            onValueChange = { f2 = it },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-            label = { Text("Username") },
-            placeholder = { Text("Choose a username") },
-            singleLine = true,
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        PrimaryButton(
-            text = "Save",
-            onClick = { onNavigate(Routes.SettingsProfile) },
-            modifier = Modifier.padding(horizontal = 16.dp),
+    AivoraScaffold(title = "Transfer chats", onBack = onBack) {
+        InfoBanner("Aivora needs the camera to scan your new phone’s QR code.")
+        SettingsList(
+            listOf(
+                null to listOf(
+                    SettingsItem("Scan QR code", "Camera access lets this phone scan the QR code your new phone shows.", Icons.Default.QrCode, onClick = { }),
+                    SettingsItem("Continue", null, Icons.Default.Devices, onClick = { onNavigate(Routes.Home) }),
+                )
+            )
         )
     }
 }
