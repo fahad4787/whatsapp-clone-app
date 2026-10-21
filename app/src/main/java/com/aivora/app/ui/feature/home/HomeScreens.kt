@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -26,14 +27,26 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Dialpad
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -58,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -67,8 +81,6 @@ import com.aivora.app.data.local.InMemoryStatusStore
 import com.aivora.app.data.local.LocalChat
 import com.aivora.app.ui.components.AivoraBottomNav
 import com.aivora.app.ui.components.Avatar
-import com.aivora.app.ui.components.PersonRow
-import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
 import com.aivora.app.ui.components.StatusRingAvatar
@@ -79,9 +91,16 @@ import com.aivora.app.ui.theme.AivoraColors
 private enum class ChatFilter(val label: String) {
     All("All"),
     Unread("Unread"),
-    Favorites("Favorites"),
+    Favourites("Favourites"),
     Groups("Groups"),
     Archived("Archived"),
+}
+
+private enum class CallFilter(val label: String) {
+    All("All"),
+    Missed("Missed"),
+    Voice("Voice"),
+    Video("Video"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
@@ -95,6 +114,8 @@ fun HomeScreen(
     val tab = HomeShellState.selectedTab
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(ChatFilter.All) }
+    var callFilter by remember { mutableStateOf(CallFilter.All) }
+    var menuOpen by remember { mutableStateOf(false) }
     val allChats by InMemoryChatStore.chats.collectAsState()
     val unreadTotal = remember(allChats) {
         allChats.filterNot { it.archived }.sumOf { it.unread }
@@ -105,34 +126,60 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     Text(
-                        when (tab) {
-                            1 -> "Updates"
-                            2 -> "Calls"
-                            3 -> "Profile"
-                            else -> "Aivora"
-                        },
+                        "Aivora",
                         fontWeight = FontWeight.Bold,
                         color = if (tab == 0) AivoraColors.Primary else MaterialTheme.colorScheme.onBackground,
                     )
                 },
                 actions = {
                     when (tab) {
-                        0 -> {
+                        0, 1 -> {
                             IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
                                 Icon(Icons.Default.CameraAlt, contentDescription = "Camera")
                             }
-                            IconButton(onClick = { onNavigate(Routes.NewChat) }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                            Box {
+                                IconButton(onClick = { menuOpen = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                                }
+                                ChatsOverflowMenu(
+                                    expanded = menuOpen,
+                                    onDismiss = { menuOpen = false },
+                                    onNavigate = { route ->
+                                        menuOpen = false
+                                        onNavigate(route)
+                                    },
+                                    onFavourites = {
+                                        menuOpen = false
+                                        filter = ChatFilter.Favourites
+                                        HomeShellState.selectedTab = 0
+                                    },
+                                )
                             }
                         }
-                        1 -> IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
-                            Icon(Icons.Default.CameraAlt, contentDescription = "Camera")
+                        2 -> {
+                            Box {
+                                IconButton(onClick = { menuOpen = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                                }
+                                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("Clear call log") },
+                                        onClick = { menuOpen = false },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Settings") },
+                                        onClick = {
+                                            menuOpen = false
+                                            onNavigate(Routes.SettingsProfile)
+                                        },
+                                    )
+                                }
+                            }
                         }
-                        2 -> IconButton(onClick = { onNavigate(Routes.NewCall) }) {
-                            Icon(Icons.Default.Add, contentDescription = "New call")
-                        }
-                        else -> IconButton(onClick = { onNavigate(Routes.SettingsQr) }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                        else -> {
+                            IconButton(onClick = { onNavigate(Routes.SettingsQr) }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                            }
                         }
                     }
                 },
@@ -147,39 +194,25 @@ fun HomeScreen(
                 onSelect = { index ->
                     if (tab != index) {
                         haptics.tick()
+                        query = ""
                         HomeShellState.selectedTab = index
                     }
                 },
             )
         },
         floatingActionButton = {
-            if (tab != 3) {
-                FloatingActionButton(
-                    onClick = {
-                        haptics.tick()
-                        when (tab) {
-                            1 -> onNavigate(Routes.NewStatus)
-                            2 -> onNavigate(Routes.NewCall)
-                            else -> onNavigate(Routes.NewChat)
-                        }
-                    },
-                    containerColor = AivoraColors.Primary,
-                    contentColor = AivoraColors.OnPrimary,
-                    elevation = FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp,
-                    ),
-                    modifier = Modifier.size(52.dp),
-                ) {
-                    Icon(
-                        when (tab) {
-                            1 -> Icons.Default.CameraAlt
-                            2 -> Icons.Default.Call
-                            else -> Icons.Default.Add
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp),
-                    )
+            when (tab) {
+                0 -> HomeFab(Icons.Default.Edit, "New chat") {
+                    haptics.tick()
+                    onNavigate(Routes.NewChat)
+                }
+                1 -> HomeFab(Icons.Default.CameraAlt, "New status") {
+                    haptics.tick()
+                    onNavigate(Routes.NewStatus)
+                }
+                2 -> HomeFab(Icons.Default.Call, "New call") {
+                    haptics.tick()
+                    onNavigate(Routes.NewCall)
                 }
             }
         },
@@ -206,11 +239,78 @@ fun HomeScreen(
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
                 )
-                1 -> StatusTab(onNavigate = onNavigate)
-                2 -> CallsTab(onNavigate = onNavigate)
-                else -> ProfileTab(onNavigate = onNavigate)
+                1 -> StatusTab(
+                    query = query,
+                    onQueryChange = { query = it },
+                    onNavigate = onNavigate,
+                )
+                2 -> CallsTab(
+                    query = query,
+                    onQueryChange = { query = it },
+                    filter = callFilter,
+                    onFilterChange = { callFilter = it },
+                    onNavigate = onNavigate,
+                )
+                else -> ProfileTab(
+                    query = query,
+                    onQueryChange = { query = it },
+                    onNavigate = onNavigate,
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun HomeFab(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
+    FloatingActionButton(
+        onClick = onClick,
+        containerColor = AivoraColors.Primary,
+        contentColor = AivoraColors.OnPrimary,
+        elevation = FloatingActionButtonDefaults.elevation(
+            defaultElevation = 4.dp,
+            pressedElevation = 8.dp,
+        ),
+        modifier = Modifier.size(56.dp),
+        shape = CircleShape,
+    ) {
+        Icon(icon, contentDescription = contentDescription, modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
+private fun ChatsOverflowMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onNavigate: (String) -> Unit,
+    onFavourites: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text("New group") },
+            leadingIcon = { Icon(Icons.Default.GroupAdd, null, tint = AivoraColors.Primary) },
+            onClick = { onNavigate(Routes.NewGroup) },
+        )
+        DropdownMenuItem(
+            text = { Text("Chat privacy") },
+            leadingIcon = { Icon(Icons.Default.Lock, null, tint = AivoraColors.Primary) },
+            onClick = { onNavigate(Routes.SettingsPrivacy) },
+        )
+        DropdownMenuItem(
+            text = { Text("Favourites") },
+            leadingIcon = { Icon(Icons.Default.Star, null, tint = AivoraColors.Primary) },
+            onClick = onFavourites,
+        )
+        DropdownMenuItem(
+            text = { Text("Linked devices") },
+            leadingIcon = { Icon(Icons.Outlined.Devices, null, tint = AivoraColors.Primary) },
+            onClick = { onNavigate(Routes.SettingsDevices) },
+        )
+        DropdownMenuItem(
+            text = { Text("Settings") },
+            leadingIcon = { Icon(Icons.Default.Settings, null, tint = AivoraColors.Primary) },
+            onClick = { onNavigate(Routes.SettingsProfile) },
+        )
     }
 }
 
@@ -234,7 +334,7 @@ private fun ChatsTab(
                 when (filter) {
                     ChatFilter.All -> !chat.archived
                     ChatFilter.Unread -> !chat.archived && chat.unread > 0
-                    ChatFilter.Favorites -> !chat.archived && chat.favorite
+                    ChatFilter.Favourites -> !chat.archived && chat.favorite
                     ChatFilter.Groups -> !chat.archived && chat.isGroup
                     ChatFilter.Archived -> chat.archived
                 }
@@ -251,7 +351,7 @@ private fun ChatsTab(
         HomeSearchBar(
             value = query,
             onValueChange = onQueryChange,
-            onSpeakClick = { /* local voice search placeholder */ },
+            placeholder = "Search chats, people, media",
         )
         Row(
             modifier = Modifier
@@ -353,11 +453,32 @@ private fun ChatsTab(
             }
             if (filter == ChatFilter.All) {
                 item {
-                    PersonRow(
-                        "Locked chats",
-                        "Authenticate to unlock",
-                        onClick = { onNavigate(Routes.LockedChats) },
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigate(Routes.LockedChats) }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(AivoraColors.Primary.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Default.Lock, null, tint = AivoraColors.Primary)
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text("Locked chats", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                            Text(
+                                "Authenticate to unlock",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -368,7 +489,8 @@ private fun ChatsTab(
 private fun HomeSearchBar(
     value: String,
     onValueChange: (String) -> Unit,
-    onSpeakClick: () -> Unit,
+    placeholder: String,
+    onSpeakClick: () -> Unit = {},
 ) {
     OutlinedTextField(
         value = value,
@@ -377,7 +499,7 @@ private fun HomeSearchBar(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)
             .height(48.dp),
-        placeholder = { Text("Search", fontSize = 14.sp) },
+        placeholder = { Text(placeholder, fontSize = 14.sp) },
         leadingIcon = {
             Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp))
         },
@@ -434,15 +556,32 @@ private fun UnreadBadge(count: Int) {
 }
 
 @Composable
-private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Unit) {
+private fun StatusTab(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onNavigate: (String) -> Unit,
+) {
     val statuses by InMemoryStatusStore.statuses.collectAsState()
     val mine = remember(statuses) { InMemoryStatusStore.myStatuses() }
-    val recent = remember(statuses) { InMemoryStatusStore.recent() }
-    val viewed = remember(statuses) { InMemoryStatusStore.viewed() }
+    val recent = remember(statuses, query) {
+        InMemoryStatusStore.recent().filter {
+            query.isBlank() || it.authorName.contains(query, ignoreCase = true)
+        }
+    }
+    val viewed = remember(statuses, query) {
+        InMemoryStatusStore.viewed().filter {
+            query.isBlank() || it.authorName.contains(query, ignoreCase = true)
+        }
+    }
 
-    LazyColumn(modifier = modifier.fillMaxSize()) {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
-            val subtitle = mine.firstOrNull()?.let { "${it.timeLabel} · Tap to view" }
+            HomeSearchBar(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = "Search updates",
+            )
+            val subtitle = mine.firstOrNull()?.let { "Just posted · ${it.timeLabel}" }
                 ?: "Tap to add status update"
             Row(
                 modifier = Modifier
@@ -458,138 +597,357 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
                 StatusRingAvatar("Me", hasUnseen = mine.isNotEmpty(), size = 48.dp)
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("My status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("My status", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text(subtitle, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
-                    Icon(Icons.Default.CameraAlt, null, tint = AivoraColors.Primary)
-                }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Text(
-                "Recent updates",
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                style = MaterialTheme.typography.labelLarge,
-                color = AivoraColors.Primary,
-            )
-        }
-        items(recent, key = { it.id }) { status ->
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onNavigate(Routes.status(status.id)) }
-                    .padding(horizontal = 14.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                StatusRingAvatar(status.authorName, hasUnseen = true, size = 48.dp)
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(status.authorName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                    Text(status.timeLabel, style = MaterialTheme.typography.bodyMedium, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                StatusActionPill(
+                    icon = Icons.Default.PhotoLibrary,
+                    label = "Gallery",
+                    onClick = { onNavigate(Routes.camera("status")) },
+                )
+                StatusActionPill(
+                    icon = Icons.Default.Edit,
+                    label = "Text",
+                    onClick = { onNavigate(Routes.NewStatus) },
+                )
             }
-        }
-        item {
-            Text(
-                "Viewed updates",
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        items(viewed, key = { it.id }) { status ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onNavigate(Routes.status(status.id)) }
-                    .padding(horizontal = 14.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                StatusRingAvatar(status.authorName, hasUnseen = false, size = 48.dp)
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(status.authorName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                    Text(status.timeLabel, style = MaterialTheme.typography.bodyMedium, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-        item {
-            Spacer(Modifier.height(6.dp))
-            PrimaryButton(
-                "Status privacy",
-                onClick = { onNavigate(Routes.SettingsPrivacyStatus) },
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun CallsTab(modifier: Modifier = Modifier, onNavigate: (String) -> Unit) {
-    LazyColumn(modifier = modifier.fillMaxSize()) {
-        item {
-            PersonRow(
-                "Create call link",
-                "Anyone with the link can join this call — no chat needed.",
-                onClick = { onNavigate(Routes.NewCall) },
-            )
-            PersonRow(
-                "Scheduled calls",
-                "A scheduled call is starting soon",
-                onClick = { onNavigate(Routes.ScheduledCalls) },
-            )
             Text(
                 "Recent",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.labelLarge,
-                color = AivoraColors.Primary,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
             )
-        }
-        items(
-            listOf(
-                "Ahmad Khan" to "Outgoing · Yesterday",
-                "Fatima Ali" to "Missed video · 2 days ago",
-                "Family Group" to "Incoming · Monday",
-            ),
-        ) { (name, sub) ->
-            PersonRow(name, sub, onClick = { onNavigate(Routes.NewCall) }) {
-                IconButton(onClick = { onNavigate(Routes.NewCall) }) {
-                    Icon(Icons.Default.Call, null, tint = AivoraColors.Primary)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProfileTab(onNavigate: (String) -> Unit) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onNavigate(Routes.SettingsProfile) }
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Avatar("You", size = 64)
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text("You", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            if (recent.isEmpty() && viewed.isEmpty()) {
                 Text(
-                    "Hey there! I am using Aivora.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    "Status updates from people you have saved appear here for 24 hours.",
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
                 )
             }
         }
-        SettingsList(
-            listOf(
-                null to listOf(
-                    SettingsItem("Account", "Security, change number", Icons.Default.Person, onClick = { onNavigate(Routes.SettingsAccount) }),
-                    SettingsItem("Chats", "Theme, wallpapers, history", Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsChats) }),
-                    SettingsItem("Privacy", "Last seen, profile photo", Icons.Default.MoreVert, onClick = { onNavigate(Routes.SettingsPrivacy) }),
-                    SettingsItem("Storage and data", "Network usage", Icons.Default.MoreVert, onClick = { onNavigate(Routes.SettingsStorage) }),
-                ),
+        items(recent, key = { it.id }) { status ->
+            StatusRow(status.authorName, status.timeLabel, unseen = true) {
+                onNavigate(Routes.status(status.id))
+            }
+        }
+        if (viewed.isNotEmpty()) {
+            item {
+                Text(
+                    "Viewed updates",
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            items(viewed, key = { it.id }) { status ->
+                StatusRow(status.authorName, status.timeLabel, unseen = false) {
+                    onNavigate(Routes.status(status.id))
+                }
+            }
+        }
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun StatusActionPill(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(AivoraColors.Primary.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, null, tint = AivoraColors.Primary, modifier = Modifier.size(18.dp))
+        Text(label, color = AivoraColors.Primary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun StatusRow(name: String, time: String, unseen: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        StatusRingAvatar(name, hasUnseen = unseen, size = 48.dp)
+        Spacer(modifier = Modifier.width(10.dp))
+        Column {
+            Text(name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(time, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun CallsTab(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    filter: CallFilter,
+    onFilterChange: (CallFilter) -> Unit,
+    onNavigate: (String) -> Unit,
+) {
+    data class CallRow(
+        val name: String,
+        val detail: String,
+        val missed: Boolean,
+        val video: Boolean,
+        val time: String,
+    )
+    val calls = remember {
+        listOf(
+            CallRow("mubasir", "Missed voice call", true, false, "10:49 pm"),
+            CallRow("B Chaudhry", "Outgoing video", false, true, "Yesterday"),
+            CallRow("Hamza (You)", "Missed video call", true, true, "Yesterday"),
+            CallRow("Ahmad Khan", "Outgoing", false, false, "Monday"),
+            CallRow("Fatima Ali", "Incoming", false, false, "Sunday"),
+        )
+    }
+    val filtered = remember(calls, query, filter) {
+        calls.filter { row ->
+            val matchesQuery = query.isBlank() ||
+                row.name.contains(query, ignoreCase = true) ||
+                row.detail.contains(query, ignoreCase = true)
+            val matchesFilter = when (filter) {
+                CallFilter.All -> true
+                CallFilter.Missed -> row.missed
+                CallFilter.Voice -> !row.video
+                CallFilter.Video -> row.video
+            }
+            matchesQuery && matchesFilter
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        HomeSearchBar(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = "Search calls, contacts",
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            CallQuickAction(Icons.Default.Call, "Call") { onNavigate(Routes.NewCall) }
+            CallQuickAction(Icons.Default.Event, "Schedule") { onNavigate(Routes.ScheduledCalls) }
+            CallQuickAction(Icons.Default.Dialpad, "Keypad") { onNavigate(Routes.NewCall) }
+            CallQuickAction(Icons.Default.StarBorder, "Favorites") {
+                onFilterChange(CallFilter.All)
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            CallFilter.entries.forEach { option ->
+                val selected = filter == option
+                FilterChip(
+                    selected = selected,
+                    onClick = { onFilterChange(option) },
+                    label = {
+                        Text(
+                            option.label,
+                            fontSize = 12.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    },
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = selected,
+                        borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                        selectedBorderColor = AivoraColors.Primary.copy(alpha = 0.35f),
+                        borderWidth = 1.dp,
+                        selectedBorderWidth = 1.dp,
+                    ),
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        labelColor = Color(0xFF8A9499),
+                        selectedContainerColor = MaterialTheme.colorScheme.surface,
+                        selectedLabelColor = MaterialTheme.colorScheme.onBackground,
+                    ),
+                    shape = RoundedCornerShape(20.dp),
+                )
+            }
+        }
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(filtered, key = { it.name + it.time }) { row ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigate(Routes.NewCall) }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Avatar(row.name, size = 44)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            row.name,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                            color = if (row.missed) Color(0xFFD32F2F) else MaterialTheme.colorScheme.onBackground,
+                        )
+                        Text(
+                            "${row.detail} · ${row.time}",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Icon(
+                        if (row.video) Icons.Default.Videocam else Icons.Default.Call,
+                        contentDescription = null,
+                        tint = AivoraColors.Primary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+            item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun CallQuickAction(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(72.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(22.dp))
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun ProfileTab(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onNavigate: (String) -> Unit,
+) {
+    val filteredSections = remember(query) {
+        val all = listOf(
+            null to listOf(
+                SettingsItem("Lists", null, Icons.Default.GroupAdd, onClick = { onNavigate(Routes.SettingsListsNew) }),
+                SettingsItem("Starred", null, Icons.Default.Star, onClick = { onNavigate(Routes.SettingsStarred) }),
+            ),
+            null to listOf(
+                SettingsItem("Account", null, Icons.Default.Lock, onClick = { onNavigate(Routes.SettingsAccount) }),
+                SettingsItem("Privacy", null, Icons.Default.Lock, onClick = { onNavigate(Routes.SettingsPrivacy) }),
+                SettingsItem("Chats", null, Icons.Default.Edit, onClick = { onNavigate(Routes.SettingsChats) }),
+            ),
+            null to listOf(
+                SettingsItem("Appearance", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsChats) }),
+                SettingsItem("Notifications", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsAccountSecurityNotifications) }),
+                SettingsItem("Storage and data", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsStorage) }),
+            ),
+            null to listOf(
+                SettingsItem("Help", null, Icons.Default.Settings, onClick = { onNavigate(Routes.SettingsPermissions) }),
+                SettingsItem("Invite a friend", null, Icons.Default.GroupAdd, onClick = { }),
             ),
         )
+        if (query.isBlank()) all
+        else all.mapNotNull { (header, items) ->
+            val match = items.filter { it.title.contains(query, ignoreCase = true) }
+            if (match.isEmpty()) null else header to match
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        HomeSearchBar(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = "Search profile, settings",
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "My Profile",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(
+                onClick = { onNavigate(Routes.SettingsQr) },
+                modifier = Modifier
+                    .size(40.dp)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+            ) {
+                Icon(Icons.Default.QrCode, contentDescription = "QR code")
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(
+                onClick = { onNavigate(Routes.YourDetails) },
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(AivoraColors.Primary.copy(alpha = 0.15f)),
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = AivoraColors.Primary)
+            }
+        }
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .clickable { }
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Right now I’m…",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("+", fontWeight = FontWeight.Bold, color = AivoraColors.Primary)
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Avatar("You", size = 88)
+            Spacer(modifier = Modifier.height(10.dp))
+            Text("You", fontWeight = FontWeight.Bold, fontSize = 22.sp)
+        }
+        SettingsList(filteredSections, modifier = Modifier.weight(1f))
     }
 }

@@ -199,14 +199,45 @@ fun SettingsList(
     sections: List<Pair<String?, List<SettingsItem>>>,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(modifier = modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         sections.forEach { (header, items) ->
-            if (header != null) {
-                item { SectionHeader(header) }
+            item {
+                Column {
+                    if (header != null) {
+                        Text(
+                            header,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surface),
+                    ) {
+                        items.forEachIndexed { index, row ->
+                            SettingsRow(row)
+                            if (index < items.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = if (row.icon != null) 70.dp else 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(0.35f),
+                                )
+                            }
+                        }
+                    }
+                }
             }
-            items(items) { SettingsRow(it); HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(0.4f)) }
         }
-        item { Spacer(Modifier.height(32.dp)) }
+        item { Spacer(Modifier.height(24.dp)) }
     }
 }
 

@@ -75,7 +75,7 @@ fun AivoraBottomNav(
             NavDest("Chats", Icons.Filled.Chat, Icons.Outlined.Chat),
             NavDest("Updates", Icons.Outlined.Update, Icons.Outlined.Update),
             NavDest("Calls", Icons.Filled.Call, Icons.Outlined.Call),
-            NavDest("Profile", Icons.Filled.Person, Icons.Outlined.Person),
+            NavDest("My Profile", Icons.Filled.Person, Icons.Outlined.Person),
         )
     }
     val shape = RoundedCornerShape(26.dp)
@@ -156,17 +156,28 @@ fun AivoraBottomNav(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(contentAlignment = Alignment.TopEnd) {
-                                Icon(
-                                    imageVector = if (selectedNow) dest.iconSelected else dest.iconIdle,
-                                    contentDescription = dest.label,
-                                    tint = tint,
-                                    modifier = Modifier
-                                        .size(22.dp)
-                                        .graphicsLayer {
+                                if (index == 3) {
+                                    Avatar(
+                                        name = "You",
+                                        size = 22,
+                                        modifier = Modifier.graphicsLayer {
                                             scaleX = scale
                                             scaleY = scale
                                         },
-                                )
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = if (selectedNow) dest.iconSelected else dest.iconIdle,
+                                        contentDescription = dest.label,
+                                        tint = tint,
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .graphicsLayer {
+                                                scaleX = scale
+                                                scaleY = scale
+                                            },
+                                    )
+                                }
                                 if (index == 0 && unreadCount > 0) {
                                     Box(
                                         modifier = Modifier

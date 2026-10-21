@@ -127,13 +127,17 @@ fun SettingsAccountScreen(
 ) {
     val sections = listOf(
         null to listOf(
-            SettingsItem("Security notifications", "Get notified when your security code changes", Icons.Default.Security, onClick = { onNavigate(Routes.SettingsAccountSecurityNotifications) }),
-            SettingsItem("Email address", "Add an email for account recovery", Icons.Default.Email, onClick = { onNavigate(Routes.SettingsAccountEmail) }),
-            SettingsItem("Passkeys", "Sign in without a password", Icons.Default.Fingerprint, onClick = { onNavigate(Routes.SettingsAccountPasskeys) }),
-            SettingsItem("Two-step verification", "PIN for extra security", Icons.Default.VpnKey, onClick = { onNavigate(Routes.SettingsTwoStep) }),
-            SettingsItem("Change number", "Migrate to a new phone number", Icons.Default.Phone, onClick = { onNavigate(Routes.SettingsAccountChangeNumber) }),
-            SettingsItem("Request account info", "Download a report of your account", Icons.Default.Folder, onClick = { onNavigate(Routes.SettingsAccountRequestInfo) }),
-            SettingsItem("Add account", "Use another account on this device", Icons.Default.PersonAdd, onClick = { onNavigate(Routes.SettingsAccountAdd) }),
+            SettingsItem("Security notifications", null, Icons.Default.Security, onClick = { onNavigate(Routes.SettingsAccountSecurityNotifications) }),
+            SettingsItem("Passkeys", null, Icons.Default.Key, onClick = { onNavigate(Routes.SettingsAccountPasskeys) }),
+            SettingsItem("Email address", "Not added", Icons.Default.Email, onClick = { onNavigate(Routes.SettingsAccountEmail) }),
+            SettingsItem("Two-step verification", "Off", Icons.Default.Lock, onClick = { onNavigate(Routes.SettingsTwoStep) }),
+        ),
+        null to listOf(
+            SettingsItem("Change number", null, Icons.Default.Phone, onClick = { onNavigate(Routes.SettingsAccountChangeNumber) }),
+            SettingsItem("Request account info", null, Icons.Default.Folder, onClick = { onNavigate(Routes.SettingsAccountRequestInfo) }),
+            SettingsItem("Add account", null, Icons.Default.PersonAdd, onClick = { onNavigate(Routes.SettingsAccountAdd) }),
+        ),
+        null to listOf(
             SettingsItem("Delete account", null, Icons.Default.Delete, danger = true, onClick = { onNavigate(Routes.SettingsDeleteAccount) }),
         ),
     )
@@ -169,35 +173,43 @@ fun SettingsPrivacyScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    var readReceipts by remember { mutableStateOf(true) }
+    var findable by remember { mutableStateOf(true) }
 
     val sections = listOf(
-        "Who can see my personal info" to listOf(
-            SettingsItem("Last seen and online", "Everyone", Icons.Default.Visibility, onClick = { onNavigate(Routes.SettingsPrivacyLastSeen) }),
-            SettingsItem("Profile photo", "Everyone", Icons.Default.Photo, onClick = { onNavigate(Routes.SettingsPrivacyProfilePhoto) }),
-            SettingsItem("About", "Everyone", Icons.Default.Info, onClick = { onNavigate(Routes.SettingsPrivacyAbout) }),
-            SettingsItem("Status", "My contacts", Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsPrivacyStatus) }),
-        ),
-        "Disappearing messages" to listOf(
-            SettingsItem("Default message timer", "Off", Icons.Default.Timer, onClick = { onNavigate(Routes.SettingsPrivacyDefaultTimer) }),
-        ),
-        "Groups & calls" to listOf(
-            SettingsItem("Groups", "Everyone", Icons.Default.Groups, onClick = { onNavigate(Routes.SettingsPrivacyGroups) }),
-            SettingsItem("Calls", "Silence unknown callers", Icons.Default.Phone, onClick = { onNavigate(Routes.SettingsPrivacyCalls) }),
-            SettingsItem("Live location", "None", Icons.Default.LocationOn, onClick = { onNavigate(Routes.SettingsPrivacyLiveLocation) }),
-        ),
-        "App security" to listOf(
-            SettingsItem("App lock", "Off", Icons.Default.Lock, onClick = { onNavigate(Routes.SettingsPrivacyAppLock) }),
-            SettingsItem("Chat lock", "Off", Icons.Default.VpnKey, onClick = { onNavigate(Routes.SettingsPrivacyChatLock) }),
-            SettingsItem("Advanced chat privacy", null, Icons.Default.Security, onClick = { onNavigate(Routes.SettingsPrivacyAdvanced) }),
-            SettingsItem("Privacy checkup", "Review your privacy", Icons.Default.Help, onClick = { onNavigate(Routes.SettingsPrivacyCheckup) }),
+        null to listOf(
+            SettingsItem("Last seen and online", null, onClick = { onNavigate(Routes.SettingsPrivacyLastSeen) }),
+            SettingsItem("Profile photo", null, onClick = { onNavigate(Routes.SettingsPrivacyProfilePhoto) }),
+            SettingsItem("About", null, onClick = { onNavigate(Routes.SettingsPrivacyAbout) }),
+            SettingsItem("Status", null, onClick = { onNavigate(Routes.SettingsPrivacyStatus) }),
+            SettingsItem("Groups", null, onClick = { onNavigate(Routes.SettingsPrivacyGroups) }),
+            SettingsItem(
+                "Read receipts",
+                trailing = if (readReceipts) "On" else "Off",
+                toggle = readReceipts,
+                onToggle = { readReceipts = it },
+            ),
         ),
         null to listOf(
-            SettingsItem("Blocked contacts", null, Icons.Default.Block, onClick = { onNavigate(Routes.SettingsBlocked) }),
+            SettingsItem(
+                "Let people find me",
+                toggle = findable,
+                onToggle = { findable = it },
+            ),
+        ),
+        null to listOf(
+            SettingsItem("Default message timer", trailing = "Off", onClick = { onNavigate(Routes.SettingsPrivacyDefaultTimer) }),
+            SettingsItem("Calls", trailing = "Silence Off", onClick = { onNavigate(Routes.SettingsPrivacyCalls) }),
+            SettingsItem("Blocked contacts", trailing = "None", onClick = { onNavigate(Routes.SettingsBlocked) }),
+            SettingsItem("Live location", trailing = "None", onClick = { onNavigate(Routes.SettingsPrivacyLiveLocation) }),
+            SettingsItem("App lock", trailing = "Off", onClick = { onNavigate(Routes.SettingsPrivacyAppLock) }),
+            SettingsItem("Chat lock", trailing = "Off", onClick = { onNavigate(Routes.SettingsPrivacyChatLock) }),
+            SettingsItem("Advanced", null, onClick = { onNavigate(Routes.SettingsPrivacyAdvanced) }),
+            SettingsItem("Privacy checkup", null, onClick = { onNavigate(Routes.SettingsPrivacyCheckup) }),
         ),
     )
 
     AivoraScaffold(title = "Privacy", onBack = onBack) {
-        InfoBanner("Control who can see your profile information and activity.")
         SettingsList(sections)
     }
 }

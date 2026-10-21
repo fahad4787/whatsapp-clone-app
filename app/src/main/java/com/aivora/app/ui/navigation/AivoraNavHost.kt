@@ -2,21 +2,14 @@ package com.aivora.app.ui.navigation
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.IntOffset
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.aivora.app.ui.feature.auth.LoginScreen
-import com.aivora.app.ui.motion.AivoraTweenFast
 import com.aivora.app.ui.feature.auth.ProfileSetupScreen
 import com.aivora.app.ui.feature.calls.NewCallScreen
 import com.aivora.app.ui.feature.calls.ScheduledCallsScreen
@@ -102,6 +95,10 @@ fun AivoraNavHost(
     NavHost(
         navController = navController,
         startDestination = startDestination,
+        enterTransition = FadeEnter,
+        exitTransition = FadeExit,
+        popEnterTransition = FadePopEnter,
+        popExitTransition = FadePopExit,
     ) {
         composable(
             route = Routes.ChannelSlug,
@@ -130,16 +127,10 @@ fun AivoraNavHost(
         composable(
             route = Routes.ChatId,
             arguments = listOf(navArgument("id") { type = NavType.StringType }),
-            enterTransition = {
-                fadeIn(AivoraTweenFast) +
-                    slideInHorizontally(animationSpec = tween<IntOffset>(160)) { it / 10 }
-            },
-            exitTransition = { fadeOut(AivoraTweenFast) },
-            popEnterTransition = { fadeIn(AivoraTweenFast) },
-            popExitTransition = {
-                fadeOut(AivoraTweenFast) +
-                    slideOutHorizontally(animationSpec = tween<IntOffset>(160)) { it / 10 }
-            },
+            enterTransition = SlideFromRightEnter,
+            exitTransition = StayPutExit,
+            popEnterTransition = StayPutPopEnter,
+            popExitTransition = SlideToRightExit,
         ) { entry ->
             ChatIdScreen(
                 chatId = entry.arguments?.getString("id").orEmpty(),
@@ -197,18 +188,20 @@ fun AivoraNavHost(
                 onNavigate = go,
             )
         }
-        composable(
-            route = Routes.Home,
-            enterTransition = { fadeIn(AivoraTweenFast) },
-            exitTransition = { fadeOut(AivoraTweenFast) },
-        ) {
+        composable(Routes.Home) {
             HomeScreen(
                 onNavigate = go,
                 sharedTransitionScope = this@SharedTransitionLayout,
                 animatedVisibilityScope = this,
             )
         }
-        composable(Routes.LockedChats) {
+        composable(
+            route = Routes.LockedChats,
+            enterTransition = SlideFromRightEnter,
+            exitTransition = StayPutExit,
+            popEnterTransition = StayPutPopEnter,
+            popExitTransition = SlideToRightExit,
+        ) {
             LockedChatsScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.Login) {
@@ -239,10 +232,22 @@ fun AivoraNavHost(
         composable(Routes.NewCall) {
             NewCallScreen(onBack = back, onNavigate = go)
         }
-        composable(Routes.NewChat) {
+        composable(
+            route = Routes.NewChat,
+            enterTransition = SlideFromRightEnter,
+            exitTransition = StayPutExit,
+            popEnterTransition = StayPutPopEnter,
+            popExitTransition = SlideToRightExit,
+        ) {
             NewChatScreen(onBack = back, onNavigate = go)
         }
-        composable(Routes.NewGroup) {
+        composable(
+            route = Routes.NewGroup,
+            enterTransition = SlideFromRightEnter,
+            exitTransition = StayPutExit,
+            popEnterTransition = StayPutPopEnter,
+            popExitTransition = SlideToRightExit,
+        ) {
             NewGroupScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.NewStatus) {
@@ -268,6 +273,10 @@ fun AivoraNavHost(
         composable(
             route = Routes.ProfileId,
             arguments = listOf(navArgument("id") { type = NavType.StringType }),
+            enterTransition = SlideFromRightEnter,
+            exitTransition = StayPutExit,
+            popEnterTransition = StayPutPopEnter,
+            popExitTransition = SlideToRightExit,
         ) { entry ->
             ProfileIdScreen(
                 profileId = entry.arguments?.getString("id").orEmpty(),
@@ -278,7 +287,13 @@ fun AivoraNavHost(
         composable(Routes.ScheduledCalls) {
             ScheduledCallsScreen(onBack = back, onNavigate = go)
         }
-        composable(Routes.SettingsAccount) {
+        composable(
+            route = Routes.SettingsAccount,
+            enterTransition = SlideFromRightEnter,
+            exitTransition = StayPutExit,
+            popEnterTransition = StayPutPopEnter,
+            popExitTransition = SlideToRightExit,
+        ) {
             SettingsAccountScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.SettingsAccountAdd) {
@@ -375,7 +390,13 @@ fun AivoraNavHost(
         composable(Routes.SettingsPermissions) {
             SettingsPermissionsScreen(onBack = back, onNavigate = go)
         }
-        composable(Routes.SettingsPrivacy) {
+        composable(
+            route = Routes.SettingsPrivacy,
+            enterTransition = SlideFromRightEnter,
+            exitTransition = StayPutExit,
+            popEnterTransition = StayPutPopEnter,
+            popExitTransition = SlideToRightExit,
+        ) {
             SettingsPrivacyScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.SettingsPrivacyAbout) {
@@ -417,7 +438,13 @@ fun AivoraNavHost(
         composable(Routes.SettingsPrivacyStatus) {
             SettingsPrivacyStatusScreen(onBack = back, onNavigate = go)
         }
-        composable(Routes.SettingsProfile) {
+        composable(
+            route = Routes.SettingsProfile,
+            enterTransition = SlideFromRightEnter,
+            exitTransition = StayPutExit,
+            popEnterTransition = StayPutPopEnter,
+            popExitTransition = SlideToRightExit,
+        ) {
             SettingsProfileScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.SettingsQr) {
