@@ -7,6 +7,8 @@ data class LocalChat(
     val time: String,
     val unread: Int = 0,
     val isGroup: Boolean = false,
+    val favorite: Boolean = false,
+    val archived: Boolean = false,
 )
 
 data class LocalMessage(
@@ -20,14 +22,14 @@ data class LocalMessage(
 /** Seed data for the in-memory store (no persistence). */
 object SeedData {
     val chats = listOf(
-        LocalChat("1", "Ahmad Khan", "Yes, joining in 5.", "9:41 PM", unread = 2),
-        LocalChat("2", "Family Group", "Fatima: See you tomorrow", "8:12 PM", isGroup = true),
+        LocalChat("1", "Ahmad Khan", "Yes, joining in 5.", "9:41 PM", unread = 2, favorite = true),
+        LocalChat("2", "Family Group", "Fatima: See you tomorrow", "8:12 PM", isGroup = true, favorite = true),
         LocalChat("3", "Aivora", "Welcome to Aivora", "Yesterday"),
         LocalChat("4", "Usman Raza", "Photo", "Yesterday", unread = 1),
         LocalChat("5", "Work", "Meeting notes shared", "Monday", isGroup = true),
-        LocalChat("6", "Zainab Noor", "Voice message", "Sunday"),
-        LocalChat("7", "Hassan Malik", "Location shared", "Saturday"),
-        LocalChat("8", "Community Announcements", "New post in General", "Friday", isGroup = true),
+        LocalChat("6", "Zainab Noor", "Voice message", "Sunday", favorite = true),
+        LocalChat("7", "Hassan Malik", "Location shared", "Saturday", archived = true),
+        LocalChat("8", "Community Announcements", "New post in General", "Friday", isGroup = true, archived = true),
     )
 
     fun chat(id: String): LocalChat =
