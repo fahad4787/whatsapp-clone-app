@@ -82,6 +82,7 @@ import com.aivora.app.ui.feature.settings.SettingsPrivacyStatusScreen
 import com.aivora.app.ui.feature.settings.SettingsProfileScreen
 import com.aivora.app.ui.feature.settings.SettingsQrScreen
 import com.aivora.app.ui.feature.settings.SettingsStarredScreen
+import com.aivora.app.ui.feature.settings.SettingsManageStorageScreen
 import com.aivora.app.ui.feature.settings.SettingsStorageScreen
 import com.aivora.app.ui.feature.settings.SettingsTwoStepScreen
 import com.aivora.app.ui.feature.transfer.TransferNewPhoneScreen
@@ -446,6 +447,9 @@ fun AivoraNavHost(
         }
         composable(Routes.SettingsStorage) {
             SettingsStorageScreen(onBack = back, onNavigate = go)
+        }
+        composable(Routes.SettingsManageStorage) {
+            SettingsManageStorageScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.SettingsAppearance) {
             SettingsAppearanceScreen(onBack = back, onNavigate = go)

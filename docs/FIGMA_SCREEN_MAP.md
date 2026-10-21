@@ -53,8 +53,16 @@ Status: `todo` | `wip` | `pass` | `deferred`
 | 7 · Settings deep | Account · Security notifications | `412:8821` | `settings` | `Routes.SettingsAccountSecurityNotifications` | wip |
 | 7 · Settings deep | Chat backup · Overview | `412:10320` | `settings` | `Routes.SettingsChatsBackup` | wip |
 | 7 · Settings deep | Starred · Empty | `412:7336` | `settings` | `Routes.SettingsStarred` | wip |
+| 7 · Settings deep | Transfer chats · Introduction | `412:10712` | `settings` | `Routes.SettingsChatsTransfer` | wip |
+| 7 · Settings deep | Manage storage · Overview | `412:14643` | `settings` | `Routes.SettingsManageStorage` | wip |
+| 7 · Settings deep | Privacy · App lock off | `412:9342` | `settings` | `Routes.SettingsPrivacyAppLock` | wip |
+| 7 · Settings deep | Privacy · Chat lock | `412:9262` | `settings` | `Routes.SettingsPrivacyChatLock` | wip |
+| 7 · Settings deep | Privacy · Advanced | `412:9201` | `settings` | `Routes.SettingsPrivacyAdvanced` | wip |
+| 7 · Settings deep | Email · Add address | `412:8663` | `settings` | `Routes.SettingsAccountEmail` | wip |
+| 7 · Settings deep | Change number · Introduction | `412:8241` | `settings` | `Routes.SettingsAccountChangeNumber` | wip |
+| 7 · Settings deep | Delete account · Review | `412:7742` | `settings` | `Routes.SettingsDeleteAccount` | wip |
 
-Remaining: Transfer, Manage storage, Lists, Email/Change number/Delete flows, App lock, Chat lock, Live location, Passkeys managed, Backup children — see Design canvas `Privacy · …`, `Account · …`, `Chat backup · …`, `Manage storage · …`.
+Remaining: Lists, Live location, Passkeys managed, Backup children, Delete/Change number multi-step — see Design canvas.
 
 ## Wave notes
 

@@ -3,7 +3,9 @@ package com.aivora.app.ui.feature.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,9 +14,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
@@ -28,6 +34,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
@@ -38,13 +45,17 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.PhoneForwarded
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Poll
+import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -53,6 +64,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -63,9 +75,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraScaffold
@@ -87,15 +101,70 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
+
+@Composable
+private fun SettingsMutedCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .padding(horizontal = AivoraDimens.CardHorizontal)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+            .background(AivoraColors.SurfaceMuted),
+        content = content,
+    )
+}
+
+@Composable
+private fun SettingsToggleBlock(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    footnote: String,
+) {
+    SettingsMutedCard {
+        SettingsRow(
+            SettingsItem(title, toggle = checked, onToggle = onCheckedChange),
+        )
+    }
+    SettingsFootnote(footnote)
+}
+
+@Composable
+private fun SettingsGreenActionRow(
+    title: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = AivoraColors.Primary, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.size(14.dp))
+        Text(
+            title,
+            color = AivoraColors.Primary,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            painter = painterResource(AivoraIcons.ChevronRight),
+            contentDescription = null,
+            tint = AivoraColors.IconSecondary,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
 
 @Composable
 private fun SettingsSectionLabel(text: String) {
@@ -537,7 +606,11 @@ fun SettingsStorageScreen(
     var lessData by remember { mutableStateOf(false) }
     val sections = listOf(
         null to listOf(
-            SettingsItem("Manage storage", subtitle = "2.4 GB", onClick = { }),
+            SettingsItem(
+                "Manage storage",
+                subtitle = "1.2 GB",
+                onClick = { onNavigate(Routes.SettingsManageStorage) },
+            ),
         ),
         "Network" to listOf(
             SettingsItem("Network usage", subtitle = "0 MB sent · 0 MB received", onClick = { }),
@@ -560,6 +633,159 @@ fun SettingsStorageScreen(
 
     AivoraScaffold(title = "Storage and data", onBack = onBack) {
         SettingsList(sections)
+    }
+}
+
+
+@Composable
+fun SettingsManageStorageScreen(
+    onBack: (() -> Unit)? = null,
+    onNavigate: (String) -> Unit = {},
+) {
+    var query by remember { mutableStateOf("") }
+    val chats = listOf(
+        "George Alan" to "400 MB",
+        "Weekend walkers" to "280 MB",
+        "Maya Chen" to "190 MB",
+        "Family" to "120 MB",
+    )
+    AivoraScaffold(title = "Manage storage", onBack = onBack) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
+            item {
+                Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        Text(
+                            "1.2 GB",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            "10.8 GB free of 64 GB",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AivoraColors.TextSecondary,
+                        )
+                    }
+                    Text(
+                        "Used by Aivora",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AivoraColors.TextSecondary,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(10.dp)
+                            .clip(RoundedCornerShape(5.dp)),
+                    ) {
+                        Box(Modifier.weight(1.2f).fillMaxSize().background(AivoraColors.Primary))
+                        Box(Modifier.weight(5.2f).fillMaxSize().background(AivoraColors.TextTertiary))
+                        Box(Modifier.weight(1.08f).fillMaxSize().background(AivoraColors.Divider))
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    StorageLegendRow(AivoraColors.Primary, "Aivora", "1.2 GB")
+                    StorageLegendRow(AivoraColors.TextTertiary, "Other apps and files", "52 GB")
+                    StorageLegendRow(AivoraColors.Divider, "Free", "10.8 GB")
+                }
+            }
+            item {
+                Text(
+                    "Review and delete",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = AivoraColors.TextSecondary,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+                SettingsMutedCard {
+                    SettingsRow(
+                        SettingsItem(
+                            "Larger than 5 MB",
+                            subtitle = "200 MB · 6 items",
+                            icon = Icons.Default.Folder,
+                            onClick = { },
+                        ),
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
+                    SettingsRow(
+                        SettingsItem(
+                            "Forwarded many times",
+                            subtitle = "72 MB · 3 items",
+                            icon = Icons.Default.Reply,
+                            onClick = { },
+                        ),
+                    )
+                }
+            }
+            item {
+                SearchField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = "Search chats or media",
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        "Chats",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "Largest first",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AivoraColors.TextSecondary,
+                    )
+                }
+            }
+            items(chats.filter { it.first.contains(query, ignoreCase = true) }) { (name, size) ->
+                PersonRow(
+                    name = name,
+                    onClick = { },
+                    trailing = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(size, color = AivoraColors.TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.width(8.dp))
+                            Icon(
+                                painter = painterResource(AivoraIcons.ChevronRight),
+                                contentDescription = null,
+                                tint = AivoraColors.IconSecondary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StorageLegendRow(color: Color, label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(color),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = AivoraColors.TextSecondary)
     }
 }
 
@@ -761,17 +987,88 @@ fun SettingsDeleteAccountScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Change number instead", null, Icons.Default.Phone, onClick = { onNavigate(Routes.SettingsAccountChangeNumber) }),
-            SettingsItem("Delete account", "Delete your account and wipe app data on this phone.", Icons.Default.Delete, danger = true, onClick = { onNavigate(Routes.SettingsAccountDeleted) }),
-        ),
-    )
-
+    var phone by remember { mutableStateOf("") }
+    val canDelete = phone.length >= 8
     AivoraScaffold(title = "Delete account", onBack = onBack) {
-        InfoBanner("Deleting your account is permanent. Your profile and message history will be wiped from this phone.")
-        SettingsList(sections)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Text(
+                "Deleting your account is permanent",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            Text(
+                "This action cannot be undone. You won’t be able to restore this account after deletion.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = AivoraColors.TextSecondary,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+            Spacer(Modifier.height(12.dp))
+            SettingsMutedCard {
+                SettingsRow(SettingsItem("Delete your Aivora account", icon = Icons.Default.Person))
+                HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
+                SettingsRow(SettingsItem("Remove you from your groups", icon = Icons.Default.Groups))
+                HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
+                SettingsRow(SettingsItem("Delete your app data and chat history", icon = Icons.Default.Chat))
+            }
+            SettingsFootnote("Messages other people already have in their chats won’t be removed.")
+            SettingsSectionLabel("Confirm your phone number")
+            SettingsMutedCard {
+                SettingsRow(
+                    SettingsItem(
+                        "India",
+                        subtitle = "Country / region",
+                        onClick = { },
+                    ),
+                )
+                HorizontalDivider(color = AivoraColors.Divider)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("+91", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.width(12.dp))
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = { phone = it.filter { c -> c.isDigit() } },
+                        placeholder = { Text("Phone number") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedBorderColor = Color.Transparent,
+                        ),
+                    )
+                }
+            }
+            SettingsFootnote("Enter the number registered to this account.")
+            SettingsMutedCard {
+                SettingsRow(
+                    SettingsItem(
+                        "Change number instead",
+                        subtitle = "Keep your account with a new number",
+                        icon = Icons.Default.Sync,
+                        onClick = { onNavigate(Routes.SettingsAccountChangeNumber) },
+                    ),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+        PrimaryButton(
+            text = "Delete my account",
+            onClick = { onNavigate(Routes.SettingsAccountDeleted) },
+            enabled = canDelete,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+        )
     }
 }
 
@@ -802,17 +1099,18 @@ fun SettingsAccountChangeNumberScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Current number", "Verified on this device", Icons.Default.Phone, onClick = { }),
-            SettingsItem("Enter new number", "Add a phone number", Icons.Default.Phone, onClick = { onNavigate(Routes.Login) }),
-        ),
-    )
-
     AivoraScaffold(title = "Change number", onBack = onBack) {
-        InfoBanner("Migrate your account to a new number.")
-        SettingsList(sections)
+        SettingsHeroIntro(
+            icon = Icons.Default.Sync,
+            title = "Move to a new phone number",
+            body = "Changing your number moves your account information, profile, groups and settings to your new number.\n\nBefore you continue, make sure your new number can receive SMS messages or calls.\n\nYour old number must be the one currently registered with Aivora.",
+        )
+        Spacer(Modifier.weight(1f))
+        PrimaryButton(
+            text = "Next",
+            onClick = { onNavigate(Routes.Login) },
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+        )
     }
 }
 
@@ -841,17 +1139,58 @@ fun SettingsAccountEmailScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Add a recovery email", "Check the email and try again.", Icons.Default.Email, onClick = { }),
-            SettingsItem("Verify email", null, Icons.Default.Check, onClick = { }),
-        ),
-    )
-
-    AivoraScaffold(title = "Email", onBack = onBack) {
-        InfoBanner("You can use this address to reset your two-step verification PIN if you forget it.")
-        SettingsList(sections)
+    var email by remember { mutableStateOf("leslie@example.com") }
+    AivoraScaffold(title = "Email address", onBack = onBack) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 24.dp),
+        ) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Add your email address",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "An email address can help you verify access to your account and recover it. It won’t be shown to your contacts.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = AivoraColors.TextSecondary,
+            )
+            Spacer(Modifier.height(20.dp))
+            Text(
+                "Email address",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(AivoraDimens.RadiusMd),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = AivoraColors.SurfaceMuted,
+                    focusedContainerColor = AivoraColors.SurfaceMuted,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedBorderColor = AivoraColors.Primary,
+                ),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "We’ll ask you to verify this address.",
+                style = MaterialTheme.typography.bodySmall,
+                color = AivoraColors.TextSecondary,
+            )
+        }
+        PrimaryButton(
+            text = "Send verification",
+            onClick = { },
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+        )
     }
 }
 
@@ -1237,17 +1576,44 @@ fun SettingsChatsTransferScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Transfer to new phone", null, Icons.Default.Devices, onClick = { onNavigate(Routes.TransferNewPhone) }),
-            SettingsItem("Receive chats", null, Icons.Default.Devices, onClick = { }),
-        ),
-    )
-
-    AivoraScaffold(title = "Chat transfer", onBack = onBack) {
-        InfoBanner("Allow access for chat transfer?")
-        SettingsList(sections)
+    AivoraScaffold(title = "Transfer chats", onBack = onBack) {
+        SettingsHeroIntro(
+            icon = Icons.Default.PhoneForwarded,
+            title = "Move chats to a new phone",
+            body = "Transfer your chats and media locally to a new phone using the same phone number.",
+        )
+        SettingsMutedCard {
+            SettingsRow(
+                SettingsItem(
+                    "Use the same phone number",
+                    subtitle = "Register that number on your new phone",
+                    icon = Icons.Default.Person,
+                ),
+            )
+            HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
+            SettingsRow(
+                SettingsItem(
+                    "Keep both phones nearby",
+                    subtitle = "Leave both phones unlocked during the transfer",
+                    icon = Icons.Default.PhoneForwarded,
+                ),
+            )
+            HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
+            SettingsRow(
+                SettingsItem(
+                    "Make sure both have enough power",
+                    subtitle = "Connect them to power if needed",
+                    icon = Icons.Default.Info,
+                ),
+            )
+        }
+        SettingsFootnote("This is a local transfer, not a cloud backup or an account merge.")
+        Spacer(Modifier.weight(1f))
+        PrimaryButton(
+            text = "Start",
+            onClick = { onNavigate(Routes.TransferNewPhone) },
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+        )
     }
 }
 
@@ -1322,19 +1688,29 @@ fun SettingsPrivacyAdvancedScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    var adv by remember { mutableStateOf(false) }
-    var def by remember { mutableStateOf(false) }
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Advanced chat privacy", "Advanced chat privacy · Can't be exported", Icons.Default.Security, toggle = adv, onToggle = { adv = it }),
-            SettingsItem("Default for new chats", null, Icons.Default.Chat, toggle = def, onToggle = { def = it }),
-        ),
-    )
-
-    AivoraScaffold(title = "Advanced chat privacy", onBack = onBack) {
-        InfoBanner("Add more privacy to your chats. Advanced privacy is on: this chat can't be exported or forwarded out of.")
-        SettingsList(sections)
+    var protectIp by remember { mutableStateOf(true) }
+    var disablePreviews by remember { mutableStateOf(true) }
+    var blockUnknown by remember { mutableStateOf(true) }
+    AivoraScaffold(title = "Advanced", onBack = onBack) {
+        Spacer(Modifier.height(8.dp))
+        SettingsToggleBlock(
+            title = "Protect IP address in calls",
+            checked = protectIp,
+            onCheckedChange = { protectIp = it },
+            footnote = "Calls are routed through Aivora to hide your IP address from the other person. This may reduce call quality.",
+        )
+        SettingsToggleBlock(
+            title = "Disable link previews",
+            checked = disablePreviews,
+            onCheckedChange = { disablePreviews = it },
+            footnote = "Link previews aren’t generated for links you share when this is enabled.",
+        )
+        SettingsToggleBlock(
+            title = "Block messages from unknown accounts",
+            checked = blockUnknown,
+            onCheckedChange = { blockUnknown = it },
+            footnote = "Limits messages from unknown accounts sending unusually high volumes. It doesn’t block all messages from non-contacts.",
+        )
     }
 }
 
@@ -1344,20 +1720,15 @@ fun SettingsPrivacyAppLockScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    var require by remember { mutableStateOf(false) }
-    var bio by remember { mutableStateOf(true) }
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Require unlock", "App lock", Icons.Default.Lock, toggle = require, onToggle = { require = it }),
-            SettingsItem("Automatically lock", "Immediately", Icons.Default.Timer, onClick = { }),
-            SettingsItem("Unlock with biometrics", null, Icons.Default.Fingerprint, toggle = bio, onToggle = { bio = it }),
-        ),
-    )
-
+    var unlock by remember { mutableStateOf(false) }
     AivoraScaffold(title = "App lock", onBack = onBack) {
-        InfoBanner("Authenticate to unlock")
-        SettingsList(sections)
+        Spacer(Modifier.height(8.dp))
+        SettingsToggleBlock(
+            title = "Unlock with device authentication",
+            checked = unlock,
+            onCheckedChange = { unlock = it },
+            footnote = "When enabled, use your device’s fingerprint, face recognition or passcode to open Aivora.",
+        )
     }
 }
 
@@ -1367,21 +1738,29 @@ fun SettingsPrivacyChatLockScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-
-    var on by remember { mutableStateOf(false) }
-    var clear by remember { mutableStateOf(true) }
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Turn on chat lock", null, Icons.Default.Lock, toggle = on, onToggle = { on = it }),
-            SettingsItem("Secret code", null, Icons.Default.VpnKey, onClick = { onNavigate(Routes.SettingsPrivacyChatLockSecretCode) }),
-            SettingsItem("Unlock and clear from recent", null, Icons.Default.Visibility, toggle = clear, onToggle = { clear = it }),
-            SettingsItem("Locked chats", null, Icons.Default.Chat, onClick = { onNavigate(Routes.LockedChats) }),
-        ),
-    )
-
+    var hide by remember { mutableStateOf(false) }
     AivoraScaffold(title = "Chat lock", onBack = onBack) {
-        InfoBanner("Unlock locked chats with your secret code.")
-        SettingsList(sections)
+        SettingsFootnote(
+            "Locked chats are kept separately and opened with your device’s fingerprint, face recognition or passcode. This protects chosen chats, not the entire app.",
+        )
+        SettingsMutedCard {
+            SettingsRow(
+                SettingsItem(
+                    "Hide locked chats",
+                    toggle = hide,
+                    onToggle = { hide = it },
+                ),
+            )
+            HorizontalDivider(modifier = Modifier.padding(start = 16.dp), color = AivoraColors.Divider)
+            SettingsGreenActionRow(
+                title = "Set secret code",
+                icon = Icons.Default.Lock,
+                onClick = { onNavigate(Routes.SettingsPrivacyChatLockSecretCode) },
+            )
+        }
+        SettingsFootnote(
+            "Set a secret code to hide the Locked chats folder and find it by entering your code in search.",
+        )
     }
 }
 
