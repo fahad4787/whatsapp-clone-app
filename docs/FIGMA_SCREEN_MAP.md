@@ -20,8 +20,8 @@ Status: `todo` | `wip` | `pass` | `deferred`
 | 4 · Calls deep | Keypad · Voice dialer | `213:13580` | `calls` | `Routes.NewCall` | wip |
 | 4 · Calls deep | Audio call · Mobile | `49:2801` | `calls` | `Routes.AudioCall` | wip |
 | 4 · Calls deep | Video call · Mobile | `49:2883` | `calls` | `Routes.VideoCall` | wip |
-| 5 · Profile edit | Profile details · Mobile | `160:11871` | `profile` | `Routes.YourDetails` | todo |
-| 5 · Profile edit | Edit profile picture · Mobile | `160:11747` | `profile` | `Routes.YourDetails` | todo |
+| 5 · Profile edit | Profile details · Mobile | `160:11871` | `profile` | `Routes.YourDetails` | wip |
+| 5 · Profile edit | Edit profile picture · Mobile | `160:11747` | `profile` | `Routes.YourDetails` | wip |
 | 6 · Settings hubs | Appearance · Overview | `412:11908` | `settings` | `Routes.SettingsAppearance` | todo |
 | 6 · Settings hubs | Notifications · Overview | `412:13285` | `settings` | `Routes.SettingsNotifications` | todo |
 | 6 · Settings hubs | Account · Overview | `412:8851` | `settings` | `Routes.SettingsAccount` | todo |
