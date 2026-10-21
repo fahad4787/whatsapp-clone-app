@@ -14,6 +14,9 @@ object Routes {
     const val Login = "login"
     const val MessageInfoChatMessage = "message-info/{chat}/{message}"
     const val Camera = "camera/{target}"
+    const val Gallery = "gallery/{target}"
+    const val PollCreate = "poll-create/{chat}"
+    const val LocationShare = "location-share/{chat}"
     const val NewCall = "new-call"
     const val AudioCall = "call/audio/{name}"
     const val VideoCall = "call/video/{name}"
@@ -81,6 +84,18 @@ object Routes {
 
     fun camera(target: String = "status"): String =
         Camera.replace("{target}", android.net.Uri.encode(target))
+
+    fun gallery(target: String = "status"): String =
+        Gallery.replace("{target}", android.net.Uri.encode(target))
+
+    fun pollCreate(chat: String): String =
+        PollCreate.replace("{chat}", android.net.Uri.encode(chat))
+
+    fun locationShare(chat: String): String =
+        LocationShare.replace("{chat}", android.net.Uri.encode(chat))
+
+    fun eventCreate(chat: String): String =
+        EventCreateChat.replace("{chat}", android.net.Uri.encode(chat))
 
     fun status(id: String): String = StatusId.replace("{id}", id)
 

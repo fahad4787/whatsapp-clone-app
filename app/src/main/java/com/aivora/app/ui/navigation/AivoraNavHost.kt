@@ -17,11 +17,14 @@ import com.aivora.app.ui.feature.calls.ScheduledCallsScreen
 import com.aivora.app.ui.feature.calls.VideoCallScreen
 import android.net.Uri
 import com.aivora.app.ui.feature.camera.CameraCaptureScreen
+import com.aivora.app.ui.feature.camera.GalleryPickerScreen
 import com.aivora.app.ui.feature.channels.ChannelSlugScreen
 import com.aivora.app.ui.feature.channels.ChannelsScreen
 import com.aivora.app.ui.feature.chat.ChatIdScreen
+import com.aivora.app.ui.feature.chat.LocationShareScreen
 import com.aivora.app.ui.feature.chat.MessageInfoChatMessageScreen
 import com.aivora.app.ui.feature.chat.NewChatScreen
+import com.aivora.app.ui.feature.chat.PollCreateScreen
 import com.aivora.app.ui.feature.community.CommunityIdScreen
 import com.aivora.app.ui.feature.community.NewGroupScreen
 import com.aivora.app.ui.feature.events.EventCreateChatScreen
@@ -126,6 +129,37 @@ fun AivoraNavHost(
             val raw = entry.arguments?.getString("target").orEmpty()
             CameraCaptureScreen(
                 target = android.net.Uri.decode(raw),
+                onBack = back,
+                onNavigate = go,
+            )
+        }
+        composable(
+            route = Routes.Gallery,
+            arguments = listOf(navArgument("target") { type = NavType.StringType }),
+        ) { entry ->
+            val raw = entry.arguments?.getString("target").orEmpty()
+            GalleryPickerScreen(
+                target = android.net.Uri.decode(raw),
+                onBack = back,
+                onNavigate = go,
+            )
+        }
+        composable(
+            route = Routes.PollCreate,
+            arguments = listOf(navArgument("chat") { type = NavType.StringType }),
+        ) { entry ->
+            PollCreateScreen(
+                chatId = Uri.decode(entry.arguments?.getString("chat").orEmpty()),
+                onBack = back,
+                onNavigate = go,
+            )
+        }
+        composable(
+            route = Routes.LocationShare,
+            arguments = listOf(navArgument("chat") { type = NavType.StringType }),
+        ) { entry ->
+            LocationShareScreen(
+                chatId = Uri.decode(entry.arguments?.getString("chat").orEmpty()),
                 onBack = back,
                 onNavigate = go,
             )

@@ -28,11 +28,11 @@ Status: `todo` | `wip` | `pass` | `deferred`
 | 6 · Settings hubs | Privacy · Overview | `412:10040` | `settings` | `Routes.SettingsPrivacy` | wip |
 | 6 · Settings hubs | Chats settings · Overview | `412:10147` | `settings` | `Routes.SettingsChats` | wip |
 | 6 · Settings hubs | Storage and data · Overview | `412:14733` | `settings` | `Routes.SettingsStorage` | wip |
-| 8 · Attachments & create | Create · Camera | `22:8320` | `camera` | `Routes.Camera` | todo |
-| 8 · Attachments & create | Create · Photos and videos | `22:8455` | `camera` | `Routes.Camera` | todo |
-| 8 · Attachments & create | Poll · Create poll | `412:5262` | `events` | `(poll create)` | todo |
-| 8 · Attachments & create | Event · Create event | `412:4930` | `events` | `Routes.EventCreateChat` | todo |
-| 8 · Attachments & create | Location · Share location | `412:6357` | `chat` | `(location sheet)` | todo |
+| 8 · Attachments & create | Create · Camera | `22:8320` | `camera` | `Routes.Camera` | wip |
+| 8 · Attachments & create | Create · Photos and videos | `22:8455` | `camera` | `Routes.Gallery` | wip |
+| 8 · Attachments & create | Poll · Create poll | `412:5262` | `chat` | `Routes.PollCreate` | wip |
+| 8 · Attachments & create | Event · Create event | `412:4930` | `events` | `Routes.EventCreateChat` | wip |
+| 8 · Attachments & create | Location · Share location | `412:6357` | `chat` | `Routes.LocationShare` | wip |
 | 9 · Help / Invite / leftovers | Help and feedback · Menu | `412:15259` | `settings` | `Routes.SettingsPermissions` | todo |
 | 9 · Help / Invite / leftovers | Invite a friend · Contacts | `412:14994` | `settings` | `(invite)` | todo |
 

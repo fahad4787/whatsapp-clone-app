@@ -35,12 +35,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Poll
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -54,6 +62,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -77,7 +86,7 @@ import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
 import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ChatIdScreen(
     chatId: String = "1",
@@ -94,6 +103,8 @@ fun ChatIdScreen(
     val messages by InMemoryChatStore.messages(chatId).collectAsState()
     var text by remember { mutableStateOf("") }
     var peerTyping by remember { mutableStateOf(false) }
+    var showAttach by remember { mutableStateOf(false) }
+    val attachSheetState = rememberModalBottomSheetState()
     val listState = rememberLazyListState()
     val wallpaper = if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
@@ -193,8 +204,8 @@ fun ChatIdScreen(
             value = text,
             onValueChange = { text = it },
             placeholder = "Message $firstName…",
-            onAttach = media.pickGallery,
-            onCamera = media.takePhoto,
+            onAttach = { showAttach = true },
+            onCamera = { onNavigate(Routes.camera("chat:$chatId")) },
             onSendOrMic = {
                 val body = text.trim()
                 if (body.isNotEmpty()) {
@@ -207,6 +218,69 @@ fun ChatIdScreen(
                 }
             },
         )
+    }
+
+    if (showAttach) {
+        ModalBottomSheet(
+            onDismissRequest = { showAttach = false },
+            sheetState = attachSheetState,
+            containerColor = AivoraColors.LightSurface,
+        ) {
+            Text(
+                "Share",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+            AttachSheetRow(Icons.Default.PhotoLibrary, "Photos & videos") {
+                showAttach = false
+                onNavigate(Routes.gallery("chat:$chatId"))
+            }
+            AttachSheetRow(Icons.Default.CameraAlt, "Camera") {
+                showAttach = false
+                onNavigate(Routes.camera("chat:$chatId"))
+            }
+            AttachSheetRow(Icons.Default.LocationOn, "Location") {
+                showAttach = false
+                onNavigate(Routes.locationShare(chatId))
+            }
+            AttachSheetRow(Icons.Default.Poll, "Poll") {
+                showAttach = false
+                onNavigate(Routes.pollCreate(chatId))
+            }
+            AttachSheetRow(Icons.Default.Event, "Event") {
+                showAttach = false
+                onNavigate(Routes.eventCreate(chatId))
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun AttachSheetRow(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(AivoraColors.PrimarySoft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = AivoraColors.Primary)
+        }
+        Spacer(Modifier.width(14.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
