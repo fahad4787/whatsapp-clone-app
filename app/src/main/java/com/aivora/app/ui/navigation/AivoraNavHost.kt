@@ -27,6 +27,7 @@ import com.aivora.app.ui.feature.locked.LockedChatsScreen
 import com.aivora.app.ui.feature.profile.ProfileIdScreen
 import com.aivora.app.ui.feature.profile.YourDetailsScreen
 import com.aivora.app.ui.feature.status.NewStatusScreen
+import com.aivora.app.ui.feature.status.StatusViewerScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountAddScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountChangeNumberScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountDeletedScreen
@@ -216,6 +217,15 @@ fun AivoraNavHost(
         }
         composable(Routes.NewStatus) {
             NewStatusScreen(onBack = back, onNavigate = go)
+        }
+        composable(
+            route = Routes.StatusId,
+            arguments = listOf(navArgument("id") { type = NavType.StringType }),
+        ) { entry ->
+            StatusViewerScreen(
+                statusId = entry.arguments?.getString("id").orEmpty(),
+                onBack = back,
+            )
         }
         composable(Routes.ProfileSetup) {
             ProfileSetupScreen(

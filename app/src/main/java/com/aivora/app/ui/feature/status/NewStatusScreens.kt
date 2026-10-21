@@ -1,112 +1,102 @@
 package com.aivora.app.ui.feature.status
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Photo
-import androidx.compose.material.icons.filled.Poll
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.aivora.app.ui.components.Avatar
+import coil3.compose.AsyncImage
+import com.aivora.app.data.local.InMemoryStatusStore
+import com.aivora.app.data.local.PendingMedia
 import com.aivora.app.ui.components.AivoraScaffold
-import com.aivora.app.ui.components.EmptyState
 import com.aivora.app.ui.components.InfoBanner
-import com.aivora.app.ui.components.LinkButton
-import com.aivora.app.ui.components.PersonRow
-import com.aivora.app.ui.components.PrimaryButton
-import com.aivora.app.ui.components.RadioGroup
-import com.aivora.app.ui.components.SearchField
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
+import com.aivora.app.ui.media.rememberMediaActions
 import com.aivora.app.ui.navigation.Routes
-import com.aivora.app.ui.theme.AivoraColors
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VpnKey
 
 @Composable
 fun NewStatusScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = LocalContext.current
     var text by remember { mutableStateOf("") }
+    var mediaUri by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        PendingMedia.consume()?.let { mediaUri = it }
+    }
+
+    val media = rememberMediaActions(context) { uri ->
+        mediaUri = uri.toString()
+    }
+
     AivoraScaffold(title = "New status", onBack = onBack) {
-        InfoBanner("My status · Photo status · Text status")
+        InfoBanner("Local only — nothing is uploaded")
+        mediaUri?.let { uri ->
+            AsyncImage(
+                model = uri,
+                contentDescription = "Status photo",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .heightIn(max = 220.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop,
+            )
+        }
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
-            modifier = Modifier.fillMaxWidth().padding(16.dp).height(160.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .height(160.dp),
             placeholder = { Text("Type a status") },
         )
         SettingsList(
             listOf(
                 null to listOf(
-                    SettingsItem("Photo status", null, Icons.Default.Photo, onClick = { }),
-                    SettingsItem("Camera", null, Icons.Default.CameraAlt, onClick = { }),
-                    SettingsItem("Status privacy", "Who can see your status", Icons.Default.Visibility, onClick = { onNavigate(Routes.SettingsPrivacyStatus) }),
-                    SettingsItem("Post status", null, Icons.Default.Send, onClick = { onNavigate(Routes.Home) }),
-                )
-            )
+                    SettingsItem("Photo status", null, Icons.Default.Photo, onClick = media.pickGallery),
+                    SettingsItem("Camera", null, Icons.Default.CameraAlt, onClick = media.takePhoto),
+                    SettingsItem(
+                        "Status privacy",
+                        "Who can see your status",
+                        Icons.Default.Visibility,
+                        onClick = { onNavigate(Routes.SettingsPrivacyStatus) },
+                    ),
+                    SettingsItem(
+                        "Post status",
+                        null,
+                        Icons.Default.Send,
+                        onClick = {
+                            if (text.isBlank() && mediaUri == null) return@SettingsItem
+                            InMemoryStatusStore.post(text, mediaUri)
+                            onNavigate(Routes.Home)
+                        },
+                    ),
+                ),
+            ),
         )
     }
 }

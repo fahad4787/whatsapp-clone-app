@@ -18,6 +18,7 @@ object Routes {
     const val NewChat = "new-chat"
     const val NewGroup = "new-group"
     const val NewStatus = "new-status"
+    const val StatusId = "status/{id}"
     const val ProfileSetup = "profile-setup"
     const val ProfileId = "profile/{id}"
     const val ScheduledCalls = "scheduled-calls"
@@ -75,4 +76,6 @@ object Routes {
 
     fun camera(target: String = "status"): String =
         Camera.replace("{target}", android.net.Uri.encode(target))
+
+    fun status(id: String): String = StatusId.replace("{id}", id)
 }

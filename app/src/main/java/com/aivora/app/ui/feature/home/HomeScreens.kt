@@ -49,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aivora.app.data.local.InMemoryChatStore
+import com.aivora.app.data.local.InMemoryStatusStore
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.PersonRow
 import com.aivora.app.ui.components.PrimaryButton
@@ -266,10 +267,28 @@ private fun UnreadBadge(count: Int) {
 
 @Composable
 private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Unit) {
+    val statuses by InMemoryStatusStore.statuses.collectAsState()
+    val mine = remember(statuses) { InMemoryStatusStore.myStatuses() }
+    val recent = remember(statuses) { InMemoryStatusStore.recent() }
+    val viewed = remember(statuses) { InMemoryStatusStore.viewed() }
+
     LazyColumn(modifier = modifier.fillMaxSize()) {
         item {
-            PersonRow("My status", "Tap to add status update", onClick = { onNavigate(Routes.NewStatus) }) {
-                IconButton(onClick = { onNavigate(Routes.NewStatus) }) {
+            val subtitle = mine.firstOrNull()?.let { "${it.timeLabel} · Tap to view" }
+                ?: "Tap to add status update"
+            PersonRow(
+                "My status",
+                subtitle,
+                onClick = {
+                    val first = mine.firstOrNull()
+                    if (first != null) {
+                        onNavigate(Routes.status(first.id))
+                    } else {
+                        onNavigate(Routes.NewStatus)
+                    }
+                },
+            ) {
+                IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
                     Icon(Icons.Default.CameraAlt, null, tint = AivoraColors.Primary)
                 }
             }
@@ -280,8 +299,12 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
                 color = AivoraColors.Primary,
             )
         }
-        items(listOf("Ahmad Khan", "Fatima Ali", "Usman Raza", "Zainab Noor")) { name ->
-            PersonRow(name, "Today, 7:20 PM", onClick = { onNavigate(Routes.NewStatus) })
+        items(recent, key = { it.id }) { status ->
+            PersonRow(
+                status.authorName,
+                status.timeLabel,
+                onClick = { onNavigate(Routes.status(status.id)) },
+            )
         }
         item {
             Text(
@@ -291,8 +314,12 @@ private fun StatusTab(modifier: Modifier = Modifier, onNavigate: (String) -> Uni
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        items(listOf("Hassan Malik", "Work Group")) { name ->
-            PersonRow(name, "Yesterday", onClick = { onNavigate(Routes.NewStatus) })
+        items(viewed, key = { it.id }) { status ->
+            PersonRow(
+                status.authorName,
+                status.timeLabel,
+                onClick = { onNavigate(Routes.status(status.id)) },
+            )
         }
         item {
             Spacer(Modifier.height(8.dp))
