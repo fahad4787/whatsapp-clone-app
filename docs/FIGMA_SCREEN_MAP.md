@@ -33,8 +33,9 @@ Status: `todo` | `wip` | `pass` | `deferred`
 | 8 · Attachments & create | Poll · Create poll | `412:5262` | `chat` | `Routes.PollCreate` | wip |
 | 8 · Attachments & create | Event · Create event | `412:4930` | `events` | `Routes.EventCreateChat` | wip |
 | 8 · Attachments & create | Location · Share location | `412:6357` | `chat` | `Routes.LocationShare` | wip |
-| 9 · Help / Invite / leftovers | Help and feedback · Menu | `412:15259` | `settings` | `Routes.SettingsPermissions` | todo |
-| 9 · Help / Invite / leftovers | Invite a friend · Contacts | `412:14994` | `settings` | `(invite)` | todo |
+| 9 · Help / Invite / leftovers | Help and feedback · Menu | `412:15259` | `settings` | `Routes.HelpFeedback` | wip |
+| 9 · Help / Invite / leftovers | Help Center · Search and topics | `412:15196` | `settings` | `Routes.HelpCenter` | wip |
+| 9 · Help / Invite / leftovers | Invite a friend · Contacts | `412:14994` | `settings` | `Routes.InviteFriend` | wip |
 
 ## Wave 7 — Settings deep (sample; full list in Figma metadata)
 

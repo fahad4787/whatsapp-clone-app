@@ -1031,12 +1031,12 @@ private fun ProfileTab(
                 SettingsItem(
                     title = "Help and feedback",
                     iconRes = AivoraIcons.Help,
-                    onClick = { onNavigate(Routes.SettingsPermissions) },
+                    onClick = { onNavigate(Routes.HelpFeedback) },
                 ),
                 SettingsItem(
                     title = "Invite a friend",
                     iconRes = AivoraIcons.Favorite,
-                    onClick = { },
+                    onClick = { onNavigate(Routes.InviteFriend) },
                 ),
             ),
         )

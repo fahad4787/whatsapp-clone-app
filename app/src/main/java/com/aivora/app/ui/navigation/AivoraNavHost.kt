@@ -60,6 +60,9 @@ import com.aivora.app.ui.feature.settings.SettingsChatsScreen
 import com.aivora.app.ui.feature.settings.SettingsChatsTranscriptsScreen
 import com.aivora.app.ui.feature.settings.SettingsChatsTransferScreen
 import com.aivora.app.ui.feature.settings.SettingsCommunitiesScreen
+import com.aivora.app.ui.feature.settings.HelpCenterScreen
+import com.aivora.app.ui.feature.settings.HelpFeedbackScreen
+import com.aivora.app.ui.feature.settings.InviteFriendScreen
 import com.aivora.app.ui.feature.settings.SettingsDeleteAccountScreen
 import com.aivora.app.ui.feature.settings.SettingsDevicesLinkScreen
 import com.aivora.app.ui.feature.settings.SettingsDevicesScreen
@@ -423,6 +426,15 @@ fun AivoraNavHost(
         }
         composable(Routes.SettingsPermissions) {
             SettingsPermissionsScreen(onBack = back, onNavigate = go)
+        }
+        composable(Routes.HelpFeedback) {
+            HelpFeedbackScreen(onBack = back, onNavigate = go)
+        }
+        composable(Routes.HelpCenter) {
+            HelpCenterScreen(onBack = back, onNavigate = go)
+        }
+        composable(Routes.InviteFriend) {
+            InviteFriendScreen(onBack = back, onNavigate = go)
         }
         composable(
             route = Routes.SettingsPrivacy,
