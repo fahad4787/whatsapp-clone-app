@@ -12,6 +12,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Url
 
 /**
  * REST surface recovered from APK Retrofit interface (`te0`).
@@ -25,8 +26,20 @@ interface AivoraApi {
 
     @POST("api/media/presign")
     suspend fun postMediaPresign(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.MediaPresignBody,
+    ): com.aivora.app.data.model.MediaPresignDto
+
+    @Multipart
+    @POST("api/media/upload")
+    suspend fun postMediaUpload(
+        @Part file: okhttp3.MultipartBody.Part,
+    ): com.aivora.app.data.model.MediaUploadResultDto
+
+    @PUT
+    suspend fun putMediaUpload(
+        @Url url: String,
+        @Body body: okhttp3.RequestBody,
+    ): com.aivora.app.data.model.MediaUploadResultDto
 
     @POST("api/channels/{slug}/posts/{postId}/reaction")
     suspend fun postChannelsSlugPostsPostIdReaction(

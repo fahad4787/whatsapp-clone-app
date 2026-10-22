@@ -10,10 +10,12 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         created.isNotBlank() -> created
         else -> "Now"
     }
+    val media = attachment?.url?.takeIf { it.isNotBlank() }
     return LocalMessage(
         id = id.orEmpty(),
         mine = senderId == myUserId,
-        body = text.orEmpty(),
+        body = text.orEmpty().ifBlank { if (media != null) "Photo" else "" },
         time = time,
+        mediaUri = media,
     )
 }

@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **Wave 5 in progress** — WebSocket typing/presence/message push. Waves 0–4 done on staging (text chat verified).
+Status: **Wave 6 in progress** — media/image messages. Waves 0–5 done on staging (realtime verified).
 
 ## Locked constraints
 

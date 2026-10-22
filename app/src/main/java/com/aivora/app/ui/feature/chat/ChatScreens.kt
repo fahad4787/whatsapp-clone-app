@@ -84,6 +84,7 @@ import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.SendMessageBody
 import com.aivora.app.data.realtime.RealtimeClient
+import com.aivora.app.data.sendImageMessage
 import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraBottomSheet
@@ -136,8 +137,22 @@ fun ChatIdScreen(
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
     val media = rememberMediaActions(context) { uri ->
         haptics.confirm()
-        InMemoryChatStore.sendMedia(chatId, uri.toString())
-        if (!useRemote) peerTyping = true
+        if (useRemote) {
+            scope.launch {
+                try {
+                    val sent = api.sendImageMessage(context, chatId, uri)
+                    val uid = myUserId ?: SessionStore.userId(context)
+                    if (uid != null) {
+                        InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
+                    }
+                } catch (_: Exception) {
+                    InMemoryChatStore.sendMedia(chatId, uri.toString())
+                }
+            }
+        } else {
+            InMemoryChatStore.sendMedia(chatId, uri.toString())
+            peerTyping = true
+        }
     }
     val firstName = chat.title.substringBefore(' ').ifBlank { chat.title }
     val subtitle = when {
