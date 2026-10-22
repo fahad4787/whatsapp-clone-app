@@ -16,8 +16,8 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0-dev"
-        buildConfigField("String", "API_BASE_URL", "\"https://wa.zirvik.com/\"")
-        buildConfigField("String", "WS_BASE_URL", "\"wss://wa.zirvik.com/ws/\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://whatsapp-clone-backend-hep1.onrender.com/\"")
+        buildConfigField("String", "WS_BASE_URL", "\"wss://whatsapp-clone-backend-hep1.onrender.com/ws/\"")
     }
 
     buildTypes {

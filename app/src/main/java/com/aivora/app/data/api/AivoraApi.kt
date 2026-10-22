@@ -223,8 +223,8 @@ interface AivoraApi {
 
     @POST("api/auth/otp/verify")
     suspend fun postAuthOtpVerify(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.OtpVerifyBody,
+    ): com.aivora.app.data.model.RefreshResult
 
     @POST("api/scheduled-calls")
     suspend fun postScheduledCalls(
@@ -645,8 +645,8 @@ interface AivoraApi {
 
     @POST("api/auth/otp/request")
     suspend fun postAuthOtpRequest(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.OtpRequestBody,
+    ): com.aivora.app.data.model.OtpRequestResult
 
     @GET("api/stickers")
     suspend fun getStickers(): okhttp3.ResponseBody

@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **Wave 0 complete** — next is Wave 1 (auth / OTP).
+Status: **Wave 1 in progress** (auth / OTP).
 
 ## Locked constraints
 
