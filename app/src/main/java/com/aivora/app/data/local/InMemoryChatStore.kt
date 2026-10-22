@@ -13,14 +13,29 @@ import java.util.concurrent.ConcurrentHashMap
 object InMemoryChatStore {
     private val _chats = MutableStateFlow(SeedData.chats)
     val chats: StateFlow<List<LocalChat>> = _chats.asStateFlow()
+    @Volatile var usingRemote: Boolean = false
+        private set
 
     private val messageFlows = ConcurrentHashMap<String, MutableStateFlow<List<LocalMessage>>>()
+
+    fun replaceFromRemote(remote: List<LocalChat>) {
+        usingRemote = true
+        _chats.value = remote
+        remote.forEach { messageFlows.getOrPut(it.id) { MutableStateFlow(emptyList()) } }
+    }
+
+    fun upsertChat(chat: LocalChat) {
+        _chats.update { listOf(chat) + it.filterNot { c -> c.id == chat.id } }
+        messageFlows.getOrPut(chat.id) { MutableStateFlow(emptyList()) }
+    }
 
     fun messages(chatId: String): StateFlow<List<LocalMessage>> =
         messageFlow(chatId).asStateFlow()
 
     fun chat(chatId: String): LocalChat =
-        _chats.value.find { it.id == chatId } ?: SeedData.chat(chatId)
+        _chats.value.find { it.id == chatId }
+            ?: if (usingRemote) LocalChat(chatId, "Chat", "Say hello", "Now")
+            else SeedData.chat(chatId)
 
     fun sendText(chatId: String, body: String, mine: Boolean = true) {
         val trimmed = body.trim()
@@ -51,6 +66,21 @@ object InMemoryChatStore {
         )
     }
 
+    fun sendVoice(chatId: String, durationSec: Int = 8, mine: Boolean = true) {
+        val secs = durationSec.coerceAtLeast(1)
+        append(
+            chatId = chatId,
+            message = LocalMessage(
+                id = newId(),
+                mine = mine,
+                body = "Voice message",
+                time = "Now",
+                voiceDurationSec = secs,
+            ),
+            preview = "Voice message",
+        )
+    }
+
     /** Ensure a 1:1 chat exists for [title]; returns chat id. */
     fun openOrCreateDirect(title: String): String {
         val existing = _chats.value.find { it.title.equals(title, ignoreCase = true) }
@@ -74,6 +104,16 @@ object InMemoryChatStore {
         }
     }
 
+    fun clearChat(chatId: String) {
+        messageFlow(chatId).value = emptyList()
+        _chats.update { list ->
+            list.map {
+                if (it.id == chatId) it.copy(preview = "No messages", time = "Now", unread = 0)
+                else it
+            }
+        }
+    }
+
     private fun append(chatId: String, message: LocalMessage, preview: String) {
         messageFlow(chatId).update { it + message }
         _chats.update { list ->
@@ -89,7 +129,7 @@ object InMemoryChatStore {
 
     private fun messageFlow(chatId: String): MutableStateFlow<List<LocalMessage>> =
         messageFlows.getOrPut(chatId) {
-            MutableStateFlow(SeedData.messagesFor(chatId))
+            MutableStateFlow(if (usingRemote) emptyList() else SeedData.messagesFor(chatId))
         }
 
     private fun newId(): String = "local-${UUID.randomUUID().toString().take(8)}"

@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **Wave 2 complete on staging** — `PUT /api/me` verified; set `PUBLIC_BASE_URL` for avatars.
+Status: **Wave 3 in progress** — conversations API + Android list/new chat/group.
 
 ## Locked constraints
 

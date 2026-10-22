@@ -1,12 +1,8 @@
 package com.aivora.app.ui.feature.home
 
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +22,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -82,6 +77,7 @@ import androidx.compose.ui.unit.sp
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.InMemoryStatusStore
 import com.aivora.app.data.local.LocalChat
+import com.aivora.app.data.toLocalChat
 import com.aivora.app.ui.components.AivoraBottomNav
 import com.aivora.app.ui.components.AivoraOverflowMenu
 import com.aivora.app.ui.components.Avatar
@@ -91,7 +87,8 @@ import com.aivora.app.ui.components.OverflowMenuItem
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
 import com.aivora.app.ui.components.StatusRingAvatar
-import com.aivora.app.ui.components.ThemeFilterChip
+import com.aivora.app.ui.components.AivoraFilterBar
+import com.aivora.app.ui.components.AivoraFilterOption
 import com.aivora.app.ui.motion.rememberAivoraHaptics
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.icons.AivoraIcons
@@ -115,12 +112,10 @@ private enum class CallFilter(val label: String) {
     Video("Video"),
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigate: (String) -> Unit = {},
-    sharedTransitionScope: SharedTransitionScope? = null,
-    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val haptics = rememberAivoraHaptics()
     val scope = rememberCoroutineScope()
@@ -138,9 +133,24 @@ fun HomeScreen(
     var showCreateCallLink by remember { mutableStateOf(false) }
     var showClearCallLog by remember { mutableStateOf(false) }
     var callLogCleared by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     val allChats by InMemoryChatStore.chats.collectAsState()
     val unreadTotal = remember(allChats) {
         allChats.filterNot { it.archived }.sumOf { it.unread }
+    }
+
+    LaunchedEffect(Unit) {
+        val token = com.aivora.app.data.local.SessionStore.accessToken(context)
+        if (token.isNullOrBlank()) return@LaunchedEffect
+        try {
+            val api = com.aivora.app.data.api.NetworkModule.api(
+                com.aivora.app.data.api.NetworkModule.okHttp { token },
+            )
+            val remote = api.getConversations().items.map { it.toLocalChat() }
+            InMemoryChatStore.replaceFromRemote(remote)
+        } catch (_: Exception) {
+            /* keep seed / last local list offline */
+        }
     }
 
     LaunchedEffect(pagerState) {
@@ -157,8 +167,8 @@ fun HomeScreen(
 
     val pageSnap = remember {
         androidx.compose.animation.core.tween<Float>(
-            durationMillis = 260,
-            easing = androidx.compose.animation.core.FastOutSlowInEasing,
+            durationMillis = 200,
+            easing = com.aivora.app.ui.motion.AivoraEmphasizedDecel,
         )
     }
 
@@ -284,7 +294,8 @@ fun HomeScreen(
                         haptics.tick()
                         query = ""
                         scope.launch {
-                            pagerState.animateScrollToPage(page = index, animationSpec = pageSnap)
+                            // Instant jump — no swipe through Updates/Calls when hopping tabs.
+                            pagerState.scrollToPage(index)
                         }
                     }
                 },
@@ -333,8 +344,6 @@ fun HomeScreen(
                         haptics.tick()
                         onNavigate(Routes.ChatId.replace("{id}", id))
                     },
-                    sharedTransitionScope = null,
-                    animatedVisibilityScope = null,
                 )
                 1 -> StatusTab(
                     query = query,
@@ -404,7 +413,7 @@ private fun HomeFabRes(
 }
 
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChatsTab(
     allChats: List<LocalChat>,
@@ -414,8 +423,6 @@ private fun ChatsTab(
     onFilterChange: (ChatFilter) -> Unit,
     onNavigate: (String) -> Unit,
     onOpenChat: (String) -> Unit,
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?,
 ) {
     val chats = remember(allChats, query, filter) {
         allChats
@@ -436,6 +443,15 @@ private fun ChatsTab(
             }
             .toList()
     }
+    val barFilters = listOf(
+        ChatFilter.All,
+        ChatFilter.Unread,
+        ChatFilter.Groups,
+        ChatFilter.Archived,
+    )
+    val unreadBadge = remember(allChats) {
+        allChats.count { !it.archived && it.unread > 0 }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         HomeSearchBar(
@@ -443,21 +459,18 @@ private fun ChatsTab(
             onValueChange = onQueryChange,
             placeholder = "Search chats, people, media",
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            ChatFilter.entries.forEach { option ->
-                ThemeFilterChip(
-                    selected = filter == option,
-                    onClick = { onFilterChange(option) },
-                    label = option.label,
-                )
-            }
-        }
+        Spacer(Modifier.height(6.dp))
+        AivoraFilterBar(
+            options = listOf(
+                AivoraFilterOption("All"),
+                AivoraFilterOption("Unread", badge = unreadBadge.takeIf { it > 0 }),
+                AivoraFilterOption("Groups"),
+                AivoraFilterOption("Archived"),
+            ),
+            selectedIndex = barFilters.indexOf(filter).coerceAtLeast(0),
+            onSelect = { onFilterChange(barFilters[it]) },
+        )
+        Spacer(Modifier.height(4.dp))
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(top = 2.dp, bottom = 8.dp),
@@ -472,11 +485,6 @@ private fun ChatsTab(
                 }
             }
             items(chats, key = { it.id }) { chat ->
-                val avatarMod = homeSharedAvatar(
-                    sharedTransitionScope,
-                    animatedVisibilityScope,
-                    chat.id,
-                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -484,7 +492,7 @@ private fun ChatsTab(
                         .padding(horizontal = 14.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(chat.title, size = 48, modifier = avatarMod)
+                    Avatar(chat.title, size = 48)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -596,22 +604,6 @@ private fun HomeSearchBar(
             disabledBorderColor = Color.Transparent,
         ),
     )
-}
-
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-private fun homeSharedAvatar(
-    scope: SharedTransitionScope?,
-    visibility: AnimatedVisibilityScope?,
-    chatId: String,
-): Modifier {
-    if (scope == null || visibility == null) return Modifier
-    return with(scope) {
-        Modifier.sharedElement(
-            state = rememberSharedContentState(key = "chat-avatar-$chatId"),
-            animatedVisibilityScope = visibility,
-        )
-    }
 }
 
 @Composable
@@ -883,24 +875,16 @@ private fun CallsTab(
         ) {
             CallQuickAction(Icons.Default.Call, "Call") { onNavigate(Routes.NewCall) }
             CallQuickAction(Icons.Default.Event, "Schedule") { onNavigate(Routes.ScheduledCalls) }
-            CallQuickAction(Icons.Default.Dialpad, "Keypad") { onNavigate(Routes.NewCall) }
+            CallQuickAction(Icons.Default.Dialpad, "Keypad") { onNavigate(Routes.Keypad) }
             CallQuickAction(Icons.Default.StarBorder, "Favorites") { onCreateCallLink() }
         }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            CallFilter.entries.forEach { option ->
-                ThemeFilterChip(
-                    selected = filter == option,
-                    onClick = { onFilterChange(option) },
-                    label = option.label,
-                )
-            }
-        }
+        Spacer(Modifier.height(6.dp))
+        AivoraFilterBar(
+            options = CallFilter.entries.map { AivoraFilterOption(it.label) },
+            selectedIndex = CallFilter.entries.indexOf(filter).coerceAtLeast(0),
+            onSelect = { onFilterChange(CallFilter.entries[it]) },
+        )
+        Spacer(Modifier.height(4.dp))
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(filtered, key = { it.name + it.time }) { row ->
                 Row(

@@ -1,72 +1,36 @@
 package com.aivora.app.ui.feature.chat
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Photo
-import androidx.compose.material.icons.filled.Poll
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.aivora.app.ui.components.Avatar
-import com.aivora.app.ui.components.AivoraScaffold
-import com.aivora.app.ui.components.EmptyState
-import com.aivora.app.ui.components.InfoBanner
-import com.aivora.app.ui.components.LinkButton
-import com.aivora.app.ui.components.PersonRow
-import com.aivora.app.ui.components.PrimaryButton
-import com.aivora.app.ui.components.RadioGroup
-import com.aivora.app.ui.components.SearchField
-import com.aivora.app.ui.components.SettingsItem
-import com.aivora.app.ui.components.SettingsList
+import androidx.compose.ui.unit.sp
+import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
-import com.aivora.app.data.local.SeedData
+import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.DirectBody
+import com.aivora.app.data.model.UserDto
+import com.aivora.app.data.toLocalChat
+import com.aivora.app.ui.components.AivoraScaffold
+import com.aivora.app.ui.components.InfoBanner
+import com.aivora.app.ui.components.PersonRow
+import com.aivora.app.ui.components.SearchField
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,10 +38,25 @@ fun NewChatScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var query by remember { mutableStateOf("") }
-    val people = SeedData.contacts.filter {
-        query.isBlank() || it.first.contains(query, true) || it.second.contains(query, true)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val api = remember {
+        NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
     }
+    var query by remember { mutableStateOf("") }
+    var people by remember { mutableStateOf<List<UserDto>>(emptyList()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(query) {
+        try {
+            people = api.getPeopleSearch(query.ifBlank { null }).items
+            error = null
+        } catch (e: Exception) {
+            error = e.message ?: "Could not load people"
+        }
+    }
+
     AivoraScaffold(
         title = "New chat",
         onBack = onBack,
@@ -89,8 +68,11 @@ fun NewChatScreen(
             ) { Icon(Icons.Default.Add, contentDescription = null) }
         },
     ) {
-        InfoBanner("Allow access to your contacts")
+        InfoBanner("Search registered users by name or phone")
         SearchField(query, { query = it }, "Search")
+        if (error != null) {
+            Text(error!!, color = AivoraColors.Danger, fontSize = 13.sp)
+        }
         LazyColumn {
             item {
                 PersonRow(
@@ -98,19 +80,30 @@ fun NewChatScreen(
                     subtitle = "Create a group with friends",
                     onClick = { onNavigate(Routes.NewGroup) },
                 )
-                PersonRow(
-                    name = "New contact",
-                    subtitle = "Add someone by number",
-                    onClick = { onNavigate(Routes.SettingsAccountAdd) },
-                )
             }
-            items(people) { (n, s) ->
+            items(people, key = { it.id.orEmpty() }) { user ->
+                val label = user.displayName?.takeIf { it.isNotBlank() }
+                    ?: user.phoneDisplay
+                    ?: user.phone
+                    ?: "User"
                 PersonRow(
-                    name = n,
-                    subtitle = s,
+                    name = label,
+                    subtitle = user.phoneDisplay ?: user.phone ?: "",
                     onClick = {
-                        val id = InMemoryChatStore.openOrCreateDirect(n)
-                        onNavigate(Routes.ChatId.replace("{id}", id))
+                        if (busy) return@PersonRow
+                        val peerId = user.id ?: return@PersonRow
+                        busy = true
+                        scope.launch {
+                            try {
+                                val conv = api.postConversationsDirect(DirectBody(userId = peerId))
+                                InMemoryChatStore.upsertChat(conv.toLocalChat())
+                                onNavigate(Routes.ChatId.replace("{id}", conv.id.orEmpty()))
+                            } catch (e: Exception) {
+                                error = e.message ?: "Could not start chat"
+                            } finally {
+                                busy = false
+                            }
+                        }
                     },
                 )
             }

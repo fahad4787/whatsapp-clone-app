@@ -11,6 +11,7 @@ import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * REST surface recovered from APK Retrofit interface (`te0`).
@@ -46,7 +47,9 @@ interface AivoraApi {
     ): okhttp3.ResponseBody
 
     @GET("api/people/search")
-    suspend fun getPeopleSearch(): okhttp3.ResponseBody
+    suspend fun getPeopleSearch(
+        @Query("q") q: String? = null,
+    ): com.aivora.app.data.model.PeopleSearchDto
 
     @POST("api/reports")
     suspend fun postReports(
@@ -194,8 +197,8 @@ interface AivoraApi {
 
     @POST("api/conversations/group")
     suspend fun postConversationsGroup(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.GroupCreateBody,
+    ): com.aivora.app.data.model.ConversationDto
 
     @PUT("api/conversations/{id}/privacy")
     suspend fun putConversationsIdPrivacy(
@@ -450,7 +453,7 @@ interface AivoraApi {
     suspend fun getMeStorage(): okhttp3.ResponseBody
 
     @GET("api/conversations")
-    suspend fun getConversations(): okhttp3.ResponseBody
+    suspend fun getConversations(): com.aivora.app.data.model.ConversationListDto
 
     @GET("api/auth/link/approved/{code}")
     suspend fun getAuthLinkApprovedCode(
@@ -479,7 +482,7 @@ interface AivoraApi {
     @GET("api/conversations/{id}")
     suspend fun getConversationsId(
         @Path("id") id: String,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.ConversationDto
 
     @Multipart
     @POST("api/me/avatar")
@@ -511,8 +514,8 @@ interface AivoraApi {
 
     @POST("api/conversations/direct")
     suspend fun postConversationsDirect(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.DirectBody,
+    ): com.aivora.app.data.model.ConversationDto
 
     @GET("api/blocks")
     suspend fun getBlocks(): okhttp3.ResponseBody
