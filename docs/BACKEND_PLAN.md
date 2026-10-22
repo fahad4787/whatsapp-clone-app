@@ -119,9 +119,9 @@ Status: **Wave 0 in progress** (kickoff confirmed).
 | # | Feature | Test gate | Status |
 |---|---------|-----------|--------|
 | 0.1 | Scaffold `aivora-backend` (Fastify, TS, Prisma, env) | `npm test` / health `GET /health` locally | Done |
-| 0.2 | Postgres + Redis; migrate; health DB ping | Local `/health` ok with db+redis up | Done locally (Docker Desktop + compose + migrate). **Render Blueprint still needed for staging URL** |
-| 0.3 | CI: lint, typecheck, tests, **Semgrep** | PR workflow green | Pushed to GitHub (`whatsapp-clone-backend`, admin frontend) |
-| 0.4 | Scaffold `aivora-admin` (Next.js) + deploy | Admin loads on Render | Health banner + CI pushed. **Render deploy still needed** |
+| 0.2 | Postgres + Redis; migrate; health DB ping | Local + Render `/health` ok | Done — staging `https://whatsapp-clone-backend-hep1.onrender.com/health` → `ok: true` |
+| 0.3 | CI: lint, typecheck, tests, **Semgrep** | PR workflow green | Workflows pushed (`whatsapp-clone-backend`, admin frontend) |
+| 0.4 | Scaffold `aivora-admin` (Next.js) + deploy | Admin loads on Render | Health banner + CI pushed. **Admin Render deploy still open** |
 
 **Exit:** you can open API health + empty admin on Render.
 
@@ -238,6 +238,7 @@ Status: **Wave 0 in progress** (kickoff confirmed).
 - [x] Wave 0 kickoff (“go Wave 0”)  
 - [x] GitHub: `fahad4787/whatsapp-clone-backend` + admin frontend pushed  
 - [x] Docker Desktop installed; local Postgres/Redis up; migrate applied; `/health` → `ok: true`  
-- [ ] Apply Render Blueprints (`aivora-backend/render.yaml`, `aivora-admin/render.yaml`)  
-- [ ] Set admin `NEXT_PUBLIC_API_URL` + API `CORS_ORIGIN` to each other’s URLs  
+- [x] Render API staging live: `https://whatsapp-clone-backend-hep1.onrender.com` (`/health` ok)  
+- [ ] Deploy `aivora-admin` on Render; set `NEXT_PUBLIC_API_URL` to the API URL above  
+- [ ] Set API `CORS_ORIGIN` to the admin Render URL  
 - [ ] (Later) Firebase for FCM when we reach Wave 7  
