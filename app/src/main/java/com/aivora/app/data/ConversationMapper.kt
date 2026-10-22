@@ -11,7 +11,7 @@ fun ConversationDto.toLocalChat(): LocalChat {
         peer?.phone?.isNotBlank() == true -> peer!!.phone!!
         else -> "Chat"
     }
-    val preview = lastMessage?.let { "Open chat" } ?: "Say hello"
+    val preview = lastMessage?.text?.takeIf { it.isNotBlank() } ?: "Say hello"
     return LocalChat(
         id = id.orEmpty(),
         title = title,

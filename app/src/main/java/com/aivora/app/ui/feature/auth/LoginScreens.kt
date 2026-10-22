@@ -307,6 +307,10 @@ fun LoginScreen(
                                             error = "Invalid server response"
                                         } else {
                                             SessionStore.save(context, access, refresh, targetPhone)
+                                            try {
+                                                val me = api.getMe()
+                                                me.id?.let { SessionStore.saveUserId(context, it) }
+                                            } catch (_: Exception) { /* optional */ }
                                             onVerified()
                                         }
                                     } catch (e: Exception) {

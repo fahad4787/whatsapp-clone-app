@@ -70,8 +70,14 @@ fun NewGroupScreen(
     var busy by remember { mutableStateOf(false) }
 
     LaunchedEffect(query) {
+        val q = query.trim()
+        if (q.length < 3) {
+            people = emptyList()
+            return@LaunchedEffect
+        }
         try {
-            people = api.getPeopleSearch(query.ifBlank { null }).items
+            people = api.getPeopleSearch(q).items
+            error = null
         } catch (e: Exception) {
             error = e.message ?: "Could not load people"
         }

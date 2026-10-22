@@ -146,6 +146,9 @@ fun HomeScreen(
             val api = com.aivora.app.data.api.NetworkModule.api(
                 com.aivora.app.data.api.NetworkModule.okHttp { token },
             )
+            if (com.aivora.app.data.local.SessionStore.userId(context) == null) {
+                runCatching { api.getMe().id?.let { com.aivora.app.data.local.SessionStore.saveUserId(context, it) } }
+            }
             val remote = api.getConversations().items.map { it.toLocalChat() }
             InMemoryChatStore.replaceFromRemote(remote)
         } catch (_: Exception) {

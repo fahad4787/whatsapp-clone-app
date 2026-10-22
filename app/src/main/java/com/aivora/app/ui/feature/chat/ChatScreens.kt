@@ -1,9 +1,6 @@
 package com.aivora.app.ui.feature.chat
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -28,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -36,25 +34,32 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.ContactPage
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Poll
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,19 +67,29 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.LocalMessage
+import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.SendMessageBody
+import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.Avatar
+import com.aivora.app.ui.components.AivoraBottomSheet
+import com.aivora.app.ui.components.AivoraOverflowMenu
+import com.aivora.app.ui.components.AivoraSheetAction
+import com.aivora.app.ui.components.AivoraSheetActionGrid
+import com.aivora.app.ui.components.OverflowMenuItem
 import com.aivora.app.ui.components.TypingIndicatorBubble
 import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.media.rememberMediaActions
@@ -85,33 +100,42 @@ import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.util.UUID
+import kotlin.random.Random
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ChatIdScreen(
     chatId: String = "1",
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
-    sharedTransitionScope: SharedTransitionScope? = null,
-    animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val api = remember {
+        NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
+    }
     val dark = isSystemInDarkTheme()
     val density = LocalDensity.current
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val haptics = rememberAivoraHaptics()
     val chat = remember(chatId) { InMemoryChatStore.chat(chatId) }
     val messages by InMemoryChatStore.messages(chatId).collectAsState()
     var text by remember { mutableStateOf("") }
     var peerTyping by remember { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
-    val attachSheetState = rememberModalBottomSheetState()
+    var showChatMenu by remember { mutableStateOf(false) }
+    var showClearChat by remember { mutableStateOf(false) }
+    var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
+    val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
     val listState = rememberLazyListState()
     val wallpaper = if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
     val media = rememberMediaActions(context) { uri ->
         haptics.confirm()
         InMemoryChatStore.sendMedia(chatId, uri.toString())
-        peerTyping = true
+        if (!useRemote) peerTyping = true
     }
     val firstName = chat.title.substringBefore(' ').ifBlank { chat.title }
     val subtitle = when {
@@ -124,11 +148,35 @@ fun ChatIdScreen(
         InMemoryChatStore.markRead(chatId)
     }
 
+    LaunchedEffect(Unit) {
+        if (!useRemote || myUserId != null) return@LaunchedEffect
+        try {
+            val me = api.getMe()
+            me.id?.let {
+                SessionStore.saveUserId(context, it)
+                myUserId = it
+            }
+        } catch (_: Exception) { /* offline */ }
+    }
+
+    LaunchedEffect(chatId, myUserId, useRemote) {
+        if (!useRemote || myUserId == null) return@LaunchedEffect
+        while (true) {
+            try {
+                val items = api.getConversationsIdMessages(chatId).items
+                    .map { it.toLocalMessage(myUserId!!) }
+                InMemoryChatStore.replaceMessages(chatId, items)
+                runCatching { api.postConversationsIdRead(chatId, emptyMap()) }
+            } catch (_: Exception) { /* keep last list */ }
+            delay(2500)
+        }
+    }
+
     // Defer list settle until after slide enter so they don't fight.
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(chatId) {
         entered = false
-        delay(AivoraNavSlideMs.toLong() + 20L)
+        delay(AivoraNavSlideMs.toLong())
         entered = true
     }
     LaunchedEffect(messages.size, peerTyping, imeVisible, entered) {
@@ -139,7 +187,7 @@ fun ChatIdScreen(
     }
 
     LaunchedEffect(peerTyping) {
-        if (!peerTyping) return@LaunchedEffect
+        if (!peerTyping || useRemote) return@LaunchedEffect
         delay(1400)
         peerTyping = false
         delay(200)
@@ -156,6 +204,8 @@ fun ChatIdScreen(
             title = chat.title,
             subtitle = subtitle,
             showTyping = peerTyping,
+            menuExpanded = showChatMenu,
+            onMenuExpandedChange = { showChatMenu = it },
             onBack = {
                 haptics.tick()
                 onBack?.invoke()
@@ -163,6 +213,20 @@ fun ChatIdScreen(
             onCall = { onNavigate(Routes.audioCall(chat.title)) },
             onVideo = { onNavigate(Routes.videoCall(chat.title)) },
             onOpenProfile = { onNavigate(Routes.ProfileId.replace("{id}", chatId)) },
+            menuItems = listOf(
+                OverflowMenuItem(
+                    if (chat.isGroup) "Group info" else "View contact",
+                    Icons.Default.Person,
+                ) { onNavigate(Routes.ProfileId.replace("{id}", chatId)) },
+                OverflowMenuItem("Media, links and docs", Icons.Default.Image) {
+                    // Viewer screen deferred to backend phase
+                },
+                OverflowMenuItem("Search", Icons.Default.Search) { },
+                OverflowMenuItem("Mute notifications", Icons.Default.NotificationsOff) { },
+                OverflowMenuItem("Clear chat", Icons.Default.Delete, danger = true) {
+                    showClearChat = true
+                },
+            ),
         )
 
         Box(
@@ -204,83 +268,123 @@ fun ChatIdScreen(
             value = text,
             onValueChange = { text = it },
             placeholder = "Message $firstName…",
-            onAttach = { showAttach = true },
+            onAttach = {
+                focusManager.clearFocus(force = true)
+                keyboard?.hide()
+                showAttach = true
+            },
             onCamera = { onNavigate(Routes.camera("chat:$chatId")) },
             onSendOrMic = {
                 val body = text.trim()
                 if (body.isNotEmpty()) {
                     haptics.confirm()
-                    InMemoryChatStore.sendText(chatId, body)
                     text = ""
-                    peerTyping = true
+                    if (useRemote) {
+                        scope.launch {
+                            try {
+                                val sent = api.postConversationsIdMessages(
+                                    chatId,
+                                    SendMessageBody(
+                                        text = body,
+                                        clientId = UUID.randomUUID().toString(),
+                                    ),
+                                )
+                                val uid = myUserId ?: SessionStore.userId(context)
+                                if (uid != null) {
+                                    val local = sent.toLocalMessage(uid)
+                                    val current = InMemoryChatStore.messages(chatId).value
+                                    if (current.none { it.id == local.id }) {
+                                        InMemoryChatStore.replaceMessages(chatId, current + local)
+                                    }
+                                }
+                            } catch (_: Exception) {
+                                InMemoryChatStore.sendText(chatId, body)
+                            }
+                        }
+                    } else {
+                        InMemoryChatStore.sendText(chatId, body)
+                        peerTyping = true
+                    }
                 } else {
-                    haptics.tick()
+                    haptics.confirm()
+                    InMemoryChatStore.sendVoice(chatId, durationSec = 8)
                 }
             },
         )
     }
 
     if (showAttach) {
-        ModalBottomSheet(
-            onDismissRequest = { showAttach = false },
-            sheetState = attachSheetState,
-            containerColor = AivoraColors.LightSurface,
+        AivoraBottomSheet(
+            onDismiss = { showAttach = false },
+            title = "Share",
         ) {
-            Text(
-                "Share",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            AivoraSheetActionGrid(
+                actions = listOf(
+                    AivoraSheetAction("Gallery", Icons.Default.PhotoLibrary) {
+                        showAttach = false
+                        media.pickGallery()
+                    },
+                    AivoraSheetAction("Camera", Icons.Default.CameraAlt) {
+                        showAttach = false
+                        onNavigate(Routes.camera("chat:$chatId"))
+                    },
+                    AivoraSheetAction("Document", Icons.Default.Description) {
+                        showAttach = false
+                        haptics.confirm()
+                        InMemoryChatStore.sendText(chatId, "📄 Document.pdf")
+                        peerTyping = true
+                    },
+                    AivoraSheetAction("Location", Icons.Default.LocationOn) {
+                        showAttach = false
+                        onNavigate(Routes.locationShare(chatId))
+                    },
+                    AivoraSheetAction("Contact", Icons.Default.ContactPage) {
+                        showAttach = false
+                        haptics.confirm()
+                        InMemoryChatStore.sendText(chatId, "👤 Contact card · $firstName")
+                        peerTyping = true
+                    },
+                    AivoraSheetAction("Poll", Icons.Default.Poll) {
+                        showAttach = false
+                        onNavigate(Routes.pollCreate(chatId))
+                    },
+                    AivoraSheetAction("Event", Icons.Default.Event) {
+                        showAttach = false
+                        onNavigate(Routes.eventCreate(chatId))
+                    },
+                ),
             )
-            AttachSheetRow(Icons.Default.PhotoLibrary, "Photos & videos") {
-                showAttach = false
-                onNavigate(Routes.gallery("chat:$chatId"))
-            }
-            AttachSheetRow(Icons.Default.CameraAlt, "Camera") {
-                showAttach = false
-                onNavigate(Routes.camera("chat:$chatId"))
-            }
-            AttachSheetRow(Icons.Default.LocationOn, "Location") {
-                showAttach = false
-                onNavigate(Routes.locationShare(chatId))
-            }
-            AttachSheetRow(Icons.Default.Poll, "Poll") {
-                showAttach = false
-                onNavigate(Routes.pollCreate(chatId))
-            }
-            AttachSheetRow(Icons.Default.Event, "Event") {
-                showAttach = false
-                onNavigate(Routes.eventCreate(chatId))
-            }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(8.dp))
         }
     }
-}
 
-@Composable
-private fun AttachSheetRow(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(AivoraColors.PrimarySoft),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = AivoraColors.Primary)
-        }
-        Spacer(Modifier.width(14.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+    if (showClearChat) {
+        AlertDialog(
+            onDismissRequest = { showClearChat = false },
+            shape = RoundedCornerShape(20.dp),
+            title = { Text("Clear this chat?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Messages will be removed from this device. This can’t be undone.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        InMemoryChatStore.clearChat(chatId)
+                        showClearChat = false
+                    },
+                ) {
+                    Text("Clear", color = AivoraColors.Danger, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearChat = false }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+        )
     }
 }
 
@@ -289,10 +393,13 @@ private fun ChatHeader(
     title: String,
     subtitle: String,
     showTyping: Boolean,
+    menuExpanded: Boolean,
+    onMenuExpandedChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onCall: () -> Unit,
     onVideo: () -> Unit,
     onOpenProfile: () -> Unit,
+    menuItems: List<OverflowMenuItem>,
 ) {
     Row(
         modifier = Modifier
@@ -363,6 +470,20 @@ private fun ChatHeader(
                 tint = AivoraColors.Primary,
             )
         }
+        Box {
+            IconButton(onClick = { onMenuExpandedChange(true) }) {
+                Icon(
+                    painter = painterResource(AivoraIcons.More),
+                    contentDescription = "More",
+                    tint = AivoraColors.Ink,
+                )
+            }
+            AivoraOverflowMenu(
+                expanded = menuExpanded,
+                onDismiss = { onMenuExpandedChange(false) },
+                items = menuItems,
+            )
+        }
     }
     HorizontalDivider(color = AivoraColors.ChatDivider, thickness = 1.dp)
 }
@@ -398,6 +519,7 @@ private fun MessageRow(
     dark: Boolean,
 ) {
     val mine = message.mine
+    val voiceSecs = message.voiceDurationSec
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
@@ -414,7 +536,8 @@ private fun MessageRow(
         }
         Column(
             modifier = Modifier
-                .widthIn(max = 320.dp)
+                .widthIn(max = if (voiceSecs != null) 280.dp else 260.dp)
+                .wrapContentWidth()
                 .clip(bubbleShape(mine))
                 .background(bubbleBg)
                 .then(
@@ -425,8 +548,12 @@ private fun MessageRow(
                     },
                 )
                 .padding(
-                    horizontal = if (message.mediaUri != null) 8.dp else 14.dp,
-                    vertical = if (message.mediaUri != null) 8.dp else 10.dp,
+                    horizontal = when {
+                        message.mediaUri != null -> 8.dp
+                        voiceSecs != null -> 12.dp
+                        else -> 12.dp
+                    },
+                    vertical = if (message.mediaUri != null) 8.dp else 8.dp,
                 ),
         ) {
             if (!mine && isGroup && !message.senderName.isNullOrBlank()) {
@@ -439,33 +566,56 @@ private fun MessageRow(
                     modifier = Modifier.padding(bottom = 4.dp),
                 )
             }
-            message.mediaUri?.let { uri ->
-                AsyncImage(
-                    model = uri,
-                    contentDescription = "Photo",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 196.dp)
-                        .clip(RoundedCornerShape(AivoraDimens.RadiusMd)),
-                    contentScale = ContentScale.Crop,
+            if (voiceSecs != null) {
+                VoiceNoteContent(
+                    durationSec = voiceSecs,
+                    seed = message.id.hashCode(),
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            if (message.body.isNotBlank()) {
-                Text(
-                    message.body,
-                    color = AivoraColors.Ink,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = if (message.mediaUri != null) 4.dp else 0.dp),
-                )
+            } else {
+                message.mediaUri?.let { uri ->
+                    AsyncImage(
+                        model = uri,
+                        contentDescription = "Photo",
+                        modifier = Modifier
+                            .widthIn(max = 236.dp)
+                            .heightIn(max = 196.dp)
+                            .clip(RoundedCornerShape(AivoraDimens.RadiusMd)),
+                        contentScale = ContentScale.Crop,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                if (message.body.isNotBlank() && message.mediaUri == null) {
+                    Text(
+                        message.body,
+                        color = AivoraColors.Ink,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else if (message.body.isNotBlank() && message.mediaUri != null &&
+                    message.body != "Photo"
+                ) {
+                    Text(
+                        message.body,
+                        color = AivoraColors.Ink,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                    )
+                }
             }
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .align(Alignment.End)
                     .padding(top = 4.dp, start = if (message.mediaUri != null) 4.dp else 0.dp),
-                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (voiceSecs != null && mine) {
+                    Icon(
+                        painter = painterResource(AivoraIcons.Mic),
+                        contentDescription = null,
+                        tint = AivoraColors.Primary,
+                        modifier = Modifier.size(12.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
                 Text(
                     message.time,
                     style = MaterialTheme.typography.labelMedium,
@@ -487,6 +637,69 @@ private fun MessageRow(
 }
 
 @Composable
+private fun VoiceNoteContent(durationSec: Int, seed: Int) {
+    val bars = remember(seed) {
+        val rnd = Random(seed)
+        List(28) { 0.25f + rnd.nextFloat() * 0.75f }
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.widthIn(min = 200.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(AivoraColors.Primary),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("▶", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(28.dp),
+            ) {
+                bars.forEachIndexed { i, h ->
+                    val active = i < bars.size / 3
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height((28 * h).dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(
+                                if (active) AivoraColors.Primary
+                                else AivoraColors.Primary.copy(alpha = 0.28f),
+                            ),
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "0:00 / ${formatVoiceDuration(durationSec)}",
+                    fontSize = 11.sp,
+                    color = AivoraColors.TextSecondary,
+                )
+                Text("1x", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AivoraColors.Ink)
+            }
+        }
+    }
+}
+
+private fun formatVoiceDuration(sec: Int): String {
+    val m = sec / 60
+    val s = sec % 60
+    return "%d:%02d".format(m, s)
+}
+
+@Composable
 private fun ChatComposer(
     value: String,
     onValueChange: (String) -> Unit,
@@ -496,13 +709,16 @@ private fun ChatComposer(
     onSendOrMic: () -> Unit,
 ) {
     val canSend = value.isNotBlank()
-    Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+    Column(
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.surface)
+            .navigationBarsPadding(),
+    ) {
         HorizontalDivider(color = AivoraColors.ChatDivider, thickness = 1.dp)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .navigationBarsPadding(),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {

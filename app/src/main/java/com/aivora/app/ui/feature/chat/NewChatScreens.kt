@@ -49,8 +49,14 @@ fun NewChatScreen(
     var busy by remember { mutableStateOf(false) }
 
     LaunchedEffect(query) {
+        val q = query.trim()
+        if (q.length < 3) {
+            people = emptyList()
+            error = null
+            return@LaunchedEffect
+        }
         try {
-            people = api.getPeopleSearch(query.ifBlank { null }).items
+            people = api.getPeopleSearch(q).items
             error = null
         } catch (e: Exception) {
             error = e.message ?: "Could not load people"
@@ -68,8 +74,8 @@ fun NewChatScreen(
             ) { Icon(Icons.Default.Add, contentDescription = null) }
         },
     ) {
-        InfoBanner("Search registered users by name or phone")
-        SearchField(query, { query = it }, "Search")
+        InfoBanner("Type at least 3 characters of a name or phone number")
+        SearchField(query, { query = it }, "Search name or phone")
         if (error != null) {
             Text(error!!, color = AivoraColors.Danger, fontSize = 13.sp)
         }

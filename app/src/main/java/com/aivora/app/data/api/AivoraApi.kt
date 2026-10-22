@@ -168,8 +168,8 @@ interface AivoraApi {
     @POST("api/conversations/{id}/messages")
     suspend fun postConversationsIdMessages(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.SendMessageBody,
+    ): com.aivora.app.data.model.MessageDto
 
     @PUT("api/conversations/{id}/disappearing")
     suspend fun putConversationsIdDisappearing(
@@ -429,7 +429,7 @@ interface AivoraApi {
     @GET("api/conversations/{id}/messages")
     suspend fun getConversationsIdMessages(
         @Path("id") id: String,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.MessageListDto
 
     @GET("api/me/username")
     suspend fun getMeUsername(): okhttp3.ResponseBody

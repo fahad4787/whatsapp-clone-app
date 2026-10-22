@@ -114,6 +114,21 @@ object InMemoryChatStore {
         }
     }
 
+    /** Replace the message list for a chat (e.g. after a remote fetch/poll). */
+    fun replaceMessages(chatId: String, messages: List<LocalMessage>) {
+        messageFlow(chatId).value = messages
+        val last = messages.lastOrNull()
+        if (last != null) {
+            _chats.update { list ->
+                val current = list.find { it.id == chatId }
+                    ?: LocalChat(chatId, "Chat", last.body, last.time)
+                listOf(
+                    current.copy(preview = last.body, time = last.time, unread = 0),
+                ) + list.filterNot { it.id == chatId }
+            }
+        }
+    }
+
     private fun append(chatId: String, message: LocalMessage, preview: String) {
         messageFlow(chatId).update { it + message }
         _chats.update { list ->
