@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **Wave 1 mostly complete** — staging OTP + admin login verified; confirm on device.
+Status: **Wave 1 complete** — OTP login verified on device against staging. Next: Wave 2 (profile).
 
 ## Locked constraints
 
