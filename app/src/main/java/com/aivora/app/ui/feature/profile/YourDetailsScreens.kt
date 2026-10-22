@@ -1,5 +1,6 @@
 package com.aivora.app.ui.feature.profile
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,7 +25,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,66 +36,166 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import com.aivora.app.data.api.NetworkModule
+import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.MeUpdateBody
 import com.aivora.app.ui.components.Avatar
+import com.aivora.app.ui.components.AivoraBottomSheet
+import com.aivora.app.ui.components.AivoraSheetAction
+import com.aivora.app.ui.components.AivoraSheetActionList
 import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.media.rememberMediaActions
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 @Composable
 fun YourDetailsScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var name by remember { mutableStateOf("Leslie") }
-    var about by remember { mutableStateOf("Ending the day with...") }
-    var phone by remember { mutableStateOf("+92 323 4226146") }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val api = remember {
+        NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
+    }
+
+    var name by remember { mutableStateOf("") }
+    var about by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
     var links by remember { mutableStateOf("") }
+    var avatarUrl by remember { mutableStateOf<String?>(null) }
     var editingField by remember { mutableStateOf<String?>(null) }
     var showEditPhoto by remember { mutableStateOf(false) }
     var showCrop by remember { mutableStateOf(false) }
     var photoUri by remember { mutableStateOf<String?>(null) }
-    val context = LocalContext.current
+    var loading by remember { mutableStateOf(true) }
+    var saving by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
     val media = rememberMediaActions(context) { uri ->
         photoUri = uri.toString()
         showEditPhoto = false
         showCrop = true
     }
 
+    fun applyUser(
+        displayName: String?,
+        aboutText: String?,
+        phoneText: String?,
+        avatar: String?,
+    ) {
+        name = displayName.orEmpty()
+        about = aboutText.orEmpty()
+        phone = phoneText.orEmpty()
+        avatarUrl = avatar
+    }
+
+    LaunchedEffect(Unit) {
+        loading = true
+        error = null
+        try {
+            val me = api.getMe()
+            applyUser(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
+        } catch (e: Exception) {
+            error = e.message ?: "Could not load profile"
+        } finally {
+            loading = false
+        }
+    }
+
+    suspend fun uploadAvatar(uriString: String) {
+        val uri = Uri.parse(uriString)
+        val bytes = withContext(Dispatchers.IO) {
+            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        } ?: throw IllegalStateException("Could not read image")
+        val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+        val body = bytes.toRequestBody(mime.toMediaTypeOrNull())
+        val part = MultipartBody.Part.createFormData("file", "avatar.jpg", body)
+        val me = api.postMeAvatar(part)
+        applyUser(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
+    }
+
     if (showCrop) {
         EditPhotoCropScreen(
-            name = name,
+            name = name.ifBlank { "A" },
+            previewUri = photoUri,
+            busy = saving,
             onCancel = { showCrop = false },
-            onDone = { showCrop = false },
+            onDone = {
+                val uri = photoUri ?: return@EditPhotoCropScreen
+                saving = true
+                error = null
+                scope.launch {
+                    try {
+                        uploadAvatar(uri)
+                        showCrop = false
+                    } catch (e: Exception) {
+                        error = e.message ?: "Upload failed"
+                    } finally {
+                        saving = false
+                    }
+                }
+            },
         )
         return
     }
 
     if (showEditPhoto) {
-        EditPhotoSheet(
+        AivoraBottomSheet(
             onDismiss = { showEditPhoto = false },
-            onCamera = media.takePhoto,
-            onGallery = media.pickGallery,
-            onRemove = {
-                photoUri = null
-                showEditPhoto = false
+            title = "Edit profile picture",
+            leading = {
+                ProfileAvatar(name = name, avatarUrl = avatarUrl, size = 40)
             },
-        )
+        ) {
+            AivoraSheetActionList(
+                actions = listOf(
+                    AivoraSheetAction("Take photo", Icons.Default.CameraAlt, onClick = media.takePhoto),
+                    AivoraSheetAction("Choose photo", Icons.Default.PhotoLibrary, onClick = media.pickGallery),
+                    AivoraSheetAction("Delete photo", Icons.Default.Delete, danger = true) {
+                        showEditPhoto = false
+                        saving = true
+                        scope.launch {
+                            try {
+                                val me = api.deleteMeAvatar()
+                                applyUser(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
+                                photoUri = null
+                            } catch (e: Exception) {
+                                error = e.message ?: "Could not delete photo"
+                            } finally {
+                                saving = false
+                            }
+                        }
+                    },
+                ),
+            )
+            Spacer(Modifier.height(8.dp))
+        }
     }
 
     editingField?.let { field ->
@@ -101,18 +204,36 @@ fun YourDetailsScreen(
             initial = when (field) {
                 "Name" -> name
                 "About" -> about
-                "Phone number" -> phone
                 else -> links
             },
             onDismiss = { editingField = null },
             onSave = { value ->
                 when (field) {
-                    "Name" -> name = value
-                    "About" -> about = value
-                    "Phone number" -> phone = value
-                    else -> links = value
+                    "Name", "About" -> {
+                        saving = true
+                        error = null
+                        scope.launch {
+                            try {
+                                val me = api.putMe(
+                                    MeUpdateBody(
+                                        displayName = if (field == "Name") value else null,
+                                        about = if (field == "About") value else null,
+                                    ),
+                                )
+                                applyUser(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
+                                editingField = null
+                            } catch (e: Exception) {
+                                error = e.message ?: "Could not save"
+                            } finally {
+                                saving = false
+                            }
+                        }
+                    }
+                    else -> {
+                        links = value
+                        editingField = null
+                    }
                 }
-                editingField = null
             },
         )
     }
@@ -143,6 +264,23 @@ fun YourDetailsScreen(
                 fontWeight = FontWeight.SemiBold,
                 color = AivoraColors.InkMuted,
             )
+            Spacer(Modifier.weight(1f))
+            if (saving || loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp).padding(end = 12.dp),
+                    strokeWidth = 2.dp,
+                    color = AivoraColors.Primary,
+                )
+            }
+        }
+
+        if (error != null) {
+            Text(
+                error!!,
+                color = AivoraColors.Danger,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+            )
         }
 
         Column(
@@ -153,13 +291,13 @@ fun YourDetailsScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(12.dp))
-            Avatar(name, size = 132)
+            ProfileAvatar(name = name.ifBlank { "?" }, avatarUrl = avatarUrl, size = 132)
             Spacer(Modifier.height(16.dp))
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(AivoraDimens.RadiusFull))
                     .background(AivoraColors.PrimarySoft)
-                    .clickable { showEditPhoto = true }
+                    .clickable(enabled = !saving) { showEditPhoto = true }
                     .padding(horizontal = 18.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -202,11 +340,15 @@ fun YourDetailsScreen(
                         .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
                         .background(AivoraColors.SurfaceMuted),
                 ) {
-                    ProfileDetailRow("Name", name, accent = false) { editingField = "Name" }
+                    ProfileDetailRow("Name", name.ifBlank { "Add name" }, accent = false) {
+                        editingField = "Name"
+                    }
                     HorizontalDivider(color = AivoraColors.Divider, modifier = Modifier.padding(start = 16.dp))
-                    ProfileDetailRow("About", about, accent = true) { editingField = "About" }
+                    ProfileDetailRow("About", about.ifBlank { "Add about" }, accent = true) {
+                        editingField = "About"
+                    }
                     HorizontalDivider(color = AivoraColors.Divider, modifier = Modifier.padding(start = 16.dp))
-                    ProfileDetailRow("Phone number", phone, accent = false) { editingField = "Phone number" }
+                    ProfileDetailRow("Phone number", phone.ifBlank { "—" }, accent = false) { /* read-only */ }
                     HorizontalDivider(color = AivoraColors.Divider, modifier = Modifier.padding(start = 16.dp))
                     ProfileDetailRow(
                         "Links",
@@ -216,6 +358,23 @@ fun YourDetailsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ProfileAvatar(name: String, avatarUrl: String?, size: Int) {
+    if (!avatarUrl.isNullOrBlank()) {
+        AsyncImage(
+            model = avatarUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(size.dp)
+                .clip(CircleShape)
+                .background(AivoraColors.PrimarySoft),
+        )
+    } else {
+        Avatar(name, size = size)
     }
 }
 
@@ -253,73 +412,10 @@ private fun ProfileDetailRow(
 }
 
 @Composable
-private fun EditPhotoSheet(
-    onDismiss: () -> Unit,
-    onCamera: () -> Unit,
-    onGallery: () -> Unit,
-    onRemove: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f))
-            .clickable(onClick = onDismiss),
-    ) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .clickable(enabled = false) {}
-                .padding(horizontal = 24.dp, vertical = 20.dp)
-                .navigationBarsPadding(),
-        ) {
-            Text("Edit profile picture", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = AivoraColors.Ink)
-            Spacer(Modifier.height(16.dp))
-            EditPhotoOption(Icons.Default.CameraAlt, "Camera", onCamera)
-            EditPhotoOption(Icons.Default.PhotoLibrary, "Gallery", onGallery)
-            EditPhotoOption(Icons.Default.Close, "Remove photo", onRemove, danger = true)
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                Text("Cancel", color = AivoraColors.TextSecondary)
-            }
-        }
-    }
-}
-
-@Composable
-private fun EditPhotoOption(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit,
-    danger: Boolean = false,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = if (danger) AivoraColors.Danger else AivoraColors.Primary,
-        )
-        Spacer(Modifier.width(14.dp))
-        Text(
-            label,
-            fontSize = 16.sp,
-            color = if (danger) AivoraColors.Danger else AivoraColors.Ink,
-        )
-    }
-}
-
-@Composable
 private fun EditPhotoCropScreen(
     name: String,
+    previewUri: String?,
+    busy: Boolean,
     onCancel: () -> Unit,
     onDone: () -> Unit,
 ) {
@@ -339,12 +435,16 @@ private fun EditPhotoCropScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            IconButton(onClick = onCancel) {
+            IconButton(onClick = onCancel, enabled = !busy) {
                 Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color.White)
             }
             Text("Move and scale", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-            IconButton(onClick = onDone) {
-                Icon(Icons.Default.Check, contentDescription = "Done", tint = AivoraColors.Primary)
+            IconButton(onClick = onDone, enabled = !busy) {
+                if (busy) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp, color = AivoraColors.Primary)
+                } else {
+                    Icon(Icons.Default.Check, contentDescription = "Done", tint = AivoraColors.Primary)
+                }
             }
         }
 
@@ -361,32 +461,31 @@ private fun EditPhotoCropScreen(
                     .border(2.dp, Color.White.copy(alpha = 0.35f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Avatar(
-                    name,
-                    size = 280,
-                    modifier = Modifier.graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    },
-                )
+                if (!previewUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = previewUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            },
+                    )
+                } else {
+                    Avatar(
+                        name,
+                        size = 280,
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        },
+                    )
+                }
             }
         }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp, vertical = 24.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = { scale = (scale - 0.1f).coerceAtLeast(0.8f) }) {
-                Text("−", color = Color.White, fontSize = 22.sp)
-            }
-            Text("Pinch to zoom (mock)", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
-            TextButton(onClick = { scale = (scale + 0.1f).coerceAtMost(1.6f) }) {
-                Text("+", color = Color.White, fontSize = 22.sp)
-            }
-        }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -397,21 +496,13 @@ private fun EditFieldDialog(
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    var value by remember(field) { mutableStateOf(initial) }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.4f))
-            .clickable(onClick = onDismiss),
-        contentAlignment = Alignment.Center,
-    ) {
+    var value by remember(field, initial) { mutableStateOf(initial) }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
-                .padding(24.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surface)
-                .clickable(enabled = false) {}
                 .padding(20.dp),
         ) {
             Text(field, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = AivoraColors.Ink)
@@ -421,16 +512,11 @@ private fun EditFieldDialog(
                 onValueChange = { value = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = field != "About",
-                shape = RoundedCornerShape(12.dp),
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel", color = AivoraColors.TextSecondary)
-                }
-                TextButton(onClick = { onSave(value.trim()) }) {
-                    Text("Save", color = AivoraColors.Primary, fontWeight = FontWeight.SemiBold)
-                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = { onSave(value.trim()) }) { Text("Save") }
             }
         }
     }

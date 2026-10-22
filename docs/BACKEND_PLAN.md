@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **Wave 1 complete** — OTP login verified on device against staging. Next: Wave 2 (profile).
+Status: **Wave 2 in progress** — profile GET/PUT/avatar + Android wiring.
 
 ## Locked constraints
 

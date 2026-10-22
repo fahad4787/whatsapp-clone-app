@@ -1,12 +1,15 @@
 package com.aivora.app.data.api
 
+import okhttp3.MultipartBody
 import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 
 /**
@@ -186,8 +189,8 @@ interface AivoraApi {
 
     @PUT("api/me")
     suspend fun putMe(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.MeUpdateBody,
+    ): com.aivora.app.data.model.UserDto
 
     @POST("api/conversations/group")
     suspend fun postConversationsGroup(
@@ -478,10 +481,11 @@ interface AivoraApi {
         @Path("id") id: String,
     ): okhttp3.ResponseBody
 
+    @Multipart
     @POST("api/me/avatar")
     suspend fun postMeAvatar(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Part file: MultipartBody.Part,
+    ): com.aivora.app.data.model.UserDto
 
     @GET("api/me/data")
     suspend fun getMeData(): okhttp3.ResponseBody
@@ -524,7 +528,7 @@ interface AivoraApi {
     ): okhttp3.ResponseBody
 
     @DELETE("api/me/avatar")
-    suspend fun deleteMeAvatar(): okhttp3.ResponseBody
+    suspend fun deleteMeAvatar(): com.aivora.app.data.model.UserDto
 
     @POST("api/auth/email/request")
     suspend fun postAuthEmailRequest(
@@ -667,7 +671,7 @@ interface AivoraApi {
     ): okhttp3.ResponseBody
 
     @GET("api/me")
-    suspend fun getMe(): okhttp3.ResponseBody
+    suspend fun getMe(): com.aivora.app.data.model.UserDto
 
     @GET("api/me/starred")
     suspend fun getMeStarredAlt(): okhttp3.ResponseBody
