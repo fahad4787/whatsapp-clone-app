@@ -84,7 +84,6 @@ import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.SendMessageBody
 import com.aivora.app.data.realtime.RealtimeClient
-import com.aivora.app.data.realtime.startFromSession
 import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraBottomSheet

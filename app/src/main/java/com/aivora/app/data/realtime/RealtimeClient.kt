@@ -67,6 +67,13 @@ object RealtimeClient {
         connect()
     }
 
+    fun startFromSession(context: android.content.Context) {
+        start(
+            tokenProvider = { SessionStore.accessToken(context) },
+            myUserIdProvider = { SessionStore.userId(context) },
+        )
+    }
+
     fun stop() {
         reconnectJob?.cancel()
         reconnectJob = null
@@ -204,12 +211,4 @@ object RealtimeClient {
 
     private fun JsonObject.boolean(key: String): Boolean? =
         (this[key] as? JsonPrimitive)?.booleanOrNull
-}
-
-/** Convenience from Activity/Compose context. */
-fun RealtimeClient.startFromSession(context: android.content.Context) {
-    start(
-        tokenProvider = { SessionStore.accessToken(context) },
-        myUserIdProvider = { SessionStore.userId(context) },
-    )
 }
