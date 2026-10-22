@@ -143,7 +143,11 @@ fun ChatIdScreen(
                     val sent = api.sendImageMessage(context, chatId, uri)
                     val uid = myUserId ?: SessionStore.userId(context)
                     if (uid != null) {
-                        InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
+                        // Keep local content URI so the sender always sees the photo immediately.
+                        InMemoryChatStore.upsertMessage(
+                            chatId,
+                            sent.toLocalMessage(uid).copy(mediaUri = uri.toString()),
+                        )
                     }
                 } catch (_: Exception) {
                     InMemoryChatStore.sendMedia(chatId, uri.toString())
@@ -627,15 +631,26 @@ private fun MessageRow(
                 )
             } else {
                 message.mediaUri?.let { uri ->
-                    AsyncImage(
-                        model = uri,
-                        contentDescription = "Photo",
+                    Box(
                         modifier = Modifier
-                            .widthIn(max = 236.dp)
-                            .heightIn(max = 196.dp)
-                            .clip(RoundedCornerShape(AivoraDimens.RadiusMd)),
-                        contentScale = ContentScale.Crop,
-                    )
+                            .widthIn(min = 160.dp, max = 236.dp)
+                            .heightIn(min = 120.dp, max = 196.dp)
+                            .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                            .background(AivoraColors.PrimarySoft),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "Photo",
+                            color = AivoraColors.TextSecondary,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                        AsyncImage(
+                            model = uri,
+                            contentDescription = "Photo",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
                 if (message.body.isNotBlank() && message.mediaUri == null) {

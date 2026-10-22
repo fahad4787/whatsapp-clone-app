@@ -54,7 +54,10 @@ fun CameraCaptureScreen(
                             val sent = api.sendImageMessage(context, chatId, uri)
                             val uid = SessionStore.userId(context)
                             if (uid != null) {
-                                InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
+                                InMemoryChatStore.upsertMessage(
+                                    chatId,
+                                    sent.toLocalMessage(uid).copy(mediaUri = uri.toString()),
+                                )
                             }
                         } catch (_: Exception) {
                             InMemoryChatStore.sendMedia(chatId, uri.toString())

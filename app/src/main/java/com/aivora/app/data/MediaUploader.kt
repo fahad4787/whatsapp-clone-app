@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import com.aivora.app.data.api.AivoraApi
 import com.aivora.app.data.model.AttachmentDto
-import com.aivora.app.data.model.MediaPresignBody
 import com.aivora.app.data.model.MessageDto
 import com.aivora.app.data.model.SendMessageBody
 import kotlinx.coroutines.Dispatchers
@@ -24,31 +23,13 @@ suspend fun AivoraApi.sendImageMessage(
     } ?: throw IllegalStateException("Could not read image")
     val mime = context.contentResolver.getType(imageUri) ?: "image/jpeg"
 
-    val uploaded = try {
-        val presign = postMediaPresign(
-            MediaPresignBody(contentType = mime, filename = "photo.jpg", size = bytes.size),
-        )
-        val uploadUrl = presign.uploadUrl
-        if (!uploadUrl.isNullOrBlank()) {
-            putMediaUpload(
-                uploadUrl,
-                bytes.toRequestBody(mime.toMediaTypeOrNull()),
-            )
-        } else {
-            null
-        }
-    } catch (_: Exception) {
-        null
-    }
-
-    val result = uploaded ?: run {
-        val part = okhttp3.MultipartBody.Part.createFormData(
-            "file",
-            "photo.jpg",
-            bytes.toRequestBody(mime.toMediaTypeOrNull()),
-        )
-        postMediaUpload(part)
-    }
+    // Multipart matches avatar upload (reliable on Render). Presign+PUT remains available for other clients.
+    val part = okhttp3.MultipartBody.Part.createFormData(
+        "file",
+        "photo.jpg",
+        bytes.toRequestBody(mime.toMediaTypeOrNull()),
+    )
+    val result = postMediaUpload(part)
 
     val url = result.url ?: throw IllegalStateException("Upload missing url")
     val key = result.key ?: throw IllegalStateException("Upload missing key")
