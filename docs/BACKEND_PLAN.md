@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **Wave 3 complete on staging** — direct chats verified; Android list/new chat/group wired. Next: Wave 4 (text messaging).
+Status: **Wave 5 in progress** — WebSocket typing/presence/message push. Waves 0–4 done on staging (text chat verified).
 
 ## Locked constraints
 

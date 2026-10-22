@@ -129,6 +129,25 @@ object InMemoryChatStore {
         }
     }
 
+    /** Insert or replace one message by id (websocket push). */
+    fun upsertMessage(chatId: String, message: LocalMessage) {
+        messageFlow(chatId).update { list ->
+            val without = list.filterNot { it.id == message.id }
+            without + message
+        }
+        _chats.update { list ->
+            val current = list.find { it.id == chatId }
+                ?: LocalChat(chatId, "Chat", message.body, message.time)
+            listOf(
+                current.copy(
+                    preview = message.body,
+                    time = message.time,
+                    unread = if (message.mine) 0 else current.unread + 1,
+                ),
+            ) + list.filterNot { it.id == chatId }
+        }
+    }
+
     private fun append(chatId: String, message: LocalMessage, preview: String) {
         messageFlow(chatId).update { it + message }
         _chats.update { list ->

@@ -151,6 +151,7 @@ fun HomeScreen(
             }
             val remote = api.getConversations().items.map { it.toLocalChat() }
             InMemoryChatStore.replaceFromRemote(remote)
+            com.aivora.app.data.realtime.RealtimeClient.startFromSession(context)
         } catch (_: Exception) {
             /* keep seed / last local list offline */
         }

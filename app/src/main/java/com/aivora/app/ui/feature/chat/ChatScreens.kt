@@ -83,6 +83,8 @@ import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.SendMessageBody
+import com.aivora.app.data.realtime.RealtimeClient
+import com.aivora.app.data.realtime.startFromSession
 import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraBottomSheet
@@ -128,6 +130,7 @@ fun ChatIdScreen(
     var showChatMenu by remember { mutableStateOf(false) }
     var showClearChat by remember { mutableStateOf(false) }
     var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
+    var peerOnline by remember { mutableStateOf(true) }
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
     val listState = rememberLazyListState()
     val wallpaper = if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight
@@ -140,8 +143,9 @@ fun ChatIdScreen(
     val firstName = chat.title.substringBefore(' ').ifBlank { chat.title }
     val subtitle = when {
         peerTyping -> "typing…"
-        chat.isGroup -> "3 online · 5 members"
-        else -> "Online now"
+        chat.isGroup -> "tap for group info"
+        peerOnline -> "Online"
+        else -> "Offline"
     }
 
     LaunchedEffect(chatId) {
@@ -149,16 +153,44 @@ fun ChatIdScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (!useRemote || myUserId != null) return@LaunchedEffect
-        try {
-            val me = api.getMe()
-            me.id?.let {
-                SessionStore.saveUserId(context, it)
-                myUserId = it
-            }
-        } catch (_: Exception) { /* offline */ }
+        if (!useRemote) return@LaunchedEffect
+        RealtimeClient.startFromSession(context)
+        if (myUserId == null) {
+            try {
+                val me = api.getMe()
+                me.id?.let {
+                    SessionStore.saveUserId(context, it)
+                    myUserId = it
+                }
+            } catch (_: Exception) { /* offline */ }
+        }
     }
 
+    LaunchedEffect(chatId, useRemote) {
+        if (!useRemote) return@LaunchedEffect
+        RealtimeClient.join(chatId)
+        try {
+            RealtimeClient.typing.collect { event ->
+                if (event.conversationId == chatId) {
+                    peerTyping = event.typing
+                }
+            }
+        } finally {
+            RealtimeClient.leave(chatId)
+            RealtimeClient.setTyping(chatId, false)
+        }
+    }
+
+    LaunchedEffect(useRemote) {
+        if (!useRemote) return@LaunchedEffect
+        RealtimeClient.presence.collect { event ->
+            if (event.userId != null && event.userId != myUserId) {
+                peerOnline = event.online
+            }
+        }
+    }
+
+    // Initial history + slow backup poll (websocket is primary)
     LaunchedEffect(chatId, myUserId, useRemote) {
         if (!useRemote || myUserId == null) return@LaunchedEffect
         while (true) {
@@ -168,8 +200,19 @@ fun ChatIdScreen(
                 InMemoryChatStore.replaceMessages(chatId, items)
                 runCatching { api.postConversationsIdRead(chatId, emptyMap()) }
             } catch (_: Exception) { /* keep last list */ }
-            delay(2500)
+            delay(15_000)
         }
+    }
+
+    LaunchedEffect(text, useRemote, chatId) {
+        if (!useRemote) return@LaunchedEffect
+        if (text.isBlank()) {
+            RealtimeClient.setTyping(chatId, false)
+            return@LaunchedEffect
+        }
+        RealtimeClient.setTyping(chatId, true)
+        delay(1200)
+        RealtimeClient.setTyping(chatId, false)
     }
 
     // Defer list settle until after slide enter so they don't fight.
@@ -280,6 +323,7 @@ fun ChatIdScreen(
                     haptics.confirm()
                     text = ""
                     if (useRemote) {
+                        RealtimeClient.setTyping(chatId, false)
                         scope.launch {
                             try {
                                 val sent = api.postConversationsIdMessages(
@@ -291,11 +335,7 @@ fun ChatIdScreen(
                                 )
                                 val uid = myUserId ?: SessionStore.userId(context)
                                 if (uid != null) {
-                                    val local = sent.toLocalMessage(uid)
-                                    val current = InMemoryChatStore.messages(chatId).value
-                                    if (current.none { it.id == local.id }) {
-                                        InMemoryChatStore.replaceMessages(chatId, current + local)
-                                    }
+                                    InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
                                 }
                             } catch (_: Exception) {
                                 InMemoryChatStore.sendText(chatId, body)
