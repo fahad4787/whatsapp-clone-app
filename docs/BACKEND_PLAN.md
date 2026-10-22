@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **Wave 0 in progress** (kickoff confirmed).
+Status: **Wave 0 complete** — next is Wave 1 (auth / OTP).
 
 ## Locked constraints
 
@@ -240,5 +240,5 @@ Status: **Wave 0 in progress** (kickoff confirmed).
 - [x] Docker Desktop installed; local Postgres/Redis up; migrate applied; `/health` → `ok: true`  
 - [x] Render API staging live: `https://whatsapp-clone-backend-hep1.onrender.com` (`/health` ok)  
 - [x] Admin staging live: `https://whatsapp-clone-admin-frontend.onrender.com`  
-- [ ] Set API `CORS_ORIGIN` to include the admin URL (so dashboard health banner can call `/health`)  
+- [x] API `CORS_ORIGIN` includes admin URL — dashboard shows API healthy  
 - [ ] (Later) Firebase for FCM when we reach Wave 7  
