@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **Wave 3 in progress** — conversations API + Android list/new chat/group.
+Status: **Wave 3 complete on staging** — direct chats verified; Android list/new chat/group wired. Next: Wave 4 (text messaging).
 
 ## Locked constraints
 
