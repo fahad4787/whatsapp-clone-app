@@ -11,5 +11,3 @@ graphify-out/
 .cursor/
 .kotlin/
 
-# Firebase (local; do not commit secrets)
-app/google-services.json

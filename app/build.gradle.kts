@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -67,13 +68,9 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-compose:3.0.4")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
-    implementation("com.google.firebase:firebase-messaging-ktx")
+    implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
+    // BoM 33+ folds KTX into the main artifact
+    implementation("com.google.firebase:firebase-messaging")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
-}
-
-// Apply only when you drop Firebase Console google-services.json into app/
-if (file("google-services.json").exists()) {
-    apply(plugin = "com.google.gms.google-services")
 }

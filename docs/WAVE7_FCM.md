@@ -5,10 +5,8 @@ Backend and Android wiring are in place. Notifications only leave the server whe
 ## 1. Firebase Console (you)
 
 1. Create a Firebase project (or use an existing one).
-2. Add an **Android** app with package name: `com.aivora.app.dev` (debug `applicationId`).
-3. Download `google-services.json` → put it at  
-   `aivora/app/google-services.json`
-4. Project settings → **Service accounts** → Generate new private key (JSON).
+2. Android app package: `com.aivora.app.dev` — `google-services.json` is already in `aivora/app/`.
+3. Project settings → **Service accounts** → Generate new private key (JSON) for the **API** (Render).
 
 ## 2. Render (API)
 
