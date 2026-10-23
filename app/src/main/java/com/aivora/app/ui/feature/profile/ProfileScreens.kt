@@ -104,7 +104,9 @@ fun ProfileIdScreen(
                     SettingsItem("Audio call", null, Icons.Default.Call, onClick = { onNavigate(Routes.NewCall) }),
                     SettingsItem("Video call", null, Icons.Default.Videocam, onClick = { onNavigate(Routes.NewCall) }),
                     SettingsItem("Search in chat", null, Icons.Default.Search, onClick = { }),
-                    SettingsItem("Media, links, and docs", null, Icons.Default.Photo, onClick = { }),
+                    SettingsItem("Media, links, and docs", null, Icons.Default.Photo, onClick = {
+                        onNavigate(Routes.chatMedia(profileId))
+                    }),
                     SettingsItem("Starred messages", null, Icons.Default.Star, onClick = { onNavigate(Routes.SettingsStarred) }),
                     SettingsItem("Notifications", null, Icons.Default.Notifications, onClick = { }),
                     SettingsItem("Disappearing messages", "Off", Icons.Default.Timer, onClick = { onNavigate(Routes.SettingsPrivacyDefaultTimer) }),

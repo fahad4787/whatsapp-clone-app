@@ -60,7 +60,16 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Unarchive
+import android.Manifest
+import android.content.Intent
+import android.media.MediaPlayer
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -100,6 +109,7 @@ import androidx.compose.foundation.rememberScrollState
 import coil3.compose.AsyncImage
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
+import com.aivora.app.data.local.LocalMediaKind
 import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.LocalReplyPreview
 import com.aivora.app.data.local.MessageDeliveryStatus
@@ -110,7 +120,9 @@ import com.aivora.app.data.model.ReactionBody
 import com.aivora.app.data.model.ReplyPreviewDto
 import com.aivora.app.data.model.SendMessageBody
 import com.aivora.app.data.realtime.RealtimeClient
+import com.aivora.app.data.sendAttachmentMessage
 import com.aivora.app.data.sendImageMessage
+import com.aivora.app.data.sendVoiceFile
 import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraBottomSheet
@@ -121,6 +133,8 @@ import com.aivora.app.ui.components.AivoraSheetActionList
 import com.aivora.app.ui.components.OverflowMenuItem
 import com.aivora.app.ui.components.TypingIndicatorBubble
 import com.aivora.app.ui.icons.AivoraIcons
+import com.aivora.app.ui.media.VoiceRecorder
+import com.aivora.app.ui.media.hasMicPermission
 import com.aivora.app.ui.media.rememberMediaActions
 import com.aivora.app.ui.motion.AivoraNavSlideMs
 import com.aivora.app.ui.motion.AivoraTweenFast
@@ -181,27 +195,62 @@ fun ChatIdScreen(
     val listState = rememberLazyListState()
     val wallpaper = if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
-    val media = rememberMediaActions(context) { uri ->
+    fun uploadPickedUri(uri: Uri) {
         haptics.confirm()
+        val mime = context.contentResolver.getType(uri).orEmpty()
+        val kind = when {
+            mime.startsWith("video/") -> LocalMediaKind.Video
+            mime.startsWith("audio/") -> LocalMediaKind.Audio
+            mime.startsWith("image/") -> LocalMediaKind.Image
+            else -> LocalMediaKind.File
+        }
         if (useRemote) {
             scope.launch {
                 try {
-                    val sent = api.sendImageMessage(context, chatId, uri)
+                    val sent = when (kind) {
+                        LocalMediaKind.Image -> api.sendImageMessage(context, chatId, uri)
+                        else -> api.sendAttachmentMessage(
+                            context = context,
+                            conversationId = chatId,
+                            uri = uri,
+                            defaultName = if (kind == LocalMediaKind.Video) "video.mp4" else "document.bin",
+                            defaultMime = mime.ifBlank { "application/octet-stream" },
+                        )
+                    }
                     val uid = myUserId ?: SessionStore.userId(context)
                     if (uid != null) {
-                        // Keep local content URI so the sender always sees the photo immediately.
                         InMemoryChatStore.upsertMessage(
                             chatId,
                             sent.toLocalMessage(uid).copy(mediaUri = uri.toString()),
                         )
                     }
                 } catch (_: Exception) {
-                    InMemoryChatStore.sendMedia(chatId, uri.toString())
+                    InMemoryChatStore.sendMedia(chatId, uri.toString(), kind = kind)
                 }
             }
         } else {
-            InMemoryChatStore.sendMedia(chatId, uri.toString())
+            InMemoryChatStore.sendMedia(chatId, uri.toString(), kind = kind)
             peerTyping = true
+        }
+    }
+    val media = rememberMediaActions(
+        context = context,
+        onDocument = { uri -> uploadPickedUri(uri) },
+        onImage = { uri -> uploadPickedUri(uri) },
+    )
+    val voiceRecorder = remember { VoiceRecorder(context) }
+    var recordingVoice by remember { mutableStateOf(false) }
+    DisposableEffect(Unit) {
+        onDispose { voiceRecorder.cancel() }
+    }
+    val requestMic = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted && voiceRecorder.start()) {
+            recordingVoice = true
+            Toast.makeText(context, "Recording… tap mic again to send", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Microphone permission needed", Toast.LENGTH_SHORT).show()
         }
     }
     val firstName = chat.title.substringBefore(' ').ifBlank { chat.title }
@@ -355,6 +404,9 @@ fun ChatIdScreen(
                 ) { onNavigate(Routes.ProfileId.replace("{id}", chatId)) },
                 OverflowMenuItem("Search", Icons.Default.Search) {
                     showSearch = true
+                },
+                OverflowMenuItem("Media", Icons.Default.Photo) {
+                    onNavigate(Routes.chatMedia(chatId))
                 },
                 OverflowMenuItem(
                     if (chat.isMuted) "Unmute" else "Mute notifications",
@@ -601,12 +653,59 @@ fun ChatIdScreen(
                             InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
                             peerTyping = true
                         }
+                    } else if (recordingVoice) {
+                        haptics.confirm()
+                        val result = voiceRecorder.stop()
+                        recordingVoice = false
+                        if (result != null) {
+                            val (file, secs) = result
+                            if (useRemote) {
+                                scope.launch {
+                                    try {
+                                        val sent = api.sendVoiceFile(chatId, file, durationSec = secs)
+                                        val uid = myUserId ?: SessionStore.userId(context)
+                                        if (uid != null) {
+                                            InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
+                                        }
+                                    } catch (_: Exception) {
+                                        InMemoryChatStore.sendVoice(
+                                            chatId,
+                                            durationSec = secs,
+                                            uri = Uri.fromFile(file).toString(),
+                                        )
+                                    } finally {
+                                        file.delete()
+                                    }
+                                }
+                            } else {
+                                InMemoryChatStore.sendVoice(
+                                    chatId,
+                                    durationSec = secs,
+                                    uri = Uri.fromFile(file).toString(),
+                                )
+                            }
+                        }
                     } else {
                         haptics.confirm()
-                        InMemoryChatStore.sendVoice(chatId, durationSec = 8)
+                        if (context.hasMicPermission()) {
+                            if (voiceRecorder.start()) {
+                                recordingVoice = true
+                                Toast.makeText(context, "Recording… tap again to send", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            requestMic.launch(Manifest.permission.RECORD_AUDIO)
+                        }
                     }
                 },
             )
+            if (recordingVoice) {
+                Text(
+                    "Recording voice note…",
+                    color = AivoraColors.Primary,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
+                )
+            }
         }
     }
 
@@ -627,9 +726,7 @@ fun ChatIdScreen(
                     },
                     AivoraSheetAction("Document", Icons.Default.Description) {
                         showAttach = false
-                        haptics.confirm()
-                        InMemoryChatStore.sendText(chatId, "📄 Document.pdf")
-                        peerTyping = true
+                        media.pickDocument()
                     },
                     AivoraSheetAction("Location", Icons.Default.LocationOn) {
                         showAttach = false
@@ -1231,56 +1328,123 @@ private fun MessageRow(
                 VoiceNoteContent(
                     durationSec = voiceSecs,
                     seed = message.id.hashCode(),
+                    mediaUrl = message.mediaUri,
                 )
-            } else {
-                message.mediaUri?.let { uri ->
-                    Box(
-                        modifier = Modifier
-                            .widthIn(min = 160.dp, max = 236.dp)
-                            .heightIn(min = 120.dp, max = 196.dp)
-                            .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
-                            .background(AivoraColors.PrimarySoft),
-                        contentAlignment = Alignment.Center,
-                    ) {
+            } else when (message.mediaKind) {
+                LocalMediaKind.File -> {
+                    FileAttachmentContent(
+                        name = message.fileName ?: message.body.ifBlank { "Document" },
+                        url = message.mediaUri,
+                    )
+                }
+                LocalMediaKind.Video -> {
+                    val ctx = LocalContext.current
+                    message.mediaUri?.let { uri ->
+                        Box(
+                            modifier = Modifier
+                                .widthIn(min = 160.dp, max = 236.dp)
+                                .heightIn(min = 120.dp, max = 196.dp)
+                                .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                                .background(AivoraColors.PrimarySoft)
+                                .clickable {
+                                    runCatching {
+                                        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)))
+                                    }
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = "Video",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.45f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = "Play",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp),
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    if (message.body.isNotBlank() && message.body != "Video") {
                         Text(
-                            "Photo",
-                            color = AivoraColors.TextSecondary,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                        AsyncImage(
-                            model = uri,
-                            contentDescription = "Photo",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
+                            message.body,
+                            color = AivoraColors.Ink,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 4.dp),
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
-                if (message.body.isNotBlank() && message.mediaUri == null) {
-                    Text(
-                        message.body,
-                        color = if (message.deletedForEveryone) {
-                            AivoraColors.TextSecondary
-                        } else {
-                            AivoraColors.Ink
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontStyle = if (message.deletedForEveryone) {
-                            androidx.compose.ui.text.font.FontStyle.Italic
-                        } else {
-                            androidx.compose.ui.text.font.FontStyle.Normal
-                        },
-                    )
-                } else if (message.body.isNotBlank() && message.mediaUri != null &&
-                    message.body != "Photo"
-                ) {
-                    Text(
-                        message.body,
-                        color = AivoraColors.Ink,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(horizontal = 4.dp),
+                LocalMediaKind.Image, null -> {
+                    message.mediaUri?.let { uri ->
+                        Box(
+                            modifier = Modifier
+                                .widthIn(min = 160.dp, max = 236.dp)
+                                .heightIn(min = 120.dp, max = 196.dp)
+                                .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                                .background(AivoraColors.PrimarySoft),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "Photo",
+                                color = AivoraColors.TextSecondary,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = "Photo",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    if (message.body.isNotBlank() && message.mediaUri == null) {
+                        Text(
+                            message.body,
+                            color = if (message.deletedForEveryone) {
+                                AivoraColors.TextSecondary
+                            } else {
+                                AivoraColors.Ink
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontStyle = if (message.deletedForEveryone) {
+                                androidx.compose.ui.text.font.FontStyle.Italic
+                            } else {
+                                androidx.compose.ui.text.font.FontStyle.Normal
+                            },
+                        )
+                    } else if (message.body.isNotBlank() && message.mediaUri != null &&
+                        message.body != "Photo"
+                    ) {
+                        Text(
+                            message.body,
+                            color = AivoraColors.Ink,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        )
+                    }
+                }
+                LocalMediaKind.Audio -> {
+                    VoiceNoteContent(
+                        durationSec = message.voiceDurationSec ?: 1,
+                        seed = message.id.hashCode(),
+                        mediaUrl = message.mediaUri,
                     )
                 }
+            }
+            message.linkPreview?.let { card ->
+                LinkPreviewCard(card)
             }
             if (message.reactions.isNotEmpty()) {
                 Row(
@@ -1352,12 +1516,121 @@ private fun MessageRow(
 }
 
 @Composable
-private fun VoiceNoteContent(durationSec: Int, seed: Int) {
+private fun FileAttachmentContent(name: String, url: String?) {
+    val context = LocalContext.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .widthIn(min = 180.dp)
+            .clickable(enabled = !url.isNullOrBlank()) {
+                url?.let {
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it)))
+                    }
+                }
+            }
+            .padding(vertical = 4.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(AivoraColors.Primary.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.InsertDriveFile,
+                contentDescription = null,
+                tint = AivoraColors.Primary,
+            )
+        }
+        Text(
+            name,
+            color = AivoraColors.Ink,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun LinkPreviewCard(card: com.aivora.app.data.local.LocalLinkPreview) {
+    val context = LocalContext.current
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(AivoraColors.Primary.copy(alpha = 0.1f))
+            .clickable {
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(card.url)))
+                }
+            }
+            .padding(10.dp),
+    ) {
+        card.imageUrl?.takeIf { it.isNotBlank() }?.let { img ->
+            AsyncImage(
+                model = img,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .clip(RoundedCornerShape(6.dp)),
+                contentScale = ContentScale.Crop,
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+        Text(
+            card.title ?: card.site ?: card.url,
+            color = AivoraColors.Ink,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        card.description?.takeIf { it.isNotBlank() }?.let {
+            Text(
+                it,
+                color = AivoraColors.TextSecondary,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            card.site ?: card.url,
+            color = AivoraColors.Primary,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = null) {
+    val context = LocalContext.current
+    var playing by remember(mediaUrl) { mutableStateOf(false) }
+    var player by remember(mediaUrl) { mutableStateOf<MediaPlayer?>(null) }
+    DisposableEffect(mediaUrl) {
+        onDispose {
+            runCatching {
+                player?.stop()
+                player?.release()
+            }
+            player = null
+            playing = false
+        }
+    }
     val bars = remember(seed) {
         val rnd = Random(seed)
         List(28) { 0.25f + rnd.nextFloat() * 0.75f }
-        }
-        Row(
+    }
+    Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.widthIn(min = 200.dp),
@@ -1366,10 +1639,38 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int) {
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(AivoraColors.Primary),
+                .background(AivoraColors.Primary)
+                .clickable(enabled = !mediaUrl.isNullOrBlank()) {
+                    val url = mediaUrl ?: return@clickable
+                    try {
+                        val current = player
+                        if (playing && current != null) {
+                            current.pause()
+                            playing = false
+                        } else {
+                            val mp = current ?: MediaPlayer().also { player = it }
+                            mp.reset()
+                            mp.setDataSource(context, Uri.parse(url))
+                            mp.setOnCompletionListener { playing = false }
+                            mp.prepare()
+                            mp.start()
+                            playing = true
+                        }
+                    } catch (_: Exception) {
+                        playing = false
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        }
+                    }
+                },
             contentAlignment = Alignment.Center,
         ) {
-            Text("▶", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(
+                if (playing) "❚❚" else "▶",
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+            )
         }
         Column(modifier = Modifier.weight(1f)) {
             Row(

@@ -19,6 +19,7 @@ import java.io.File
 data class MediaActions(
     val takePhoto: () -> Unit,
     val pickGallery: () -> Unit,
+    val pickDocument: () -> Unit,
 )
 
 fun Context.createCaptureUri(): Uri {
@@ -29,6 +30,10 @@ fun Context.createCaptureUri(): Uri {
 
 fun Context.hasCameraPermission(): Boolean =
     ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+        PackageManager.PERMISSION_GRANTED
+
+fun Context.hasMicPermission(): Boolean =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
         PackageManager.PERMISSION_GRANTED
 
 fun Context.hasReadMediaPermission(): Boolean {
@@ -43,6 +48,8 @@ fun Context.hasReadMediaPermission(): Boolean {
 @Composable
 fun rememberMediaActions(
     context: Context,
+    onCancel: (() -> Unit)? = null,
+    onDocument: ((Uri) -> Unit)? = null,
     onImage: (Uri) -> Unit,
 ): MediaActions {
     var pendingCapture by remember { mutableStateOf<Uri?>(null) }
@@ -52,13 +59,34 @@ fun rememberMediaActions(
     ) { ok ->
         val uri = pendingCapture
         pendingCapture = null
-        if (ok && uri != null) onImage(uri)
+        if (ok && uri != null) {
+            onImage(uri)
+        } else {
+            onCancel?.invoke()
+        }
     }
 
     val pickVisual = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         if (uri != null) onImage(uri)
+        else onCancel?.invoke()
+    }
+
+    val pickDoc = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+            onDocument?.invoke(uri)
+        } else {
+            onCancel?.invoke()
+        }
     }
 
     val requestCamera = rememberLauncherForActivityResult(
@@ -68,6 +96,8 @@ fun rememberMediaActions(
             val uri = context.createCaptureUri()
             pendingCapture = uri
             takePicture.launch(uri)
+        } else {
+            onCancel?.invoke()
         }
     }
 
@@ -84,7 +114,21 @@ fun rememberMediaActions(
         pickGallery = {
             pickVisual.launch(
                 androidx.activity.result.PickVisualMediaRequest(
-                    ActivityResultContracts.PickVisualMedia.ImageOnly,
+                    ActivityResultContracts.PickVisualMedia.ImageAndVideo,
+                ),
+            )
+        },
+        pickDocument = {
+            pickDoc.launch(
+                arrayOf(
+                    "application/pdf",
+                    "application/msword",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "application/vnd.ms-excel",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "text/plain",
+                    "application/zip",
+                    "*/*",
                 ),
             )
         },

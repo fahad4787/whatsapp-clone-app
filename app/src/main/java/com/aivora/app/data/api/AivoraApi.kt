@@ -106,7 +106,9 @@ interface AivoraApi {
     @GET("api/conversations/{id}/media")
     suspend fun getConversationsIdMedia(
         @Path("id") id: String,
-    ): okhttp3.ResponseBody
+        @Query("type") type: String? = null,
+        @Query("limit") limit: Int? = null,
+    ): com.aivora.app.data.model.MessageListDto
 
     @POST("api/invites/{code}/join")
     suspend fun postInvitesCodeJoin(
@@ -307,7 +309,7 @@ interface AivoraApi {
     @GET("api/conversations/{id}/media/counts")
     suspend fun getConversationsIdMediaCounts(
         @Path("id") id: String,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.MediaCountsDto
 
     @POST("api/calls")
     suspend fun postCalls(

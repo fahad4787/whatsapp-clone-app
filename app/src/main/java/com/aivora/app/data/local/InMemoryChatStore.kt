@@ -88,21 +88,40 @@ object InMemoryChatStore {
         )
     }
 
-    fun sendMedia(chatId: String, uri: String, caption: String = "Photo", mine: Boolean = true) {
+    fun sendMedia(
+        chatId: String,
+        uri: String,
+        caption: String = "Photo",
+        mine: Boolean = true,
+        kind: LocalMediaKind = LocalMediaKind.Image,
+        fileName: String? = null,
+        durationSec: Int? = null,
+    ) {
+        val body = caption.ifBlank {
+            when (kind) {
+                LocalMediaKind.Image -> "Photo"
+                LocalMediaKind.Video -> "Video"
+                LocalMediaKind.File -> fileName ?: "Document"
+                LocalMediaKind.Audio -> "Voice message"
+            }
+        }
         append(
             chatId = chatId,
             message = LocalMessage(
                 id = newId(),
                 mine = mine,
-                body = caption.ifBlank { "Photo" },
+                body = body,
                 time = "Now",
                 mediaUri = uri,
+                mediaKind = kind,
+                fileName = fileName,
+                voiceDurationSec = if (kind == LocalMediaKind.Audio) durationSec?.coerceAtLeast(1) else null,
             ),
-            preview = "Photo",
+            preview = body,
         )
     }
 
-    fun sendVoice(chatId: String, durationSec: Int = 8, mine: Boolean = true) {
+    fun sendVoice(chatId: String, durationSec: Int = 8, mine: Boolean = true, uri: String? = null) {
         val secs = durationSec.coerceAtLeast(1)
         append(
             chatId = chatId,
@@ -111,6 +130,8 @@ object InMemoryChatStore {
                 mine = mine,
                 body = "Voice message",
                 time = "Now",
+                mediaUri = uri,
+                mediaKind = LocalMediaKind.Audio,
                 voiceDurationSec = secs,
             ),
             preview = "Voice message",

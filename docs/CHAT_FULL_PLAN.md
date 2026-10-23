@@ -1,7 +1,7 @@
 # Full chat plan (Wave 9+)
 
 Date: 2026-10-23  
-Status: **Wave 11 shipping** — Waves 0–10 done. Goal: make **1:1 and group chat** feel complete before status/channels/calls.
+Status: **Wave 12 shipping** — Waves 0–11 done. Goal: make **1:1 and group chat** feel complete before status/channels/calls.
 
 ## Principle
 
@@ -63,13 +63,13 @@ Biggest gaps for “full chat”: message actions, conversation controls, voice/
 ### Wave 12 — Rich media in chat
 **Goal:** attach sheet is real, not fake text.
 
-| # | Feature | Exit |
-|---|---------|------|
-| 12.1 | Voice notes (AUDIO type + upload + playback bubble) | Record → send → play on peer |
-| 12.2 | Documents (FILE type + open/download) | PDF/doc opens |
-| 12.3 | Video messages (VIDEO type, short clip + thumbnail) | Send/play on peer |
-| 12.4 | Shared media gallery in chat (images/videos/docs tabs) | Menu → Media works |
-| 12.5 | Link preview (unfurl on send or open) | URL shows card |
+| # | Feature | Exit | Status |
+|---|---------|------|--------|
+| 12.1 | Voice notes (AUDIO type + upload + playback bubble) | Record → send → play on peer | Done |
+| 12.2 | Documents (FILE type + open/download) | PDF/doc opens | Done |
+| 12.3 | Video messages (VIDEO type, short clip + thumbnail) | Send/play on peer | Done |
+| 12.4 | Shared media gallery in chat (images/videos/docs tabs) | Menu → Media works | Done |
+| 12.5 | Link preview (unfurl on send or open) | URL shows card | Done |
 
 ---
 

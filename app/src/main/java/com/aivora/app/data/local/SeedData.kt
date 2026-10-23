@@ -47,12 +47,30 @@ data class LocalReaction(
     val mine: Boolean = false,
 )
 
+enum class LocalMediaKind {
+    Image,
+    Audio,
+    Video,
+    File,
+}
+
+data class LocalLinkPreview(
+    val url: String,
+    val title: String? = null,
+    val description: String? = null,
+    val site: String? = null,
+    val imageUrl: String? = null,
+)
+
 data class LocalMessage(
     val id: String,
     val mine: Boolean,
     val body: String,
     val time: String,
     val mediaUri: String? = null,
+    val mediaKind: LocalMediaKind? = null,
+    val fileName: String? = null,
+    val linkPreview: LocalLinkPreview? = null,
     val senderName: String? = null,
     /** When non-null, message is a voice note (duration in seconds). */
     val voiceDurationSec: Int? = null,

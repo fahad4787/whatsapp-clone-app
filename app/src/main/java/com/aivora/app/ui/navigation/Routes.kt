@@ -5,6 +5,7 @@ object Routes {
     const val ChannelSlug = "channel/{slug}"
     const val Channels = "channels"
     const val ChatId = "chat/{id}"
+    const val ChatMedia = "chat/{id}/media"
     const val CommunityId = "community/{id}"
     const val EventCreateChat = "event-create/{chat}"
     const val EventDetailsChatMessage = "event-details/{chat}/{message}"
@@ -14,10 +15,12 @@ object Routes {
     const val Login = "login"
     const val MessageInfoChatMessage = "message-info/{chat}/{message}"
     const val Camera = "camera/{target}"
+    /** APK route kept for backend map; UI uses system photo picker instead of a fake gallery screen. */
     const val Gallery = "gallery/{target}"
     const val PollCreate = "poll-create/{chat}"
     const val LocationShare = "location-share/{chat}"
     const val NewCall = "new-call"
+    const val Keypad = "keypad"
     const val AudioCall = "call/audio/{name}"
     const val VideoCall = "call/video/{name}"
     const val NewChat = "new-chat"
@@ -84,6 +87,9 @@ object Routes {
     const val SettingsTwoStep = "settings/two-step"
     const val TransferNewPhone = "transfer/new-phone"
     const val YourDetails = "your-details"
+
+    fun chatMedia(id: String): String =
+        ChatMedia.replace("{id}", android.net.Uri.encode(id))
 
     fun camera(target: String = "status"): String =
         Camera.replace("{target}", android.net.Uri.encode(target))
