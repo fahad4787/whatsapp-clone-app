@@ -19,11 +19,13 @@ suspend fun AivoraApi.sendImageMessage(
     conversationId: String,
     imageUri: Uri,
     caption: String? = null,
+    viewOnce: Boolean = false,
 ): MessageDto = sendAttachmentMessage(
     context = context,
     conversationId = conversationId,
     uri = imageUri,
     caption = caption,
+    viewOnce = viewOnce,
     defaultName = "photo.jpg",
     defaultMime = "image/jpeg",
 )
@@ -36,6 +38,7 @@ suspend fun AivoraApi.sendAttachmentMessage(
     defaultName: String = "file.bin",
     defaultMime: String = "application/octet-stream",
     durationSec: Int? = null,
+    viewOnce: Boolean = false,
 ): MessageDto {
     val bytes = withContext(Dispatchers.IO) {
         context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
@@ -66,6 +69,7 @@ suspend fun AivoraApi.sendAttachmentMessage(
                 name = name,
                 duration = durationSec ?: 0,
             ),
+            viewOnce = viewOnce,
         ),
     )
 }

@@ -25,6 +25,8 @@ data class LocalChat(
     val onlyAdminsCanSend: Boolean = false,
     val onlyAdminsCanEditInfo: Boolean = false,
     val disappearingSeconds: Int = 0,
+    /** Wallpaper key: null/"default" | "mint" | "dusk" | "sand". */
+    val wallpaper: String? = null,
     val peerLastSeenAt: String? = null,
     val peerPresenceVisible: Boolean = true,
 ) {
@@ -129,7 +131,11 @@ data class LocalMessage(
     val disappeared: Boolean = false,
     /** Centered WhatsApp-style info (e.g. disappearing messages). */
     val system: Boolean = false,
-)
+    val editedAtIso: String? = null,
+    val viewOnce: Boolean = false,
+) {
+    val edited: Boolean get() = !editedAtIso.isNullOrBlank()
+}
 
 /** Seed data for the in-memory store (no persistence). */
 object SeedData {

@@ -472,7 +472,7 @@ private fun ChatsTab(
                 when (filter) {
                     ChatFilter.All -> !chat.archived
                     ChatFilter.Unread -> !chat.archived && chat.unread > 0
-                    ChatFilter.Favourites -> !chat.archived && (chat.favorite || chat.pinned)
+                    ChatFilter.Favourites -> !chat.archived && chat.favorite
                     ChatFilter.Groups -> !chat.archived && chat.isGroup
                     ChatFilter.Archived -> chat.archived
                 }

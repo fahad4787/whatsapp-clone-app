@@ -1,7 +1,7 @@
 # Full chat plan (Wave 9+)
 
 Date: 2026-10-24  
-Status: **Wave 14 done** (after Waves 9–13 + PERF F0–F5). Next: Wave 15 polish. See `WAVE14_CHAT_EXTRAS.md`.
+Status: **Wave 15 done** (Waves 9–15 + PERF F0–F5). Chat track complete. See `WAVE15_CHAT_POLISH.md`.
 
 ## Principle
 
@@ -101,15 +101,15 @@ Biggest gaps for “full chat”: message actions, conversation controls, voice/
 ---
 
 ### Wave 15 — Chat polish
-**Goal:** production-feel edges.
+**Goal:** production-feel edges. See `WAVE15_CHAT_POLISH.md`.
 
-| # | Feature | Exit |
-|---|---------|------|
-| 15.1 | Edit message (within window) + “edited” label | Both sides |
-| 15.2 | Message info (real readers for groups) | Not mock |
-| 15.3 | Per-chat wallpaper / keep device theme | Persists |
-| 15.4 | Favourites filter from API | Toggle works |
-| 15.5 | View-once image (optional) | Opens once |
+| # | Feature | Exit | Status |
+|---|---------|------|--------|
+| 15.1 | Edit message (within window) + “edited” label | Both sides | Done |
+| 15.2 | Message info (real readers for groups) | Not mock | Done |
+| 15.3 | Per-chat wallpaper / keep device theme | Persists | Done |
+| 15.4 | Favourites filter from API | Toggle works | Done |
+| 15.5 | View-once image (optional) | Opens once | Done |
 
 ---
 

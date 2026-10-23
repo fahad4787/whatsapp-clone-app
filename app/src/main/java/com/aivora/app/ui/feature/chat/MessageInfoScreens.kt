@@ -43,6 +43,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.Box
+import com.aivora.app.data.ChatRepository
+import com.aivora.app.data.model.MessageInfoDto
+import com.aivora.app.data.model.MessageReceiptDto
+import com.aivora.app.ui.components.SectionHeader
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -91,21 +98,77 @@ fun MessageInfoChatMessageScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    var info by remember(messageId) { mutableStateOf<MessageInfoDto?>(null) }
+    var failed by remember(messageId) { mutableStateOf(false) }
+    LaunchedEffect(messageId) {
+        info = null
+        failed = false
+        runCatching { ChatRepository.api().getMessagesIdInfo(messageId) }
+            .onSuccess { info = it }
+            .onFailure { failed = true }
+    }
     AivoraScaffold(title = "Message info", onBack = onBack) {
-        InfoBanner("Read receipts and delivery details for this message.")
-        SettingsList(
-            listOf(
-                "Read by" to listOf(
-                    SettingsItem("Ahmad Khan", "Today, 9:41 PM", Icons.Default.Person, onClick = { }),
-                ),
-                "Delivered to" to listOf(
-                    SettingsItem("Fatima Ali", "Today, 9:40 PM", Icons.Default.Person, onClick = { }),
-                ),
-                null to listOf(
-                    SettingsItem("Star", null, Icons.Default.Star, onClick = { }),
-                    SettingsItem("Delete for everyone", null, Icons.Default.Delete, danger = true, onClick = { }),
-                ),
+        val loaded = info
+        when {
+            failed -> EmptyState(
+                title = "Couldn't load info",
+                body = "Check your connection and try again.",
+                icon = Icons.Default.Info,
             )
-        )
+            loaded == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = AivoraColors.Primary)
+            }
+            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                receiptSection("Read by", "No one has read this yet", loaded.read)
+                receiptSection("Delivered to", "Not delivered to anyone yet", loaded.delivered)
+            }
+        }
+    }
+}
+
+private fun androidx.compose.foundation.lazy.LazyListScope.receiptSection(
+    title: String,
+    emptyText: String,
+    receipts: List<MessageReceiptDto>,
+) {
+    item { SectionHeader(title) }
+    if (receipts.isEmpty()) {
+        item {
+            Text(
+                emptyText,
+                color = AivoraColors.TextSecondary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+    } else {
+        items(receipts) { r ->
+            val name = r.displayName?.takeIf { it.isNotBlank() } ?: "Unknown"
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Avatar(name, size = 40)
+                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(name, fontWeight = FontWeight.SemiBold, color = AivoraColors.Ink)
+                    formatReceiptTime(r.at)?.let {
+                        Text(it, color = AivoraColors.TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatReceiptTime(iso: String?): String? {
+    val at = runCatching { java.time.Instant.parse(iso) }.getOrNull() ?: return null
+    val zone = java.time.ZoneId.systemDefault()
+    val time = at.atZone(zone)
+    val clock = java.time.format.DateTimeFormatter.ofPattern("h:mm a").format(time)
+    return if (time.toLocalDate() == java.time.LocalDate.now(zone)) {
+        "Today, $clock"
+    } else {
+        java.time.format.DateTimeFormatter.ofPattern("MMM d").format(time) + ", " + clock
     }
 }

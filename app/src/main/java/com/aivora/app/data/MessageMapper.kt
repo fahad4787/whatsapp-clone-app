@@ -145,6 +145,7 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
             disappeared -> DISAPPEARED_TEXT
             !text.isNullOrBlank() -> text!!
             richBody != null -> richBody
+            viewOnce && media == null -> "Opened"
             else -> fallbackBody
         },
         time = time,
@@ -180,5 +181,7 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         expiresAtIso = expiresAt,
         disappeared = disappeared,
         system = system,
+        editedAtIso = editedAt,
+        viewOnce = viewOnce,
     )
 }

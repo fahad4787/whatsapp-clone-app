@@ -3,6 +3,29 @@ package com.aivora.app.ui.feature.chat
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.aivora.app.ui.theme.AivoraColors
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Delete
@@ -13,7 +36,10 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Unarchive
+import androidx.compose.material.icons.filled.Wallpaper
 import com.aivora.app.data.api.AivoraApi
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.LocalChat
@@ -31,6 +57,8 @@ object ChatControls {
         chatId: String,
         archived: Boolean? = null,
         pinned: Boolean? = null,
+        favorite: Boolean? = null,
+        wallpaper: String? = null,
         mutedUntil: String? = null,
         clearMute: Boolean = false,
         blockedByMe: Boolean? = null,
@@ -39,7 +67,8 @@ object ChatControls {
         val next = current.copy(
             archived = archived ?: current.archived,
             pinned = pinned ?: current.pinned,
-            favorite = pinned ?: current.favorite,
+            favorite = favorite ?: current.favorite,
+            wallpaper = wallpaper ?: current.wallpaper,
             mutedUntil = when {
                 clearMute -> null
                 mutedUntil != null -> mutedUntil
@@ -89,6 +118,35 @@ object ChatControls {
                 ConversationSettingsBody(pinned = nextPinned),
             )
             mergeLocal(chat.id, pinned = res.pinned)
+        }.isSuccess
+    }
+
+    suspend fun toggleFavorite(api: AivoraApi, useRemote: Boolean, chat: LocalChat): Boolean {
+        val nextFavorite = !chat.favorite
+        if (!useRemote) {
+            mergeLocal(chat.id, favorite = nextFavorite)
+            return true
+        }
+        return runCatching {
+            val res = api.putConversationsIdSettings(
+                chat.id,
+                ConversationSettingsBody(favorite = nextFavorite),
+            )
+            mergeLocal(chat.id, favorite = res.favorite)
+        }.isSuccess
+    }
+
+    suspend fun setWallpaper(api: AivoraApi, useRemote: Boolean, chat: LocalChat, key: String): Boolean {
+        if (!useRemote) {
+            mergeLocal(chat.id, wallpaper = key)
+            return true
+        }
+        return runCatching {
+            val res = api.putConversationsIdSettings(
+                chat.id,
+                ConversationSettingsBody(wallpaper = key),
+            )
+            mergeLocal(chat.id, wallpaper = res.wallpaper ?: key)
         }.isSuccess
     }
 
@@ -149,6 +207,7 @@ object ChatControls {
         onClear: (() -> Unit)? = null,
         onReport: (() -> Unit)? = null,
         onViewInfo: (() -> Unit)? = null,
+        onWallpaper: (() -> Unit)? = null,
         onAfterArchive: ((archived: Boolean) -> Unit)? = null,
     ): List<AivoraSheetAction> = buildList {
         onViewInfo?.let { view ->
@@ -198,6 +257,28 @@ object ChatControls {
                 }
             },
         )
+        add(
+            AivoraSheetAction(
+                if (chat.favorite) "Remove from favourites" else "Add to favourites",
+                if (chat.favorite) Icons.Default.Star else Icons.Default.StarBorder,
+            ) {
+                onDismiss()
+                scope.launch {
+                    val ok = toggleFavorite(api, useRemote, chat)
+                    if (!ok) {
+                        Toast.makeText(context, "Could not update favourites", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+        )
+        if (onWallpaper != null) {
+            add(
+                AivoraSheetAction("Chat wallpaper", Icons.Default.Wallpaper) {
+                    onDismiss()
+                    onWallpaper()
+                },
+            )
+        }
         add(
             AivoraSheetAction(
                 if (chat.archived) "Unarchive" else "Archive",
@@ -281,6 +362,7 @@ object ChatControls {
         onReport: (() -> Unit)? = null,
         onViewInfo: (() -> Unit)? = null,
         onMedia: (() -> Unit)? = null,
+        onWallpaper: (() -> Unit)? = null,
         onBlockRequest: (() -> Unit)? = null,
         onAfterArchive: ((archived: Boolean) -> Unit)? = null,
     ): List<OverflowMenuItem> {
@@ -298,6 +380,7 @@ object ChatControls {
             onClear = onClear,
             onReport = onReport,
             onViewInfo = onViewInfo,
+            onWallpaper = onWallpaper,
             onAfterArchive = onAfterArchive,
         ).toMutableList()
         if (includeMedia && onMedia != null) {
@@ -322,4 +405,74 @@ object ChatControls {
         }
         return sheets.map { OverflowMenuItem(it.label, it.icon, it.danger, it.onClick) }
     }
+}
+
+private val WallpaperChoices = listOf(
+    "default" to "Default",
+    "mint" to "Mint",
+    "dusk" to "Dusk",
+    "sand" to "Sand",
+)
+
+/** Chat canvas colour for a wallpaper key; null/"default" follows the device theme. */
+fun chatWallpaperColor(key: String?, dark: Boolean): Color = when (key) {
+    "mint" -> AivoraColors.SoftMint
+    "dusk" -> Color(0xFFE4EAF2)
+    "sand" -> Color(0xFFF3EBDD)
+    else -> if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight
+}
+
+@Composable
+fun ChatWallpaperDialog(
+    selected: String?,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val dark = isSystemInDarkTheme()
+    val ink = if (dark) Color.White else AivoraColors.Ink
+    val current = selected?.takeIf { k -> WallpaperChoices.any { it.first == k } } ?: "default"
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(20.dp),
+        containerColor = if (dark) AivoraColors.DarkSurface else AivoraColors.LightSurface,
+        title = { Text("Chat wallpaper", fontWeight = FontWeight.Bold, color = ink) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                WallpaperChoices.forEach { (key, label) ->
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onPick(key) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Spacer(
+                            Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(chatWallpaperColor(key, dark))
+                                .border(
+                                    width = if (key == current) 2.dp else 1.dp,
+                                    color = if (key == current) AivoraColors.Primary else AivoraColors.ChatDivider,
+                                    shape = RoundedCornerShape(10.dp),
+                                ),
+                        )
+                        Text(
+                            label,
+                            color = ink,
+                            fontSize = 16.sp,
+                            fontWeight = if (key == current) FontWeight.SemiBold else FontWeight.Normal,
+                            modifier = Modifier.padding(start = 14.dp),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = AivoraColors.TextSecondary)
+            }
+        },
+    )
 }

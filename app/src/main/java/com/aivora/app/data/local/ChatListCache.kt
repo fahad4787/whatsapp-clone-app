@@ -35,6 +35,7 @@ object ChatListCache {
         val avatarUrl: String? = null,
         val onlyAdminsCanSend: Boolean = false,
         val onlyAdminsCanEditInfo: Boolean = false,
+        val wallpaper: String? = null,
     )
 
     fun load(context: Context): List<LocalChat> {
@@ -62,6 +63,7 @@ object ChatListCache {
                     avatarUrl = it.avatarUrl,
                     onlyAdminsCanSend = it.onlyAdminsCanSend,
                     onlyAdminsCanEditInfo = it.onlyAdminsCanEditInfo,
+                    wallpaper = it.wallpaper,
                 )
             }
         }.getOrDefault(emptyList())
@@ -88,6 +90,7 @@ object ChatListCache {
                 avatarUrl = it.avatarUrl,
                 onlyAdminsCanSend = it.onlyAdminsCanSend,
                 onlyAdminsCanEditInfo = it.onlyAdminsCanEditInfo,
+                wallpaper = it.wallpaper,
             )
         }
         runCatching {

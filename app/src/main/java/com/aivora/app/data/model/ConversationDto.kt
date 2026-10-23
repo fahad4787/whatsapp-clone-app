@@ -24,6 +24,7 @@ data class ConversationDto(
     @SerialName("muted_until") val mutedUntil: String? = null,
     @SerialName("archived") val archived: Boolean = false,
     @SerialName("pinned") val pinned: Boolean = false,
+    @SerialName("favorite") val favorite: Boolean = false,
     @SerialName("blocked_by_me") val blockedByMe: Boolean = false,
     @SerialName("blocked_me") val blockedMe: Boolean = false,
     @SerialName("manually_unread") val manuallyUnread: Boolean = false,

@@ -56,6 +56,8 @@ object MessageCache {
         val forwarded: Boolean = false,
         val conversationId: String? = null,
         val createdAtIso: String? = null,
+        val editedAtIso: String? = null,
+        val viewOnce: Boolean = false,
     )
 
     fun load(context: Context, chatId: String): List<LocalMessage> {
@@ -149,6 +151,8 @@ object MessageCache {
         forwarded = forwarded,
         conversationId = conversationId,
         createdAtIso = createdAtIso,
+        editedAtIso = editedAtIso,
+        viewOnce = viewOnce,
     )
 
     private fun CachedMessage.toLocal() = LocalMessage(
@@ -173,5 +177,7 @@ object MessageCache {
         forwarded = forwarded,
         conversationId = conversationId,
         createdAtIso = createdAtIso,
+        editedAtIso = editedAtIso,
+        viewOnce = viewOnce,
     )
 }

@@ -89,6 +89,11 @@ object Routes {
     const val TransferNewPhone = "transfer/new-phone"
     const val YourDetails = "your-details"
 
+    fun messageInfo(chat: String, message: String): String =
+        MessageInfoChatMessage
+            .replace("{chat}", android.net.Uri.encode(chat))
+            .replace("{message}", android.net.Uri.encode(message))
+
     fun chatMedia(id: String): String =
         ChatMedia.replace("{id}", android.net.Uri.encode(id))
 

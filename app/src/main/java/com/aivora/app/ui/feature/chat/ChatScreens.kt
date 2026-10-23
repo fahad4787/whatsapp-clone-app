@@ -68,6 +68,13 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material.icons.filled.Unarchive
 import android.Manifest
 import android.content.Intent
@@ -127,6 +134,7 @@ import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.LocalReplyPreview
 import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.EditMessageBody
 import com.aivora.app.data.model.EmptyRequestBody
 import com.aivora.app.data.model.ForwardMessageBody
 import com.aivora.app.data.model.ReactionBody
@@ -203,14 +211,19 @@ fun ChatIdScreen(
     var deleteTarget by remember { mutableStateOf<LocalMessage?>(null) }
     var reactTarget by remember { mutableStateOf<LocalMessage?>(null) }
     var forwardTarget by remember { mutableStateOf<LocalMessage?>(null) }
+    var editTarget by remember { mutableStateOf<LocalMessage?>(null) }
+    var editText by remember { mutableStateOf("") }
+    var showWallpaper by remember { mutableStateOf(false) }
+    // Message + url currently shown in the one-time viewer.
+    var viewOnceShown by remember { mutableStateOf<Pair<LocalMessage, String>?>(null) }
     var replyTo by remember(chatId) { mutableStateOf<LocalMessage?>(null) }
     var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
     // Per-chat list state so reopen doesn't flash a previous scroll offset.
     val listState = remember(chatId) { androidx.compose.foundation.lazy.LazyListState() }
-    val wallpaper = if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight
+    val wallpaper = chatWallpaperColor(chat.wallpaper, dark)
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
-    fun uploadPickedUri(uri: Uri) {
+    fun uploadPickedUri(uri: Uri, viewOnce: Boolean = false) {
         haptics.confirm()
         val mime = context.contentResolver.getType(uri).orEmpty()
         val kind = when {
@@ -223,7 +236,7 @@ fun ChatIdScreen(
             scope.launch {
                 try {
                     val sent = when (kind) {
-                        LocalMediaKind.Image -> api.sendImageMessage(context, chatId, uri)
+                        LocalMediaKind.Image -> api.sendImageMessage(context, chatId, uri, viewOnce = viewOnce)
                         else -> api.sendAttachmentMessage(
                             context = context,
                             conversationId = chatId,
@@ -253,6 +266,9 @@ fun ChatIdScreen(
         onDocument = { uri -> uploadPickedUri(uri) },
         onImage = { uri -> uploadPickedUri(uri) },
     )
+    val pickViewOnce = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri -> if (uri != null) uploadPickedUri(uri, viewOnce = true) }
     val voiceRecorder = remember { VoiceRecorder(context) }
     var recordingVoice by remember { mutableStateOf(false) }
     var recordingSecs by remember { mutableStateOf(0) }
@@ -542,6 +558,7 @@ fun ChatIdScreen(
                 onClear = { showClearChat = true },
                 onViewInfo = { onNavigate(Routes.ProfileId.replace("{id}", chatId)) },
                 onMedia = { onNavigate(Routes.chatMedia(chatId)) },
+                onWallpaper = { showWallpaper = true },
                 onBlockRequest = { showBlockConfirm = true },
                 onAfterArchive = { archived -> if (archived) onBack?.invoke() },
                 onReport = {
@@ -649,6 +666,25 @@ fun ChatIdScreen(
                             onLongPress = {
                                 haptics.tick()
                                 actionTarget = msg
+                            },
+                            onOpenViewOnce = {
+                                val url = msg.mediaUri
+                                if (url != null) {
+                                    haptics.tick()
+                                    if (useRemote) {
+                                        scope.launch {
+                                            runCatching { api.postMessagesIdViewOnce(msg.id, EmptyRequestBody()) }
+                                                .onSuccess { dto ->
+                                                    viewOnceShown = msg to (dto.attachment?.url?.takeIf { it.isNotBlank() } ?: url)
+                                                }
+                                                .onFailure {
+                                                    Toast.makeText(context, "Could not open photo", Toast.LENGTH_SHORT).show()
+                                                }
+                                        }
+                                    } else {
+                                        viewOnceShown = msg to url
+                                    }
+                                }
                             },
                             onVote = { optionId ->
                                 val uid = myUserId ?: SessionStore.userId(context)
@@ -834,6 +870,14 @@ fun ChatIdScreen(
                         showAttach = false
                         media.pickGallery()
                     },
+                    AivoraSheetAction("View once photo", Icons.Default.Visibility) {
+                        showAttach = false
+                        pickViewOnce.launch(
+                            androidx.activity.result.PickVisualMediaRequest(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly,
+                            ),
+                        )
+                    },
                     AivoraSheetAction("Camera", Icons.Default.CameraAlt) {
                         showAttach = false
                         onNavigate(Routes.camera("chat:$chatId"))
@@ -956,6 +1000,23 @@ fun ChatIdScreen(
                             AivoraSheetAction("Forward", Icons.AutoMirrored.Filled.Forward) {
                                 forwardTarget = target
                                 actionTarget = null
+                            },
+                        )
+                    }
+                    if (canEditMessage(target)) {
+                        add(
+                            AivoraSheetAction("Edit", Icons.Default.Edit) {
+                                editText = target.body
+                                editTarget = target
+                                actionTarget = null
+                            },
+                        )
+                    }
+                    if (target.mine && !target.deletedForEveryone && !target.system) {
+                        add(
+                            AivoraSheetAction("Info", Icons.Default.Info) {
+                                actionTarget = null
+                                onNavigate(Routes.messageInfo(chatId, target.id))
                             },
                         )
                     }
@@ -1134,6 +1195,114 @@ fun ChatIdScreen(
             },
             onDismiss = { deleteTarget = null },
         )
+    }
+
+    editTarget?.let { target ->
+        val container = if (dark) AivoraColors.DarkSurface else AivoraColors.LightSurface
+        val ink = if (dark) Color.White else AivoraColors.Ink
+        val trimmed = editText.trim()
+        AlertDialog(
+            onDismissRequest = { editTarget = null },
+            shape = RoundedCornerShape(20.dp),
+            containerColor = container,
+            title = { Text("Edit message", fontWeight = FontWeight.Bold, color = ink) },
+            text = {
+                OutlinedTextField(
+                    value = editText,
+                    onValueChange = { editText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 6,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = trimmed.isNotEmpty() && trimmed != target.body,
+                    onClick = {
+                        editTarget = null
+                        haptics.confirm()
+                        if (useRemote) {
+                            scope.launch {
+                                val uid = myUserId ?: SessionStore.userId(context)
+                                runCatching { api.putMessagesId(target.id, EditMessageBody(text = trimmed)) }
+                                    .onSuccess { dto ->
+                                        InMemoryChatStore.upsertMessage(
+                                            chatId,
+                                            if (uid != null) dto.toLocalMessage(uid)
+                                            else target.copy(body = trimmed, editedAtIso = dto.editedAt),
+                                        )
+                                    }
+                                    .onFailure {
+                                        Toast.makeText(context, "Could not edit message", Toast.LENGTH_SHORT).show()
+                                    }
+                            }
+                        } else {
+                            InMemoryChatStore.upsertMessage(
+                                chatId,
+                                target.copy(body = trimmed, editedAtIso = java.time.Instant.now().toString()),
+                            )
+                        }
+                    },
+                ) {
+                    Text("Save", color = AivoraColors.Primary, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editTarget = null }) {
+                    Text("Cancel", color = AivoraColors.TextSecondary)
+                }
+            },
+        )
+    }
+
+    if (showWallpaper) {
+        ChatWallpaperDialog(
+            selected = chat.wallpaper,
+            onPick = { key ->
+                showWallpaper = false
+                scope.launch {
+                    val ok = ChatControls.setWallpaper(api, useRemote, chat, key)
+                    if (!ok) {
+                        Toast.makeText(context, "Could not change wallpaper", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onDismiss = { showWallpaper = false },
+        )
+    }
+
+    viewOnceShown?.let { (target, url) ->
+        val closeViewer = {
+            viewOnceShown = null
+            InMemoryChatStore.upsertMessage(chatId, target.copy(mediaUri = null, body = "Opened"))
+        }
+        Dialog(
+            onDismissRequest = closeViewer,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+                    .clickable(onClick = closeViewer),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = "View once photo",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+                Text(
+                    "View once · tap to close",
+                    color = Color.White.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 12.dp),
+                )
+            }
+        }
     }
 
     if (showReportSent) {
@@ -1374,6 +1543,7 @@ private fun MessageRow(
     onLongPress: () -> Unit = {},
     onVote: (optionId: String) -> Unit = {},
     onRsvp: (answer: String) -> Unit = {},
+    onOpenViewOnce: () -> Unit = {},
 ) {
     val mine = message.mine
     val voiceSecs = message.voiceDurationSec
@@ -1472,6 +1642,11 @@ private fun MessageRow(
                     color = AivoraColors.TextSecondary,
                     style = MaterialTheme.typography.bodyMedium,
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                )
+            } else if (message.viewOnce) {
+                ViewOnceBubble(
+                    opened = message.mediaUri == null,
+                    onClick = if (!mine && message.mediaUri != null) onOpenViewOnce else null,
                 )
             } else if (message.poll != null) {
                 PollBubble(message.poll, onVote)
@@ -1657,6 +1832,16 @@ private fun MessageRow(
                     )
                     Spacer(modifier = Modifier.width(3.dp))
                 }
+                if (message.edited && !message.deletedForEveryone) {
+                    Text(
+                        "Edited",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontSize = 11.sp,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        color = AivoraColors.TextSecondary,
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
                 Text(
                     message.time,
                     style = MaterialTheme.typography.labelMedium,
@@ -1679,6 +1864,42 @@ private fun MessageRow(
                 }
             }
         }
+    }
+}
+
+private const val EDIT_WINDOW_SECONDS = 15 * 60L
+
+private fun canEditMessage(m: LocalMessage): Boolean {
+    if (!m.mine || m.deletedForEveryone || m.system || m.disappeared || m.viewOnce) return false
+    if (m.mediaUri != null || m.mediaKind != null || m.voiceDurationSec != null) return false
+    if (m.poll != null || m.contact != null || m.location != null || m.event != null) return false
+    if (m.body.isBlank() || m.id.startsWith("local-")) return false
+    val created = runCatching { java.time.Instant.parse(m.createdAtIso) }.getOrNull() ?: return false
+    return java.time.Duration.between(created, java.time.Instant.now()).seconds <= EDIT_WINDOW_SECONDS
+}
+
+@Composable
+private fun ViewOnceBubble(opened: Boolean, onClick: (() -> Unit)?) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+            .background(AivoraColors.PrimarySoft)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            if (opened) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+            contentDescription = null,
+            tint = AivoraColors.Primary,
+        )
+        Text(
+            if (opened) "Opened" else "View once photo",
+            color = AivoraColors.Ink,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 

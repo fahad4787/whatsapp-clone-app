@@ -94,8 +94,8 @@ interface AivoraApi {
     @POST("api/messages/{id}/view-once")
     suspend fun postMessagesIdViewOnce(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.EmptyRequestBody,
+    ): com.aivora.app.data.model.MessageDto
 
     @POST("api/communities/{id}/groups/{conversationId}/join")
     suspend fun postCommunitiesIdGroupsConversationIdJoin(
@@ -344,8 +344,13 @@ interface AivoraApi {
     @PUT("api/messages/{id}")
     suspend fun putMessagesId(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.EditMessageBody,
+    ): com.aivora.app.data.model.MessageDto
+
+    @GET("api/messages/{id}/info")
+    suspend fun getMessagesIdInfo(
+        @Path("id") id: String,
+    ): com.aivora.app.data.model.MessageInfoDto
 
     @POST("api/me/live-locations/stop")
     suspend fun postMeLiveLocationsStop(

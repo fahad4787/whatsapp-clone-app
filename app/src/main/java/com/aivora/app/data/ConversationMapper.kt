@@ -19,7 +19,7 @@ fun ConversationDto.toLocalChat(): LocalChat {
         time = "",
         unread = unreadCount,
         isGroup = type.equals("group", ignoreCase = true),
-        favorite = pinned,
+        favorite = favorite,
         archived = archived,
         pinned = pinned,
         mutedUntil = mutedUntil,
@@ -32,6 +32,7 @@ fun ConversationDto.toLocalChat(): LocalChat {
         onlyAdminsCanSend = onlyAdminsCanSend,
         onlyAdminsCanEditInfo = onlyAdminsCanEditInfo,
         disappearingSeconds = disappearingSeconds,
+        wallpaper = wallpaper,
         peerLastSeenAt = peer?.lastSeenAt,
         peerPresenceVisible = peer?.presenceVisible ?: true,
     )

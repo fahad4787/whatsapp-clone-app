@@ -326,7 +326,8 @@ object InMemoryChatStore {
             val y = b[i]
             if (x.id != y.id || x.status != y.status || x.body != y.body ||
                 x.starred != y.starred || x.deletedForEveryone != y.deletedForEveryone ||
-                x.reactions != y.reactions
+                x.reactions != y.reactions || x.editedAtIso != y.editedAtIso ||
+                x.mediaUri != y.mediaUri
             ) {
                 return false
             }
