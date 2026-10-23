@@ -1,6 +1,7 @@
 package com.aivora.app.data
 
 import com.aivora.app.data.local.LocalMessage
+import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.model.MessageDto
 
 fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
@@ -10,12 +11,25 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         created.isNotBlank() -> created
         else -> "Now"
     }
-    val media = attachment?.url?.takeIf { it.isNotBlank() }
+    val deleted = !deletedForEveryoneAt.isNullOrBlank()
+    val media = if (deleted) null else attachment?.url?.takeIf { it.isNotBlank() }
     return LocalMessage(
         id = id.orEmpty(),
         mine = senderId == myUserId,
-        body = text.orEmpty().ifBlank { if (media != null) "Photo" else "" },
+        body = when {
+            deleted -> "This message was deleted"
+            !text.isNullOrBlank() -> text!!
+            media != null -> "Photo"
+            else -> ""
+        },
         time = time,
         mediaUri = media,
+        status = when (status?.lowercase()) {
+            "read" -> MessageDeliveryStatus.Read
+            "delivered" -> MessageDeliveryStatus.Delivered
+            "sent" -> MessageDeliveryStatus.Sent
+            else -> MessageDeliveryStatus.Sent
+        },
+        deletedForEveryone = deleted,
     )
 }

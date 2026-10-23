@@ -3,6 +3,7 @@ package com.aivora.app.data.realtime
 import com.aivora.app.BuildConfig
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
+import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.MessageDto
 import com.aivora.app.data.toLocalMessage
@@ -25,7 +26,9 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -175,7 +178,7 @@ object RealtimeClient {
         }.getOrNull() ?: return
 
         when (frame.type) {
-            "message" -> {
+            "message", "message_deleted" -> {
                 val data = frame.data ?: return
                 val dto = runCatching {
                     NetworkModule.json.decodeFromJsonElement(MessageDto.serializer(), data)
@@ -184,19 +187,36 @@ object RealtimeClient {
                 val uid = myUserIdProvider?.invoke() ?: return
                 val local = dto.toLocalMessage(uid)
                 InMemoryChatStore.upsertMessage(chatId, local)
-                // Heads-up while app is open on home (FCM alone often won't show in foreground).
-                if (!local.mine && !InMemoryChatStore.isViewing(chatId)) {
-                    val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
-                    if (app != null) {
-                        val preview = when {
-                            !local.mediaUri.isNullOrBlank() -> "Photo"
-                            local.body.isNotBlank() -> local.body
-                            else -> "New message"
+                if (!local.mine && !local.deletedForEveryone) {
+                    ackDelivered(listOfNotNull(dto.id))
+                    if (!InMemoryChatStore.isViewing(chatId)) {
+                        val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
+                        if (app != null) {
+                            val preview = when {
+                                !local.mediaUri.isNullOrBlank() -> "Photo"
+                                local.body.isNotBlank() -> local.body
+                                else -> "New message"
+                            }
+                            val title = InMemoryChatStore.chat(chatId).title.ifBlank { "Aivora" }
+                            com.aivora.app.data.push.MessageNotifier.show(app, title, preview, chatId)
                         }
-                        val title = InMemoryChatStore.chat(chatId).title.ifBlank { "Aivora" }
-                        com.aivora.app.data.push.MessageNotifier.show(app, title, preview, chatId)
                     }
                 }
+            }
+            "receipt" -> {
+                val obj = frame.data?.jsonObject ?: return
+                val chatId = obj.string("conversation_id") ?: return
+                val status = when (obj.string("status")?.lowercase()) {
+                    "read" -> MessageDeliveryStatus.Read
+                    "delivered" -> MessageDeliveryStatus.Delivered
+                    else -> return
+                }
+                val ids = mutableListOf<String>()
+                obj["message_ids"]?.jsonArray?.forEach { el ->
+                    el.jsonPrimitive.contentOrNull?.let { ids.add(it) }
+                }
+                obj.string("message_id")?.let { if (it.isNotBlank()) ids.add(it) }
+                InMemoryChatStore.applyReceipt(chatId, ids.distinct(), status)
             }
             "typing" -> {
                 val obj = frame.data?.jsonObject ?: return
@@ -216,6 +236,17 @@ object RealtimeClient {
                         lastSeenAt = obj.string("last_seen_at"),
                     ),
                 )
+            }
+        }
+    }
+
+    private fun ackDelivered(messageIds: List<String>) {
+        if (messageIds.isEmpty()) return
+        val token = tokenProvider?.invoke() ?: return
+        scope.launch {
+            runCatching {
+                val api = NetworkModule.api(NetworkModule.okHttp { token })
+                api.postMessagesDelivered(mapOf("message_ids" to messageIds))
             }
         }
     }

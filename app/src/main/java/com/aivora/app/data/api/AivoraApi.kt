@@ -263,6 +263,7 @@ interface AivoraApi {
     @DELETE("api/messages/{id}")
     suspend fun deleteMessagesId(
         @Path("id") id: String,
+        @Query("for") forScope: String = "me",
     ): okhttp3.ResponseBody
 
     @DELETE("api/me/devices/{id}")

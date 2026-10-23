@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **Wave 8 done** — thin admin (users/ban, reports, metrics). Waves 0–7 done on staging.
+Status: **MVP Waves 0–8 done.** Next: full chat — see `CHAT_FULL_PLAN.md` (Waves 9–15).
 
 ## Locked constraints
 
@@ -218,11 +218,14 @@ Status: **Wave 8 done** — thin admin (users/ban, reports, metrics). Waves 0–
 
 ---
 
-### Later (explicitly out of this plan)
+### Next — full chat (Wave 9+)
+See **[CHAT_FULL_PLAN.md](./CHAT_FULL_PLAN.md)** for Waves 9–15 (receipts, reply/react, mute/archive/block, voice/docs, group admin, polls/location, polish).
+
+### Still later (after full chat)
 - Real SMS OTP  
 - LiveKit calls / scheduled calls  
-- Communities, channels depth, passkeys, backup, stickers, live location  
-- Status / polls / events — can insert as Wave 9+ after MVP exit if you want  
+- Communities, channels depth, status/stories server, passkeys, backup, stickers  
+
 
 ---
 

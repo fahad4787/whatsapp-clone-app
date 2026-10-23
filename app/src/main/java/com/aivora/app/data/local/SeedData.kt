@@ -13,6 +13,13 @@ data class LocalChat(
     val peerUserId: String? = null,
 )
 
+enum class MessageDeliveryStatus {
+    Sending,
+    Sent,
+    Delivered,
+    Read,
+}
+
 data class LocalMessage(
     val id: String,
     val mine: Boolean,
@@ -22,6 +29,8 @@ data class LocalMessage(
     val senderName: String? = null,
     /** When non-null, message is a voice note (duration in seconds). */
     val voiceDurationSec: Int? = null,
+    val status: MessageDeliveryStatus = MessageDeliveryStatus.Sent,
+    val deletedForEveryone: Boolean = false,
 )
 
 /** Seed data for the in-memory store (no persistence). */

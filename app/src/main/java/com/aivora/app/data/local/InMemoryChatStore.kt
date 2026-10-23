@@ -125,6 +125,43 @@ object InMemoryChatStore {
         }
     }
 
+    fun removeMessage(chatId: String, messageId: String) {
+        messageFlow(chatId).update { list -> list.filterNot { it.id == messageId } }
+        val last = messageFlow(chatId).value.lastOrNull()
+        _chats.update { list ->
+            list.map {
+                if (it.id != chatId) it
+                else it.copy(
+                    preview = last?.body ?: "No messages",
+                    time = last?.time ?: it.time,
+                )
+            }
+        }
+    }
+
+    fun applyReceipt(chatId: String, messageIds: List<String>?, status: MessageDeliveryStatus) {
+        val ids = messageIds?.filter { it.isNotBlank() }.orEmpty()
+        messageFlow(chatId).update { list ->
+            list.map { msg ->
+                if (!msg.mine) return@map msg
+                val matches = if (ids.isEmpty()) true else msg.id in ids
+                if (!matches) return@map msg
+                val next = maxStatus(msg.status, status)
+                if (next == msg.status) msg else msg.copy(status = next)
+            }
+        }
+    }
+
+    private fun maxStatus(a: MessageDeliveryStatus, b: MessageDeliveryStatus): MessageDeliveryStatus {
+        val order = listOf(
+            MessageDeliveryStatus.Sending,
+            MessageDeliveryStatus.Sent,
+            MessageDeliveryStatus.Delivered,
+            MessageDeliveryStatus.Read,
+        )
+        return if (order.indexOf(b) >= order.indexOf(a)) b else a
+    }
+
     /** Replace the message list for a chat (e.g. after a remote fetch/poll). */
     fun replaceMessages(chatId: String, messages: List<LocalMessage>) {
         messageFlow(chatId).value = messages
@@ -137,26 +174,40 @@ object InMemoryChatStore {
                     current.copy(preview = last.body, time = last.time, unread = 0),
                 ) + list.filterNot { it.id == chatId }
             }
+        } else {
+            _chats.update { list ->
+                list.map {
+                    if (it.id == chatId) it.copy(preview = "No messages", unread = 0) else it
+                }
+            }
         }
     }
 
     /** Insert or replace one message by id (websocket push). */
     fun upsertMessage(chatId: String, message: LocalMessage) {
+        val alreadyHad = messageFlow(chatId).value.any { it.id == message.id }
         messageFlow(chatId).update { list ->
-            val without = list.filterNot { it.id == message.id }
-            without + message
+            val existing = list.find { it.id == message.id }
+            val merged = if (existing != null && message.mine) {
+                message.copy(status = maxStatus(existing.status, message.status))
+            } else {
+                message
+            }
+            list.filterNot { it.id == message.id } + merged
         }
         _chats.update { list ->
             val current = list.find { it.id == chatId }
                 ?: LocalChat(chatId, "Chat", message.body, message.time)
+            val unread = when {
+                message.mine || viewingChatId == chatId -> 0
+                alreadyHad -> current.unread
+                else -> current.unread + 1
+            }
             listOf(
                 current.copy(
                     preview = message.body,
                     time = message.time,
-                    unread = when {
-                        message.mine || viewingChatId == chatId -> 0
-                        else -> current.unread + 1
-                    },
+                    unread = unread,
                 ),
             ) + list.filterNot { it.id == chatId }
         }
