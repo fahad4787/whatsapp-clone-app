@@ -43,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -90,7 +91,11 @@ fun ProfileIdScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    val chat = com.aivora.app.data.local.InMemoryChatStore.chat(profileId.ifBlank { "1" })
+    val chats by com.aivora.app.data.local.InMemoryChatStore.chats.collectAsState()
+    val chat = remember(profileId, chats) {
+        com.aivora.app.data.local.InMemoryChatStore.chat(profileId.ifBlank { "1" })
+    }
+    var showDisappearing by remember { mutableStateOf(false) }
     if (chat.isGroup) {
         com.aivora.app.ui.feature.chat.GroupInfoScreen(
             chatId = chat.id,
@@ -117,13 +122,25 @@ fun ProfileIdScreen(
                     }),
                     SettingsItem("Starred messages", null, Icons.Default.Star, onClick = { onNavigate(Routes.SettingsStarred) }),
                     SettingsItem("Notifications", null, Icons.Default.Notifications, onClick = { }),
-                    SettingsItem("Disappearing messages", "Off", Icons.Default.Timer, onClick = { onNavigate(Routes.SettingsPrivacyDefaultTimer) }),
+                    SettingsItem(
+                        "Disappearing messages",
+                        icon = Icons.Default.Timer,
+                        trailing = com.aivora.app.ui.feature.chat.formatDisappearing(chat.disappearingSeconds),
+                        onClick = { showDisappearing = true },
+                    ),
                     SettingsItem("Advanced chat privacy", null, Icons.Default.Security, onClick = { onNavigate(Routes.SettingsPrivacyAdvanced) }),
                     SettingsItem("Encryption", "Messages and calls are end-to-end encrypted.", Icons.Default.Lock, onClick = { }),
                     SettingsItem("Block", null, Icons.Default.Block, danger = true, onClick = { onNavigate(Routes.SettingsBlocked) }),
                     SettingsItem("Report", null, Icons.Default.Info, danger = true, onClick = { }),
                 )
             )
+        )
+    }
+    if (showDisappearing) {
+        com.aivora.app.ui.feature.chat.DisappearingMessagesDialog(
+            chatId = chat.id,
+            currentSeconds = chat.disappearingSeconds,
+            onDismiss = { showDisappearing = false },
         )
     }
 }

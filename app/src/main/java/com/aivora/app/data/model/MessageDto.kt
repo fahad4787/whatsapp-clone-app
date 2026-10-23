@@ -15,6 +15,8 @@ data class MessageDto(
     @SerialName("preview") val preview: LinkPreviewDto? = null,
     @SerialName("poll") val poll: PollDto? = null,
     @SerialName("event") val event: EventDto? = null,
+    @SerialName("contact") val contact: ContactCardDto? = null,
+    @SerialName("location") val location: LocationBody? = null,
     @SerialName("mentions") val mentions: List<String> = emptyList(),
     @SerialName("view_once") val viewOnce: Boolean = false,
     @SerialName("expires_at") val expiresAt: String? = null,

@@ -1,7 +1,7 @@
 # Full chat plan (Wave 9+)
 
-Date: 2026-10-23  
-Status: **PERF F0–F5 done** after Wave 12 — see `PERF_FOUNDATION.md`. Next: Wave 13 groups.
+Date: 2026-10-24  
+Status: **Wave 14 done** (after Waves 9–13 + PERF F0–F5). Next: Wave 15 polish. See `WAVE14_CHAT_EXTRAS.md`.
 
 ## Principle
 
@@ -87,16 +87,16 @@ Biggest gaps for “full chat”: message actions, conversation controls, voice/
 ---
 
 ### Wave 14 — Chat extras (composer pack)
-**Goal:** remaining attach / privacy features that are still chat.
+**Goal:** remaining attach / privacy features that are still chat. See `WAVE14_CHAT_EXTRAS.md`.
 
-| # | Feature | Exit |
-|---|---------|------|
-| 14.1 | Contact card message | Peer can tap to save/start chat |
-| 14.2 | Location pin (static map / coords message) | Shows on peer |
-| 14.3 | Polls (create, vote, live tallies) | Votes sync over WS |
-| 14.4 | Events (create + RSVP in chat) | Event bubble + details |
-| 14.5 | Disappearing messages (per-chat timer) | Old msgs vanish after TTL |
-| 14.6 | Last-seen + privacy settings wired | Respects privacy |
+| # | Feature | Exit | Status |
+|---|---------|------|--------|
+| 14.1 | Contact card message | Peer can tap to save/start chat | Done |
+| 14.2 | Location pin (static map / coords message) | Shows on peer | Done |
+| 14.3 | Polls (create, vote, live tallies) | Votes sync over WS | Done |
+| 14.4 | Events (create + RSVP in chat) | Event bubble + details | Done |
+| 14.5 | Disappearing messages (per-chat timer) | Old msgs vanish after TTL | Done |
+| 14.6 | Last-seen + privacy settings wired | Respects privacy | Done |
 
 ---
 

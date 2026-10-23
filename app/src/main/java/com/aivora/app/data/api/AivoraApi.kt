@@ -83,8 +83,8 @@ interface AivoraApi {
 
     @PUT("api/me/privacy")
     suspend fun putMePrivacy(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.PrivacySettingsBody,
+    ): com.aivora.app.data.model.PrivacySettingsDto
 
     @GET("api/communities/{id}")
     suspend fun getCommunitiesId(
@@ -193,8 +193,8 @@ interface AivoraApi {
     @PUT("api/conversations/{id}/disappearing")
     suspend fun putConversationsIdDisappearing(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.DisappearingBody,
+    ): com.aivora.app.data.model.ConversationDto
 
     @GET("api/scheduled-calls")
     suspend fun getScheduledCalls(): okhttp3.ResponseBody
@@ -230,8 +230,8 @@ interface AivoraApi {
 
     @PUT("api/me/privacy")
     suspend fun putMePrivacyAlt(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.PrivacySettingsBody,
+    ): com.aivora.app.data.model.PrivacySettingsDto
 
     @GET("api/app/config")
     suspend fun getAppConfig(): okhttp3.ResponseBody
@@ -338,8 +338,8 @@ interface AivoraApi {
     @POST("api/messages/{id}/vote")
     suspend fun postMessagesIdVote(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.VoteBody,
+    ): com.aivora.app.data.model.MessageDto
 
     @PUT("api/messages/{id}")
     suspend fun putMessagesId(
@@ -367,7 +367,7 @@ interface AivoraApi {
     suspend fun getCommunities(): okhttp3.ResponseBody
 
     @GET("api/me/privacy")
-    suspend fun getMePrivacy(): okhttp3.ResponseBody
+    suspend fun getMePrivacy(): com.aivora.app.data.model.PrivacySettingsDto
 
     @POST("api/status/{id}")
     suspend fun postStatusId(
@@ -586,8 +586,8 @@ interface AivoraApi {
     @POST("api/messages/{id}/rsvp")
     suspend fun postMessagesIdRsvp(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.RsvpBody,
+    ): com.aivora.app.data.model.MessageDto
 
     @GET("api/users/lookup")
     suspend fun getUsersLookup(): okhttp3.ResponseBody

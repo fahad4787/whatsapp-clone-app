@@ -31,5 +31,8 @@ fun ConversationDto.toLocalChat(): LocalChat {
         avatarUrl = avatarUrl ?: avatarThumb,
         onlyAdminsCanSend = onlyAdminsCanSend,
         onlyAdminsCanEditInfo = onlyAdminsCanEditInfo,
+        disappearingSeconds = disappearingSeconds,
+        peerLastSeenAt = peer?.lastSeenAt,
+        peerPresenceVisible = peer?.presenceVisible ?: true,
     )
 }

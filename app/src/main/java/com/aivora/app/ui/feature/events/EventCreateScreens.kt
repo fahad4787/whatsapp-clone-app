@@ -1,5 +1,6 @@
 package com.aivora.app.ui.feature.events
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,16 +37,31 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
+import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.EventCreateBody
+import com.aivora.app.data.model.SendMessageBody
+import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +81,9 @@ fun EventCreateChatScreen(
     var endTime by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
     var type by remember { mutableIntStateOf(0) } // 0 in person, 1 call
+    var sending by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val canPreview = title.isNotBlank() && date.isNotBlank() && startTime.isNotBlank()
 
     Column(
@@ -183,22 +202,66 @@ fun EventCreateChatScreen(
         }
 
         PrimaryButton(
-            text = "Preview event",
+            text = "Send event",
             onClick = {
-                if (chatId.isNotBlank()) {
-                    InMemoryChatStore.sendText(
-                        chatId,
-                        "📅 Event: ${title.trim()} · $date $startTime" +
-                            if (location.isNotBlank()) " · $location" else "",
-                    )
+                val uid = SessionStore.userId(context)
+                if (chatId.isBlank() || SessionStore.accessToken(context).isNullOrBlank() || uid == null) {
+                    if (chatId.isNotBlank()) {
+                        InMemoryChatStore.sendText(
+                            chatId,
+                            "📅 Event: ${title.trim()} · $date $startTime" +
+                                if (location.isNotBlank()) " · $location" else "",
+                        )
+                    }
+                    onBack?.invoke()
+                } else if (!sending) {
+                    sending = true
+                    val startsAt = parseEventInstant(date, startTime)
+                    val endsAt = endTime.takeIf { it.isNotBlank() }
+                        ?.let { parseEventInstantOrNull(date, it) }
+                        ?.takeIf { it.isAfter(startsAt) }
+                    scope.launch {
+                        runCatching {
+                            NetworkModule.api().postConversationsIdMessages(
+                                chatId,
+                                SendMessageBody(
+                                    clientId = UUID.randomUUID().toString(),
+                                    event = EventCreateBody(
+                                        title = title.trim(),
+                                        description = description.trim().ifBlank { null },
+                                        location = location.trim().ifBlank { null },
+                                        startsAt = startsAt.toString(),
+                                        endsAt = endsAt?.toString(),
+                                        withCall = type == 1,
+                                        timezone = ZoneId.systemDefault().id,
+                                    ),
+                                ),
+                            )
+                        }.onSuccess {
+                            InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid))
+                            onBack?.invoke()
+                        }.onFailure {
+                            sending = false
+                            Toast.makeText(context, "Could not send event", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 }
-                onBack?.invoke()
             },
-            enabled = canPreview,
+            enabled = canPreview && !sending,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
         )
     }
 }
+
+/** `YYYY-MM-DD` + `HH:mm` in the device zone; falls back to now + 1 day when unparseable. */
+private fun parseEventInstantOrNull(date: String, time: String): Instant? = runCatching {
+    LocalDateTime.of(LocalDate.parse(date.trim()), LocalTime.parse(time.trim()))
+        .atZone(ZoneId.systemDefault())
+        .toInstant()
+}.getOrNull()
+
+private fun parseEventInstant(date: String, time: String): Instant =
+    parseEventInstantOrNull(date, time) ?: Instant.now().plus(1, ChronoUnit.DAYS)
 
 @Composable
 private fun FieldLabel(text: String) {

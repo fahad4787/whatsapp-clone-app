@@ -1,12 +1,19 @@
 package com.aivora.app.data
 
+import com.aivora.app.data.local.LocalContact
+import com.aivora.app.data.local.LocalEvent
 import com.aivora.app.data.local.LocalLinkPreview
+import com.aivora.app.data.local.LocalLocation
 import com.aivora.app.data.local.LocalMediaKind
 import com.aivora.app.data.local.LocalMessage
+import com.aivora.app.data.local.LocalPoll
+import com.aivora.app.data.local.LocalPollOption
 import com.aivora.app.data.local.LocalReaction
 import com.aivora.app.data.local.LocalReplyPreview
 import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.model.MessageDto
+
+private const val DISAPPEARED_TEXT = "This message has disappeared"
 
 fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
     val created = createdAt.orEmpty()
@@ -67,12 +74,65 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         LocalMediaKind.File -> attachment?.name?.takeIf { it.isNotBlank() } ?: "Document"
         null -> ""
     }
+    val localPoll = if (deleted) null else poll?.let { p ->
+        LocalPoll(
+            question = p.question.orEmpty(),
+            multiple = p.multiple,
+            closed = p.closed,
+            totalVoters = p.totalVoters,
+            options = p.options.map { o ->
+                LocalPollOption(id = o.id.orEmpty(), text = o.text.orEmpty(), votes = o.votes, mine = o.mine)
+            },
+        )
+    }
+    val localContact = if (deleted) null else contact?.let { c ->
+        LocalContact(name = c.name.orEmpty(), phones = c.phones, userId = c.userId)
+    }
+    val localLocation = if (deleted) null else location?.let { l ->
+        val lat = l.lat
+        val lng = l.lng
+        if (lat != null && lng != null) {
+            LocalLocation(lat = lat, lng = lng, name = l.name, address = l.address)
+        } else {
+            null
+        }
+    }
+    val localEvent = if (deleted) null else event?.let { e ->
+        LocalEvent(
+            title = e.title.orEmpty(),
+            description = e.description,
+            location = e.location,
+            startsAt = e.startsAt.orEmpty(),
+            endsAt = e.endsAt,
+            withCall = e.withCall,
+            cancelled = e.cancelled,
+            going = e.counts?.going ?: 0,
+            maybe = e.counts?.maybe ?: 0,
+            notGoing = e.counts?.notGoing ?: 0,
+            myAnswer = e.myAnswer,
+        )
+    }
+    val disappeared = !deleted && (
+        text == DISAPPEARED_TEXT ||
+            expiresAt?.let { exp ->
+                runCatching { java.time.Instant.parse(exp).isBefore(java.time.Instant.now()) }.getOrDefault(false)
+            } == true
+        )
+    val richBody = when {
+        localPoll != null -> "Poll: ${localPoll.question}"
+        localContact != null -> "Contact: ${localContact.name}"
+        localLocation != null -> "Location"
+        localEvent != null -> "Event: ${localEvent.title}"
+        else -> null
+    }
     return LocalMessage(
         id = id.orEmpty(),
         mine = senderId == myUserId,
         body = when {
             deleted -> "This message was deleted"
+            disappeared -> DISAPPEARED_TEXT
             !text.isNullOrBlank() -> text!!
+            richBody != null -> richBody
             else -> fallbackBody
         },
         time = time,
@@ -101,5 +161,11 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         forwarded = forwarded,
         conversationId = conversationId,
         createdAtIso = createdAt,
+        poll = localPoll,
+        contact = localContact,
+        location = localLocation,
+        event = localEvent,
+        expiresAtIso = expiresAt,
+        disappeared = disappeared,
     )
 }

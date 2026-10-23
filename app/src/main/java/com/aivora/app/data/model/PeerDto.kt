@@ -17,4 +17,5 @@ data class PeerDto(
     @SerialName("avatar_thumb") val avatarThumb: String? = null,
     @SerialName("last_seen_at") val lastSeenAt: String? = null,
     @SerialName("deleted_at") val deletedAt: String? = null,
+    @SerialName("presence_visible") val presenceVisible: Boolean = true,
 )

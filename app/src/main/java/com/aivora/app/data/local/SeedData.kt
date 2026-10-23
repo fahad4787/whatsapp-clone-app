@@ -24,6 +24,9 @@ data class LocalChat(
     val avatarUrl: String? = null,
     val onlyAdminsCanSend: Boolean = false,
     val onlyAdminsCanEditInfo: Boolean = false,
+    val disappearingSeconds: Int = 0,
+    val peerLastSeenAt: String? = null,
+    val peerPresenceVisible: Boolean = true,
 ) {
     val isGroupAdmin: Boolean get() = myRole.equals("admin", ignoreCase = true)
     val isMuted: Boolean
@@ -69,6 +72,34 @@ data class LocalLinkPreview(
     val imageUrl: String? = null,
 )
 
+data class LocalPollOption(val id: String, val text: String, val votes: Int, val mine: Boolean)
+
+data class LocalPoll(
+    val question: String,
+    val multiple: Boolean,
+    val closed: Boolean,
+    val totalVoters: Int,
+    val options: List<LocalPollOption>,
+)
+
+data class LocalContact(val name: String, val phones: List<String>, val userId: String?)
+
+data class LocalLocation(val lat: Double, val lng: Double, val name: String?, val address: String?)
+
+data class LocalEvent(
+    val title: String,
+    val description: String?,
+    val location: String?,
+    val startsAt: String,
+    val endsAt: String?,
+    val withCall: Boolean,
+    val cancelled: Boolean,
+    val going: Int,
+    val maybe: Int,
+    val notGoing: Int,
+    val myAnswer: String?,
+)
+
 data class LocalMessage(
     val id: String,
     val mine: Boolean,
@@ -90,6 +121,12 @@ data class LocalMessage(
     val conversationId: String? = null,
     /** ISO created_at from server — used for older-history paging. */
     val createdAtIso: String? = null,
+    val poll: LocalPoll? = null,
+    val contact: LocalContact? = null,
+    val location: LocalLocation? = null,
+    val event: LocalEvent? = null,
+    val expiresAtIso: String? = null,
+    val disappeared: Boolean = false,
 )
 
 /** Seed data for the in-memory store (no persistence). */

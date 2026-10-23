@@ -363,8 +363,34 @@ fun SettingsPrivacyLastSeenScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val api = remember { com.aivora.app.data.ChatRepository.api() }
+    val useRemote = !com.aivora.app.data.local.SessionStore.accessToken(context).isNullOrBlank()
+    val lastSeenKeys = listOf("everyone", "contacts", "nobody")
+    val onlineKeys = listOf("everyone", "same_as_last_seen", "nobody")
     var lastSeen by remember { mutableIntStateOf(1) }
     var online by remember { mutableIntStateOf(1) }
+    androidx.compose.runtime.LaunchedEffect(useRemote) {
+        if (!useRemote) return@LaunchedEffect
+        runCatching { api.getMePrivacy() }
+            .onSuccess {
+                lastSeenKeys.indexOf(it.lastSeen).takeIf { i -> i >= 0 }?.let { i -> lastSeen = i }
+                onlineKeys.indexOf(it.online).takeIf { i -> i >= 0 }?.let { i -> online = i }
+            }
+            .onFailure {
+                android.widget.Toast.makeText(context, "Could not load privacy settings", android.widget.Toast.LENGTH_SHORT).show()
+            }
+    }
+    fun savePrivacy(body: com.aivora.app.data.model.PrivacySettingsBody, revert: () -> Unit) {
+        if (!useRemote) return
+        scope.launch {
+            runCatching { api.putMePrivacy(body) }.onFailure {
+                revert()
+                android.widget.Toast.makeText(context, "Could not update privacy", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     AivoraScaffold(title = "Last seen and online", onBack = onBack) {
         Spacer(Modifier.height(8.dp))
         SettingsSectionLabel("Who can see my last seen")
@@ -372,12 +398,14 @@ fun SettingsPrivacyLastSeenScreen(
             options = listOf(
                 "Everyone" to null,
                 "My contacts" to null,
-                "My contacts except…" to null,
                 "Nobody" to null,
             ),
             selected = lastSeen,
-            onSelect = { lastSeen = it },
-            navigableIndices = setOf(2),
+            onSelect = { i ->
+                val prev = lastSeen
+                lastSeen = i
+                savePrivacy(com.aivora.app.data.model.PrivacySettingsBody(lastSeen = lastSeenKeys[i])) { lastSeen = prev }
+            },
         )
         Spacer(Modifier.height(16.dp))
         SettingsSectionLabel("Who can see when I’m online")
@@ -385,9 +413,14 @@ fun SettingsPrivacyLastSeenScreen(
             options = listOf(
                 "Everyone" to null,
                 "Same as last seen" to null,
+                "Nobody" to null,
             ),
             selected = online,
-            onSelect = { online = it },
+            onSelect = { i ->
+                val prev = online
+                online = i
+                savePrivacy(com.aivora.app.data.model.PrivacySettingsBody(online = onlineKeys[i])) { online = prev }
+            },
         )
         SettingsFootnote(
             "If you don’t share your last seen or online status, you won’t be able to see other people’s last seen or online status.",

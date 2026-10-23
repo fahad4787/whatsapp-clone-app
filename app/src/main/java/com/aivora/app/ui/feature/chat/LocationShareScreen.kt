@@ -1,5 +1,6 @@
 package com.aivora.app.ui.feature.chat
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,19 +35,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
+import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.LocationBody
+import com.aivora.app.data.model.SendMessageBody
+import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsRow
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
+import kotlinx.coroutines.launch
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +68,9 @@ fun LocationShareScreen(
     val chat = remember(chatId) { InMemoryChatStore.chat(chatId) }
     val peer = chat.title.substringBefore(" ").ifBlank { "contact" }
     var query by remember { mutableStateOf("") }
+    var sending by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -174,11 +187,37 @@ fun LocationShareScreen(
                 SettingsRow(
                     SettingsItem(
                         "Send current location",
-                        subtitle = "Willow Lane · accurate to 20 m",
+                        subtitle = "Lahore · demo coordinates",
                         icon = Icons.Default.NearMe,
                         onClick = {
-                            InMemoryChatStore.sendText(chatId, "📍 Current location · Willow Lane")
-                            onBack?.invoke()
+                            val uid = SessionStore.userId(context)
+                            if (SessionStore.accessToken(context).isNullOrBlank() || uid == null) {
+                                InMemoryChatStore.sendText(chatId, "📍 Current location · Lahore")
+                                onBack?.invoke()
+                            } else if (!sending) {
+                                sending = true
+                                scope.launch {
+                                    runCatching {
+                                        NetworkModule.api().postConversationsIdMessages(
+                                            chatId,
+                                            SendMessageBody(
+                                                clientId = UUID.randomUUID().toString(),
+                                                location = LocationBody(
+                                                    lat = 31.5204,
+                                                    lng = 74.3587,
+                                                    name = "Current location",
+                                                ),
+                                            ),
+                                        )
+                                    }.onSuccess {
+                                        InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid))
+                                        onBack?.invoke()
+                                    }.onFailure {
+                                        sending = false
+                                        Toast.makeText(context, "Could not send location", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
                         },
                     ),
                 )
@@ -196,8 +235,7 @@ fun LocationShareScreen(
                         subtitle = "Let $peer see your location for a while",
                         icon = Icons.Default.ShareLocation,
                         onClick = {
-                            InMemoryChatStore.sendText(chatId, "📡 Live location shared")
-                            onBack?.invoke()
+                            Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show()
                         },
                     ),
                 )

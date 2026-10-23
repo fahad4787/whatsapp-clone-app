@@ -19,6 +19,7 @@ import com.aivora.app.ui.feature.channels.ChannelSlugScreen
 import com.aivora.app.ui.feature.channels.ChannelsScreen
 import com.aivora.app.ui.feature.chat.ChatIdScreen
 import com.aivora.app.ui.feature.chat.ChatMediaScreen
+import com.aivora.app.ui.feature.chat.ContactShareScreen
 import com.aivora.app.ui.feature.chat.LocationShareScreen
 import com.aivora.app.ui.feature.chat.MessageInfoChatMessageScreen
 import com.aivora.app.ui.feature.chat.NewChatScreen
@@ -151,6 +152,15 @@ fun AivoraNavHost(
                 chatId = Uri.decode(entry.arguments?.getString("chat").orEmpty()),
                 onBack = back,
                 onNavigate = go,
+            )
+        }
+        composable(
+            route = Routes.ContactShare,
+            arguments = listOf(navArgument("chat") { type = NavType.StringType }),
+        ) { entry ->
+            ContactShareScreen(
+                chatId = Uri.decode(entry.arguments?.getString("chat").orEmpty()),
+                onBack = back,
             )
         }
         composable(

@@ -67,6 +67,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Unarchive
 import android.Manifest
 import android.content.Intent
@@ -130,7 +131,9 @@ import com.aivora.app.data.model.EmptyRequestBody
 import com.aivora.app.data.model.ForwardMessageBody
 import com.aivora.app.data.model.ReactionBody
 import com.aivora.app.data.model.ReplyPreviewDto
+import com.aivora.app.data.model.RsvpBody
 import com.aivora.app.data.model.SendMessageBody
+import com.aivora.app.data.model.VoteBody
 import com.aivora.app.data.realtime.RealtimeClient
 import com.aivora.app.data.sendAttachmentMessage
 import com.aivora.app.data.sendImageMessage
@@ -320,8 +323,8 @@ fun ChatIdScreen(
     val groupOnlineCount = remember(chatId, roomOnlineMap, myUserId) {
         RealtimeClient.onlineCountInChat(chatId, myUserId)
     }
-    val peerOnline = remember(chatId, chat.peerUserId, roomOnlineMap, hidePresence) {
-        if (hidePresence || chat.isGroup) false
+    val peerOnline = remember(chatId, chat.peerUserId, roomOnlineMap, hidePresence, chat.peerPresenceVisible) {
+        if (hidePresence || chat.isGroup || !chat.peerPresenceVisible) false
         else {
             val peerId = chat.peerUserId
             !peerId.isNullOrBlank() && (roomOnlineMap[chatId]?.contains(peerId) == true)
@@ -334,8 +337,10 @@ fun ChatIdScreen(
             groupOnlineCount > 0 -> "$groupOnlineCount online · tap for info"
             else -> "tap for group info"
         }
+        !chat.peerPresenceVisible -> ""
         peerOnline -> "Online"
-        else -> "Offline"
+        !chat.peerLastSeenAt.isNullOrBlank() -> formatLastSeen(chat.peerLastSeenAt)
+        else -> ""
     }
 
     DisposableEffect(chatId) {
@@ -611,6 +616,10 @@ fun ChatIdScreen(
                     key = { it.id },
                     contentType = { msg ->
                         when {
+                            msg.poll != null -> "poll"
+                            msg.location != null -> "location"
+                            msg.contact != null -> "contact"
+                            msg.event != null -> "event"
                             msg.voiceDurationSec != null -> "voice"
                             msg.mediaKind != null -> msg.mediaKind.name
                             msg.linkPreview != null -> "link"
@@ -627,6 +636,32 @@ fun ChatIdScreen(
                         onLongPress = {
                             haptics.tick()
                             actionTarget = msg
+                        },
+                        onVote = { optionId ->
+                            val uid = myUserId ?: SessionStore.userId(context)
+                            if (useRemote && uid != null) {
+                                haptics.tick()
+                                scope.launch {
+                                    runCatching { api.postMessagesIdVote(msg.id, VoteBody(optionId = optionId)) }
+                                        .onSuccess { InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid)) }
+                                        .onFailure {
+                                            Toast.makeText(context, "Could not vote", Toast.LENGTH_SHORT).show()
+                                        }
+                                }
+                            }
+                        },
+                        onRsvp = { answer ->
+                            val uid = myUserId ?: SessionStore.userId(context)
+                            if (useRemote && uid != null) {
+                                haptics.tick()
+                                scope.launch {
+                                    runCatching { api.postMessagesIdRsvp(msg.id, RsvpBody(answer = answer)) }
+                                        .onSuccess { InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid)) }
+                                        .onFailure {
+                                            Toast.makeText(context, "Could not RSVP", Toast.LENGTH_SHORT).show()
+                                        }
+                                }
+                            }
                         },
                     )
                 }
@@ -799,9 +834,13 @@ fun ChatIdScreen(
                     },
                     AivoraSheetAction("Contact", Icons.Default.ContactPage) {
                         showAttach = false
-                        haptics.confirm()
-                        InMemoryChatStore.sendText(chatId, "👤 Contact card · $firstName")
-                        peerTyping = true
+                        if (useRemote) {
+                            onNavigate(Routes.contactShare(chatId))
+                        } else {
+                            haptics.confirm()
+                            InMemoryChatStore.sendText(chatId, "👤 Contact card · $firstName")
+                            peerTyping = true
+                        }
                     },
                     AivoraSheetAction("Poll", Icons.Default.Poll) {
                         showAttach = false
@@ -1299,6 +1338,8 @@ private fun MessageRow(
     dark: Boolean,
     forceSingleTick: Boolean = false,
     onLongPress: () -> Unit = {},
+    onVote: (optionId: String) -> Unit = {},
+    onRsvp: (answer: String) -> Unit = {},
 ) {
     val mine = message.mine
     val voiceSecs = message.voiceDurationSec
@@ -1391,7 +1432,22 @@ private fun MessageRow(
                     )
                 }
             }
-            if (voiceSecs != null) {
+            if (message.disappeared || message.deletedForEveryone) {
+                Text(
+                    message.body,
+                    color = AivoraColors.TextSecondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                )
+            } else if (message.poll != null) {
+                PollBubble(message.poll, onVote)
+            } else if (message.location != null) {
+                LocationBubble(message.location)
+            } else if (message.contact != null) {
+                ContactBubble(message.contact)
+            } else if (message.event != null) {
+                EventBubble(message.event, onRsvp)
+            } else if (voiceSecs != null) {
                 VoiceNoteContent(
                     durationSec = voiceSecs,
                     seed = message.id.hashCode(),
@@ -1557,6 +1613,15 @@ private fun MessageRow(
                         modifier = Modifier.size(12.dp),
                     )
                     Spacer(modifier = Modifier.width(4.dp))
+                }
+                if (message.expiresAtIso != null && !message.disappeared) {
+                    Icon(
+                        Icons.Default.Timer,
+                        contentDescription = "Disappearing",
+                        tint = AivoraColors.TextSecondary,
+                        modifier = Modifier.size(11.dp),
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
                 }
                 Text(
                     message.time,

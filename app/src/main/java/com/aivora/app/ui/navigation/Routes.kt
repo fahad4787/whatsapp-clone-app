@@ -19,6 +19,7 @@ object Routes {
     const val Gallery = "gallery/{target}"
     const val PollCreate = "poll-create/{chat}"
     const val LocationShare = "location-share/{chat}"
+    const val ContactShare = "contact-share/{chat}"
     const val NewCall = "new-call"
     const val Keypad = "keypad"
     const val AudioCall = "call/audio/{name}"
@@ -102,6 +103,9 @@ object Routes {
 
     fun locationShare(chat: String): String =
         LocationShare.replace("{chat}", android.net.Uri.encode(chat))
+
+    fun contactShare(chat: String): String =
+        ContactShare.replace("{chat}", android.net.Uri.encode(chat))
 
     fun eventCreate(chat: String): String =
         EventCreateChat.replace("{chat}", android.net.Uri.encode(chat))

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -89,6 +90,7 @@ fun GroupInfoScreen(
     var memberTarget by remember { mutableStateOf<MemberDto?>(null) }
     var confirmLeave by remember { mutableStateOf(false) }
     var confirmDissolve by remember { mutableStateOf(false) }
+    var showDisappearing by remember { mutableStateOf(false) }
 
     fun applyConv(next: ConversationDto) {
         conv = next
@@ -167,6 +169,14 @@ fun GroupInfoScreen(
                             title = "Media, links, and docs",
                             icon = Icons.Default.Photo,
                             onClick = { onNavigate(Routes.chatMedia(chatId)) },
+                        ),
+                    )
+                    add(
+                        SettingsItem(
+                            title = "Disappearing messages",
+                            icon = Icons.Default.Timer,
+                            trailing = formatDisappearing(conv?.disappearingSeconds ?: 0),
+                            onClick = { showDisappearing = true },
                         ),
                     )
                     if (canEditInfo) {
@@ -444,6 +454,19 @@ fun GroupInfoScreen(
             },
             dismissButton = {
                 TextButton(onClick = { confirmLeave = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (showDisappearing) {
+        DisappearingMessagesDialog(
+            chatId = chatId,
+            currentSeconds = conv?.disappearingSeconds ?: 0,
+            onDismiss = { showDisappearing = false },
+            onUpdated = {
+                scope.launch {
+                    runCatching { api.getConversationsId(chatId) }.onSuccess { applyConv(it) }
+                }
             },
         )
     }

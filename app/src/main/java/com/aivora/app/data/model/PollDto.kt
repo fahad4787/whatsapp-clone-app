@@ -11,5 +11,5 @@ data class PollDto(
     @SerialName("multiple") val multiple: Boolean = false,
     @SerialName("closed") val closed: Boolean = false,
     @SerialName("total_voters") val totalVoters: Int = 0,
-    @SerialName("options") val options: List<String> = emptyList(),
+    @SerialName("options") val options: List<PollOptionDto> = emptyList(),
 )
