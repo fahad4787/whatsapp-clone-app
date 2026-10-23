@@ -23,6 +23,8 @@ fun ConversationDto.toLocalChat(): LocalChat {
         archived = archived,
         pinned = pinned,
         mutedUntil = mutedUntil,
+        blockedByMe = blockedByMe,
+        blockedMe = blockedMe,
         peerUserId = peer?.id,
     )
 }

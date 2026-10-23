@@ -12,6 +12,10 @@ data class LocalChat(
     val pinned: Boolean = false,
     /** ISO muted-until; null/blank = not muted. */
     val mutedUntil: String? = null,
+    /** I blocked this peer. */
+    val blockedByMe: Boolean = false,
+    /** This peer blocked me. */
+    val blockedMe: Boolean = false,
     /** Peer user id for 1:1 chats (reports / profile). */
     val peerUserId: String? = null,
 ) {

@@ -111,7 +111,6 @@ import com.aivora.app.data.model.ForwardMessageBody
 import com.aivora.app.data.model.ReactionBody
 import com.aivora.app.data.model.ReplyPreviewDto
 import com.aivora.app.data.model.SendMessageBody
-import com.aivora.app.data.toLocalChat
 import com.aivora.app.data.realtime.RealtimeClient
 import com.aivora.app.data.sendImageMessage
 import com.aivora.app.data.toLocalMessage
@@ -208,11 +207,34 @@ fun ChatIdScreen(
         }
     }
     val firstName = chat.title.substringBefore(' ').ifBlank { chat.title }
+    val hidePresence = chat.blockedByMe || chat.blockedMe
     val subtitle = when {
+        hidePresence -> ""
         peerTyping -> "typing…"
         chat.isGroup -> "tap for group info"
         peerOnline -> "Online"
         else -> "Offline"
+    }
+
+    fun applySettingsResult(
+        archived: Boolean? = null,
+        pinned: Boolean? = null,
+        mutedUntil: String? = null,
+        clearMute: Boolean = false,
+    ) {
+        val current = InMemoryChatStore.chat(chatId)
+        InMemoryChatStore.upsertChat(
+            current.copy(
+                archived = archived ?: current.archived,
+                pinned = pinned ?: current.pinned,
+                favorite = pinned ?: current.favorite,
+                mutedUntil = when {
+                    clearMute -> null
+                    mutedUntil != null -> mutedUntil
+                    else -> current.mutedUntil
+                },
+            ),
+        )
     }
 
     DisposableEffect(chatId) {
@@ -260,8 +282,12 @@ fun ChatIdScreen(
         }
     }
 
-    LaunchedEffect(useRemote) {
+    LaunchedEffect(useRemote, hidePresence) {
         if (!useRemote) return@LaunchedEffect
+        if (hidePresence) {
+            peerOnline = false
+            return@LaunchedEffect
+        }
         RealtimeClient.presence.collect { event ->
             if (event.userId != null && event.userId != myUserId) {
                 peerOnline = event.online
@@ -333,7 +359,7 @@ fun ChatIdScreen(
             .statusBarsPadding(),
     ) {
         ChatHeader(
-            title = chat.title,
+        title = chat.title,
             subtitle = subtitle,
             showTyping = peerTyping,
             menuExpanded = showChatMenu,
@@ -357,70 +383,80 @@ fun ChatIdScreen(
                     if (chat.isMuted) "Unmute" else "Mute notifications",
                     if (chat.isMuted) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
                 ) {
+                    val nextMuted = !chat.isMuted
                     if (useRemote) {
                         scope.launch {
                             runCatching {
                                 api.putConversationsIdSettings(
                                     chatId,
-                                    ConversationSettingsBody(muted = !chat.isMuted),
+                                    ConversationSettingsBody(muted = nextMuted),
                                 )
-                            }.onSuccess { dto ->
-                                InMemoryChatStore.upsertChat(dto.toLocalChat())
+                            }.onSuccess { res ->
+                                applySettingsResult(
+                                    mutedUntil = res.mutedUntil,
+                                    clearMute = res.mutedUntil.isNullOrBlank(),
+                                )
                             }.onFailure {
+                                android.util.Log.w("Chat", "mute failed", it)
                                 Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
                             }
                         }
                     } else {
-                        InMemoryChatStore.upsertChat(
-                            chat.copy(
-                                mutedUntil = if (chat.isMuted) null
-                                else java.time.Instant.now().plusSeconds(8 * 3600).toString(),
-                            ),
-                        )
+                        if (nextMuted) {
+                            applySettingsResult(
+                                mutedUntil = java.time.Instant.now().plusSeconds(8 * 3600).toString(),
+                            )
+                        } else {
+                            applySettingsResult(clearMute = true)
+                        }
                     }
                 },
                 OverflowMenuItem(
                     if (chat.pinned) "Unpin" else "Pin",
                     Icons.Default.PushPin,
                 ) {
+                    val nextPinned = !chat.pinned
                     if (useRemote) {
                         scope.launch {
                             runCatching {
                                 api.putConversationsIdSettings(
                                     chatId,
-                                    ConversationSettingsBody(pinned = !chat.pinned),
+                                    ConversationSettingsBody(pinned = nextPinned),
                                 )
-                            }.onSuccess { dto ->
-                                InMemoryChatStore.upsertChat(dto.toLocalChat())
+                            }.onSuccess { res ->
+                                applySettingsResult(pinned = res.pinned)
                             }.onFailure {
+                                android.util.Log.w("Chat", "pin failed", it)
                                 Toast.makeText(context, "Could not pin (max 3)", Toast.LENGTH_SHORT).show()
                             }
                         }
                     } else {
-                        InMemoryChatStore.upsertChat(chat.copy(pinned = !chat.pinned, favorite = !chat.pinned))
+                        applySettingsResult(pinned = nextPinned)
                     }
                 },
                 OverflowMenuItem(
                     if (chat.archived) "Unarchive" else "Archive",
                     if (chat.archived) Icons.Default.Unarchive else Icons.Default.Archive,
                 ) {
+                    val nextArchived = !chat.archived
                     if (useRemote) {
                         scope.launch {
                             runCatching {
                                 api.putConversationsIdSettings(
                                     chatId,
-                                    ConversationSettingsBody(archived = !chat.archived),
+                                    ConversationSettingsBody(archived = nextArchived),
                                 )
-                            }.onSuccess { dto ->
-                                InMemoryChatStore.upsertChat(dto.toLocalChat())
-                                if (!chat.archived) onBack?.invoke()
+                            }.onSuccess { res ->
+                                applySettingsResult(archived = res.archived)
+                                if (nextArchived) onBack?.invoke()
                             }.onFailure {
+                                android.util.Log.w("Chat", "archive failed", it)
                                 Toast.makeText(context, "Could not archive", Toast.LENGTH_SHORT).show()
                             }
                         }
                     } else {
-                        InMemoryChatStore.upsertChat(chat.copy(archived = !chat.archived))
-                        if (!chat.archived) onBack?.invoke()
+                        applySettingsResult(archived = nextArchived)
+                        if (nextArchived) onBack?.invoke()
                     }
                 },
                 OverflowMenuItem("Report", Icons.Default.Flag, danger = true) {
@@ -496,9 +532,9 @@ fun ChatIdScreen(
                 .weight(1f)
                 .fillMaxWidth()
                 .background(wallpaper),
-        ) {
-            LazyColumn(
-                state = listState,
+    ) {
+        LazyColumn(
+            state = listState,
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
@@ -511,6 +547,8 @@ fun ChatIdScreen(
                         message = msg,
                         isGroup = chat.isGroup,
                         dark = dark,
+                        // WhatsApp: if they blocked you, ticks stay single (never delivered/read).
+                        forceSingleTick = chat.blockedMe,
                         onLongPress = {
                             haptics.tick()
                             actionTarget = msg
@@ -519,8 +557,8 @@ fun ChatIdScreen(
                 }
                 if (peerTyping) {
                     item(key = "typing") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Start,
                         ) {
                             TypingIndicatorBubble()
@@ -530,67 +568,108 @@ fun ChatIdScreen(
             }
         }
 
-        ChatComposer(
-            value = text,
-            onValueChange = { text = it },
-            placeholder = "Message $firstName…",
-            replyPreview = replyTo?.let { r ->
-                if (r.deletedForEveryone) "Original message was deleted" else r.body.ifBlank { "Message" }
-            },
-            onClearReply = { replyTo = null },
-            onAttach = {
-                focusManager.clearFocus(force = true)
-                keyboard?.hide()
-                showAttach = true
-            },
-            onCamera = { onNavigate(Routes.camera("chat:$chatId")) },
-            onSendOrMic = {
-                val body = text.trim()
-                if (body.isNotEmpty()) {
-                    haptics.confirm()
-                    val quoting = replyTo
-                    text = ""
-                    replyTo = null
-                    val replyDto = quoting?.let {
-                        ReplyPreviewDto(id = it.id, text = it.body.takeIf { t -> t.isNotBlank() })
-                    }
-                    val localReply = quoting?.let {
-                        LocalReplyPreview(
-                            id = it.id,
-                            body = if (it.deletedForEveryone) "Original message was deleted" else it.body,
-                            deleted = it.deletedForEveryone,
-                        )
-                    }
-                    if (useRemote) {
-                        RealtimeClient.setTyping(chatId, false)
-                        scope.launch {
-                            try {
-                                val sent = api.postConversationsIdMessages(
-                                    chatId,
-                                    SendMessageBody(
-                                        text = body,
-                                        clientId = UUID.randomUUID().toString(),
-                                        replyTo = replyDto,
-                                    ),
-                                )
-                                val uid = myUserId ?: SessionStore.userId(context)
-                                if (uid != null) {
-                                    InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
-                                }
-                            } catch (_: Exception) {
-                                InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
+        if (chat.blockedByMe) {
+            // WhatsApp-style: composer replaced by Unblock.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
+            ) {
+                HorizontalDivider(color = AivoraColors.ChatDivider, thickness = 1.dp)
+                TextButton(
+                    onClick = {
+                        val peerId = chat.peerUserId
+                        if (useRemote && !peerId.isNullOrBlank()) {
+                            scope.launch {
+                                runCatching { api.deleteBlocksId(peerId) }
+                                    .onSuccess {
+                                        InMemoryChatStore.upsertChat(chat.copy(blockedByMe = false))
+                                        Toast.makeText(context, "Contact unblocked", Toast.LENGTH_SHORT).show()
+                                    }
+                                    .onFailure {
+                                        Toast.makeText(context, "Could not unblock", Toast.LENGTH_SHORT).show()
+                                    }
                             }
+                        } else {
+                            InMemoryChatStore.upsertChat(chat.copy(blockedByMe = false))
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 14.dp),
+                ) {
+                    Text(
+                        "Unblock",
+                        color = AivoraColors.Primary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp,
+                    )
+                }
+            }
+        } else {
+            ChatComposer(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = "Message $firstName…",
+                replyPreview = replyTo?.let { r ->
+                    if (r.deletedForEveryone) "Original message was deleted" else r.body.ifBlank { "Message" }
+                },
+                onClearReply = { replyTo = null },
+                onAttach = {
+                    focusManager.clearFocus(force = true)
+                    keyboard?.hide()
+                    showAttach = true
+                },
+                onCamera = { onNavigate(Routes.camera("chat:$chatId")) },
+                onSendOrMic = {
+                    val body = text.trim()
+                    if (body.isNotEmpty()) {
+                        haptics.confirm()
+                        val quoting = replyTo
+                        text = ""
+                        replyTo = null
+                        val replyDto = quoting?.let {
+                            ReplyPreviewDto(id = it.id, text = it.body.takeIf { t -> t.isNotBlank() })
+                        }
+                        val localReply = quoting?.let {
+                            LocalReplyPreview(
+                                id = it.id,
+                                body = if (it.deletedForEveryone) "Original message was deleted" else it.body,
+                                deleted = it.deletedForEveryone,
+                            )
+                        }
+                        if (useRemote) {
+                            RealtimeClient.setTyping(chatId, false)
+                            scope.launch {
+                                try {
+                                    val sent = api.postConversationsIdMessages(
+                                        chatId,
+                                        SendMessageBody(
+                                            text = body,
+                                            clientId = UUID.randomUUID().toString(),
+                                            replyTo = replyDto,
+                                        ),
+                                    )
+                                    val uid = myUserId ?: SessionStore.userId(context)
+                                    if (uid != null) {
+                                        InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
+                                    }
+                                } catch (_: Exception) {
+                                    InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
+                                }
+                            }
+                        } else {
+                            InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
+                            peerTyping = true
                         }
                     } else {
-                        InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
-                        peerTyping = true
+                        haptics.confirm()
+                        InMemoryChatStore.sendVoice(chatId, durationSec = 8)
                     }
-                } else {
-                    haptics.confirm()
-                    InMemoryChatStore.sendVoice(chatId, durationSec = 8)
-                }
-            },
-        )
+                },
+            )
+        }
     }
 
     if (showAttach) {
@@ -745,7 +824,7 @@ fun ChatIdScreen(
             title = "React",
         ) {
             Row(
-                modifier = Modifier
+                        modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -797,7 +876,7 @@ fun ChatIdScreen(
             title = "Forward to…",
         ) {
             if (destinations.isEmpty()) {
-                Text(
+                        Text(
                     "No other chats yet",
                     color = AivoraColors.TextSecondary,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
@@ -928,8 +1007,10 @@ fun ChatIdScreen(
                         runCatching {
                             api.postBlocks(BlockBody(userId = peerId))
                         }.onSuccess {
+                            InMemoryChatStore.upsertChat(
+                                chat.copy(blockedByMe = true),
+                            )
                             Toast.makeText(context, "Contact blocked", Toast.LENGTH_SHORT).show()
-                            onBack?.invoke()
                         }.onFailure {
                             Toast.makeText(context, "Could not block", Toast.LENGTH_SHORT).show()
                         }
@@ -1013,8 +1094,8 @@ private fun ChatHeader(
             .fillMaxWidth()
             .padding(start = 4.dp, end = 8.dp, bottom = 8.dp)
             .height(72.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
         IconButton(onClick = onBack) {
             Icon(
                 painter = painterResource(AivoraIcons.Back),
@@ -1102,7 +1183,7 @@ private fun DateSeparator(label: String) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         HorizontalDivider(
-            modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f),
             color = AivoraColors.ChatDivider,
         )
         Text(
@@ -1125,10 +1206,12 @@ private fun MessageRow(
     message: LocalMessage,
     isGroup: Boolean,
     dark: Boolean,
+    forceSingleTick: Boolean = false,
     onLongPress: () -> Unit = {},
 ) {
     val mine = message.mine
     val voiceSecs = message.voiceDurationSec
+    val displayStatus = if (forceSingleTick && mine) MessageDeliveryStatus.Sent else message.status
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1297,10 +1380,10 @@ private fun MessageRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (message.starred) {
-                    Icon(
+                Icon(
                         Icons.Default.Star,
                         contentDescription = "Starred",
-                        tint = AivoraColors.Primary,
+                    tint = AivoraColors.Primary,
                         modifier = Modifier.size(12.dp),
                     )
                     Spacer(modifier = Modifier.width(4.dp))
@@ -1325,8 +1408,8 @@ private fun MessageRow(
                     // Always use the ticks vector + explicit tint (TicksRead XML theme-tint hides blue).
                     Icon(
                         painter = painterResource(AivoraIcons.Ticks),
-                        contentDescription = message.status.name,
-                        tint = when (message.status) {
+                        contentDescription = displayStatus.name,
+                        tint = when (displayStatus) {
                             MessageDeliveryStatus.Read -> Color(0xFF53BDEB)
                             MessageDeliveryStatus.Delivered -> AivoraColors.TextSecondary
                             else -> AivoraColors.TextSecondary.copy(alpha = 0.55f)
@@ -1344,8 +1427,8 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int) {
     val bars = remember(seed) {
         val rnd = Random(seed)
         List(28) { 0.25f + rnd.nextFloat() * 0.75f }
-    }
-    Row(
+        }
+        Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.widthIn(min = 200.dp),

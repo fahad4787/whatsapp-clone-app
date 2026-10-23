@@ -462,7 +462,7 @@ interface AivoraApi {
     suspend fun putConversationsIdSettings(
         @Path("id") id: String,
         @Body body: com.aivora.app.data.model.ConversationSettingsBody,
-    ): com.aivora.app.data.model.ConversationDto
+    ): com.aivora.app.data.model.ConversationSettingsResult
 
     @GET("api/calls/history")
     suspend fun getCallsHistory(): okhttp3.ResponseBody
