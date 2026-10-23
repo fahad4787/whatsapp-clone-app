@@ -1,8 +1,10 @@
 package com.aivora.app.ui.feature.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -76,12 +78,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.widget.Toast
+import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.InMemoryStatusStore
 import com.aivora.app.data.local.LocalChat
+import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.ReportRequestBody
 import com.aivora.app.data.toLocalChat
 import com.aivora.app.ui.components.AivoraBottomNav
+import com.aivora.app.ui.components.AivoraBottomSheet
+import com.aivora.app.ui.components.AivoraFilterBar
+import com.aivora.app.ui.components.AivoraFilterOption
 import com.aivora.app.ui.components.AivoraOverflowMenu
+import com.aivora.app.ui.components.AivoraSheetActionList
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.ClearCallLogDialog
 import com.aivora.app.ui.components.CreateCallLinkDialog
@@ -89,11 +99,10 @@ import com.aivora.app.ui.components.OverflowMenuItem
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
 import com.aivora.app.ui.components.StatusRingAvatar
-import com.aivora.app.ui.components.AivoraFilterBar
-import com.aivora.app.ui.components.AivoraFilterOption
+import com.aivora.app.ui.feature.chat.ChatControls
+import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.motion.rememberAivoraHaptics
 import com.aivora.app.ui.navigation.Routes
-import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -435,7 +444,7 @@ private fun HomeFabRes(
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun ChatsTab(
     allChats: List<LocalChat>,
@@ -446,6 +455,15 @@ private fun ChatsTab(
     onNavigate: (String) -> Unit,
     onOpenChat: (String) -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val haptics = rememberAivoraHaptics()
+    val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
+    val api = remember {
+        NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
+    }
+    var menuChat by remember { mutableStateOf<LocalChat?>(null) }
+
     val chats = remember(allChats, query, filter) {
         allChats
             .asSequence()
@@ -511,28 +529,36 @@ private fun ChatsTab(
                 }
             }
             items(chats, key = { it.id }) { chat ->
+                // Live row from store so mute/pin/archive icons update after sheet actions.
+                val row = allChats.find { it.id == chat.id } ?: chat
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onOpenChat(chat.id) }
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                        .combinedClickable(
+                            onClick = { onOpenChat(row.id) },
+                            onLongClick = {
+                                haptics.tick()
+                                menuChat = row
+                            },
+                        )
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(chat.title, size = 48)
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Avatar(row.title, size = 52)
+                    Spacer(modifier = Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                chat.title,
+                                row.title,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium,
+                                fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 color = AivoraColors.Ink,
                                 modifier = Modifier.weight(1f, fill = false),
                             )
-                            if (chat.pinned) {
-                                Spacer(Modifier.width(4.dp))
+                            if (row.pinned) {
+                                Spacer(Modifier.width(6.dp))
                                 Icon(
                                     Icons.Default.PushPin,
                                     contentDescription = "Pinned",
@@ -540,8 +566,8 @@ private fun ChatsTab(
                                     modifier = Modifier.size(14.dp),
                                 )
                             }
-                            if (chat.isMuted) {
-                                Spacer(Modifier.width(4.dp))
+                            if (row.isMuted) {
+                                Spacer(Modifier.width(6.dp))
                                 Icon(
                                     Icons.Default.NotificationsOff,
                                     contentDescription = "Muted",
@@ -550,25 +576,27 @@ private fun ChatsTab(
                                 )
                             }
                         }
+                        Spacer(Modifier.height(2.dp))
                         Text(
-                            chat.preview,
+                            row.preview,
                             style = MaterialTheme.typography.bodyMedium,
                             color = AivoraColors.TextSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                    Spacer(Modifier.width(10.dp))
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            chat.time,
+                            row.time,
                             style = MaterialTheme.typography.labelMedium,
-                            fontSize = 11.sp,
-                            color = if (chat.unread > 0) AivoraColors.Primary
+                            fontSize = 12.sp,
+                            color = if (row.unread > 0) AivoraColors.Primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        if (chat.unread > 0) {
-                            Spacer(modifier = Modifier.height(3.dp))
-                            UnreadBadge(chat.unread)
+                        if (row.unread > 0) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            UnreadBadge(row.unread)
                         }
                     }
                 }
@@ -579,19 +607,19 @@ private fun ChatsTab(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onNavigate(Routes.LockedChats) }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(52.dp)
                                 .clip(CircleShape)
                                 .background(AivoraColors.Primary.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(Icons.Default.Lock, null, tint = AivoraColors.Primary)
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(14.dp))
                         Column {
                             Text("Locked chats", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                             Text(
@@ -603,6 +631,56 @@ private fun ChatsTab(
                     }
                 }
             }
+        }
+    }
+
+    menuChat?.let { target ->
+        val live = allChats.find { it.id == target.id } ?: target
+        AivoraBottomSheet(
+            onDismiss = { menuChat = null },
+            title = live.title,
+        ) {
+            AivoraSheetActionList(
+                actions = ChatControls.sheetActions(
+                    chat = live,
+                    scope = scope,
+                    context = context,
+                    api = api,
+                    useRemote = useRemote,
+                    includeSearch = false,
+                    includeClear = false,
+                    includeReport = !live.isGroup,
+                    onDismiss = { menuChat = null },
+                    onViewInfo = {
+                        onNavigate(Routes.ProfileId.replace("{id}", live.id))
+                    },
+                    onReport = {
+                        scope.launch {
+                            runCatching {
+                                api.postReports(
+                                    ReportRequestBody(
+                                        targetUserId = live.peerUserId,
+                                        targetConversationId = live.id,
+                                        reason = "Reported from chats list",
+                                        messageIds = emptyList(),
+                                        block = false,
+                                    ),
+                                )
+                            }.onSuccess {
+                                Toast.makeText(context, "Report sent", Toast.LENGTH_SHORT).show()
+                            }.onFailure {
+                                Toast.makeText(context, "Could not send report", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    onAfterArchive = { archived ->
+                        if (archived && filter != ChatFilter.Archived) {
+                            // Stay on list; archived chat leaves All/Unread/Groups naturally.
+                        }
+                    },
+                ),
+            )
+            Spacer(Modifier.height(8.dp))
         }
     }
 }

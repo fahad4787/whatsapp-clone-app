@@ -104,8 +104,6 @@ import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.LocalReplyPreview
 import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.local.SessionStore
-import com.aivora.app.data.model.BlockBody
-import com.aivora.app.data.model.ConversationSettingsBody
 import com.aivora.app.data.model.EmptyRequestBody
 import com.aivora.app.data.model.ForwardMessageBody
 import com.aivora.app.data.model.ReactionBody
@@ -214,27 +212,6 @@ fun ChatIdScreen(
         chat.isGroup -> "tap for group info"
         peerOnline -> "Online"
         else -> "Offline"
-    }
-
-    fun applySettingsResult(
-        archived: Boolean? = null,
-        pinned: Boolean? = null,
-        mutedUntil: String? = null,
-        clearMute: Boolean = false,
-    ) {
-        val current = InMemoryChatStore.chat(chatId)
-        InMemoryChatStore.upsertChat(
-            current.copy(
-                archived = archived ?: current.archived,
-                pinned = pinned ?: current.pinned,
-                favorite = pinned ?: current.favorite,
-                mutedUntil = when {
-                    clearMute -> null
-                    mutedUntil != null -> mutedUntil
-                    else -> current.mutedUntil
-                },
-            ),
-        )
     }
 
     DisposableEffect(chatId) {
@@ -383,31 +360,9 @@ fun ChatIdScreen(
                     if (chat.isMuted) "Unmute" else "Mute notifications",
                     if (chat.isMuted) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
                 ) {
-                    val nextMuted = !chat.isMuted
-                    if (useRemote) {
-                        scope.launch {
-                            runCatching {
-                                api.putConversationsIdSettings(
-                                    chatId,
-                                    ConversationSettingsBody(muted = nextMuted),
-                                )
-                            }.onSuccess { res ->
-                                applySettingsResult(
-                                    mutedUntil = res.mutedUntil,
-                                    clearMute = res.mutedUntil.isNullOrBlank(),
-                                )
-                            }.onFailure {
-                                android.util.Log.w("Chat", "mute failed", it)
-                                Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    } else {
-                        if (nextMuted) {
-                            applySettingsResult(
-                                mutedUntil = java.time.Instant.now().plusSeconds(8 * 3600).toString(),
-                            )
-                        } else {
-                            applySettingsResult(clearMute = true)
+                    scope.launch {
+                        if (!ChatControls.toggleMute(api, useRemote, chat)) {
+                            Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
@@ -415,48 +370,23 @@ fun ChatIdScreen(
                     if (chat.pinned) "Unpin" else "Pin",
                     Icons.Default.PushPin,
                 ) {
-                    val nextPinned = !chat.pinned
-                    if (useRemote) {
-                        scope.launch {
-                            runCatching {
-                                api.putConversationsIdSettings(
-                                    chatId,
-                                    ConversationSettingsBody(pinned = nextPinned),
-                                )
-                            }.onSuccess { res ->
-                                applySettingsResult(pinned = res.pinned)
-                            }.onFailure {
-                                android.util.Log.w("Chat", "pin failed", it)
-                                Toast.makeText(context, "Could not pin (max 3)", Toast.LENGTH_SHORT).show()
-                            }
+                    scope.launch {
+                        if (!ChatControls.togglePin(api, useRemote, chat)) {
+                            Toast.makeText(context, "Could not pin (max 3)", Toast.LENGTH_SHORT).show()
                         }
-                    } else {
-                        applySettingsResult(pinned = nextPinned)
                     }
                 },
                 OverflowMenuItem(
                     if (chat.archived) "Unarchive" else "Archive",
                     if (chat.archived) Icons.Default.Unarchive else Icons.Default.Archive,
                 ) {
-                    val nextArchived = !chat.archived
-                    if (useRemote) {
-                        scope.launch {
-                            runCatching {
-                                api.putConversationsIdSettings(
-                                    chatId,
-                                    ConversationSettingsBody(archived = nextArchived),
-                                )
-                            }.onSuccess { res ->
-                                applySettingsResult(archived = res.archived)
-                                if (nextArchived) onBack?.invoke()
-                            }.onFailure {
-                                android.util.Log.w("Chat", "archive failed", it)
-                                Toast.makeText(context, "Could not archive", Toast.LENGTH_SHORT).show()
-                            }
+                    val willArchive = !chat.archived
+                    scope.launch {
+                        if (!ChatControls.toggleArchive(api, useRemote, chat)) {
+                            Toast.makeText(context, "Could not archive", Toast.LENGTH_SHORT).show()
+                        } else if (willArchive) {
+                            onBack?.invoke()
                         }
-                    } else {
-                        applySettingsResult(archived = nextArchived)
-                        if (nextArchived) onBack?.invoke()
                     }
                 },
                 OverflowMenuItem("Report", Icons.Default.Flag, danger = true) {
@@ -482,8 +412,23 @@ fun ChatIdScreen(
                         showReportSent = true
                     }
                 },
-                OverflowMenuItem("Block", Icons.Default.Block, danger = true) {
-                    showBlockConfirm = true
+                OverflowMenuItem(
+                    if (chat.blockedByMe) "Unblock" else "Block",
+                    Icons.Default.Block,
+                    danger = !chat.blockedByMe,
+                ) {
+                    if (chat.blockedByMe) {
+                        scope.launch {
+                            val ok = ChatControls.unblock(api, useRemote, chat)
+                            Toast.makeText(
+                                context,
+                                if (ok) "Contact unblocked" else "Could not unblock",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    } else {
+                        showBlockConfirm = true
+                    }
                 },
                 OverflowMenuItem("Clear chat", Icons.Default.Delete, danger = true) {
                     showClearChat = true
@@ -579,20 +524,13 @@ fun ChatIdScreen(
                 HorizontalDivider(color = AivoraColors.ChatDivider, thickness = 1.dp)
                 TextButton(
                     onClick = {
-                        val peerId = chat.peerUserId
-                        if (useRemote && !peerId.isNullOrBlank()) {
-                            scope.launch {
-                                runCatching { api.deleteBlocksId(peerId) }
-                                    .onSuccess {
-                                        InMemoryChatStore.upsertChat(chat.copy(blockedByMe = false))
-                                        Toast.makeText(context, "Contact unblocked", Toast.LENGTH_SHORT).show()
-                                    }
-                                    .onFailure {
-                                        Toast.makeText(context, "Could not unblock", Toast.LENGTH_SHORT).show()
-                                    }
-                            }
-                        } else {
-                            InMemoryChatStore.upsertChat(chat.copy(blockedByMe = false))
+                        scope.launch {
+                            val ok = ChatControls.unblock(api, useRemote, chat)
+                            Toast.makeText(
+                                context,
+                                if (ok) "Contact unblocked" else "Could not unblock",
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         }
                     },
                     modifier = Modifier
@@ -1001,22 +939,13 @@ fun ChatIdScreen(
             confirmDanger = true,
             onConfirm = {
                 showBlockConfirm = false
-                val peerId = chat.peerUserId
-                if (useRemote && !peerId.isNullOrBlank()) {
-                    scope.launch {
-                        runCatching {
-                            api.postBlocks(BlockBody(userId = peerId))
-                        }.onSuccess {
-                            InMemoryChatStore.upsertChat(
-                                chat.copy(blockedByMe = true),
-                            )
-                            Toast.makeText(context, "Contact blocked", Toast.LENGTH_SHORT).show()
-                        }.onFailure {
-                            Toast.makeText(context, "Could not block", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                } else {
-                    Toast.makeText(context, "No peer to block", Toast.LENGTH_SHORT).show()
+                scope.launch {
+                    val ok = ChatControls.block(api, useRemote, chat)
+                    Toast.makeText(
+                        context,
+                        if (ok) "Contact blocked" else "Could not block",
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
             },
             onDismiss = { showBlockConfirm = false },
