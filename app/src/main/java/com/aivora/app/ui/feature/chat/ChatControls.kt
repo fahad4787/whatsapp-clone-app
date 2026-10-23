@@ -19,6 +19,7 @@ import com.aivora.app.data.local.LocalChat
 import com.aivora.app.data.model.BlockBody
 import com.aivora.app.data.model.ConversationSettingsBody
 import com.aivora.app.ui.components.AivoraSheetAction
+import com.aivora.app.ui.components.OverflowMenuItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -260,5 +261,64 @@ object ChatControls {
                 },
             )
         }
+    }
+
+    /** Same actions as [sheetActions], shaped for the chat ⋮ overflow menu. */
+    fun overflowMenuItems(
+        chat: LocalChat,
+        scope: CoroutineScope,
+        context: Context,
+        api: AivoraApi,
+        useRemote: Boolean,
+        includeSearch: Boolean = true,
+        includeClear: Boolean = true,
+        includeReport: Boolean = true,
+        includeMedia: Boolean = false,
+        onDismiss: () -> Unit,
+        onSearch: (() -> Unit)? = null,
+        onClear: (() -> Unit)? = null,
+        onReport: (() -> Unit)? = null,
+        onViewInfo: (() -> Unit)? = null,
+        onMedia: (() -> Unit)? = null,
+        onBlockRequest: (() -> Unit)? = null,
+        onAfterArchive: ((archived: Boolean) -> Unit)? = null,
+    ): List<OverflowMenuItem> {
+        val sheets = sheetActions(
+            chat = chat,
+            scope = scope,
+            context = context,
+            api = api,
+            useRemote = useRemote,
+            includeSearch = includeSearch,
+            includeClear = includeClear,
+            includeReport = includeReport,
+            onDismiss = onDismiss,
+            onSearch = onSearch,
+            onClear = onClear,
+            onReport = onReport,
+            onViewInfo = onViewInfo,
+            onAfterArchive = onAfterArchive,
+        ).toMutableList()
+        if (includeMedia && onMedia != null) {
+            val insertAt = sheets.indexOfFirst { it.label == "Search" }.let { if (it < 0) 1 else it + 1 }
+            sheets.add(
+                insertAt.coerceAtMost(sheets.size),
+                AivoraSheetAction("Media", Icons.Default.Photo) {
+                    onDismiss()
+                    onMedia()
+                },
+            )
+        }
+        // Prefer confirm dialog for block when provided.
+        if (onBlockRequest != null && !chat.blockedByMe && !chat.isGroup) {
+            val idx = sheets.indexOfFirst { it.label == "Block" }
+            if (idx >= 0) {
+                sheets[idx] = AivoraSheetAction("Block", Icons.Default.Block, danger = true) {
+                    onDismiss()
+                    onBlockRequest()
+                }
+            }
+        }
+        return sheets.map { OverflowMenuItem(it.label, it.icon, it.danger, it.onClick) }
     }
 }

@@ -100,5 +100,6 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         starred = starred,
         forwarded = forwarded,
         conversationId = conversationId,
+        createdAtIso = createdAt,
     )
 }

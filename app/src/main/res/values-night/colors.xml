@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg_app">#111B21</color>
+    <!-- Match Compose DarkBackground — avoids splash→home flash. -->
+    <color name="bg_app">#0B141A</color>
 </resources>

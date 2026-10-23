@@ -79,13 +79,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import com.aivora.app.data.ChatRepository
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.InMemoryStatusStore
 import com.aivora.app.data.local.LocalChat
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.ReportRequestBody
-import com.aivora.app.data.toLocalChat
+import com.aivora.app.data.realtime.RealtimeClient
 import com.aivora.app.ui.components.AivoraBottomNav
 import com.aivora.app.ui.components.AivoraBottomSheet
 import com.aivora.app.ui.components.AivoraFilterBar
@@ -145,13 +149,14 @@ fun HomeScreen(
     var showClearCallLog by remember { mutableStateOf(false) }
     var callLogCleared by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val allChats by InMemoryChatStore.chats.collectAsState()
     val unreadTotal = remember(allChats) {
         allChats.filterNot { it.archived }.sumOf { it.unread }
     }
 
     LaunchedEffect(Unit) {
-        val token = com.aivora.app.data.local.SessionStore.accessToken(context)
+        val token = SessionStore.accessToken(context)
         if (token.isNullOrBlank()) {
             InMemoryChatStore.useOfflineSeed()
             return@LaunchedEffect
@@ -160,31 +165,23 @@ fun HomeScreen(
         InMemoryChatStore.hydrateFromCache(
             com.aivora.app.data.local.ChatListCache.load(context),
         )
-        val api = com.aivora.app.data.api.NetworkModule.api(
-            com.aivora.app.data.api.NetworkModule.okHttp {
-                com.aivora.app.data.local.SessionStore.accessToken(context)
-            },
-        )
+        val api = ChatRepository.api()
         try {
-            if (com.aivora.app.data.local.SessionStore.userId(context) == null) {
-                runCatching { api.getMe().id?.let { com.aivora.app.data.local.SessionStore.saveUserId(context, it) } }
+            if (SessionStore.userId(context) == null) {
+                runCatching { api.getMe().id?.let { SessionStore.saveUserId(context, it) } }
             }
-            val remote = api.getConversations().items.map { it.toLocalChat() }
-            InMemoryChatStore.replaceFromRemote(remote)
-            com.aivora.app.data.local.ChatListCache.save(context, remote)
-            com.aivora.app.data.realtime.RealtimeClient.startFromSession(context)
+            ChatRepository.refreshConversations(context)
+            RealtimeClient.startFromSession(context)
         } catch (_: Exception) {
             /* keep cache / last remote list; do not flash seed while logged in */
         }
-        // Backup poll only when WS is down (live updates come from RealtimeClient).
-        while (true) {
-            kotlinx.coroutines.delay(20_000)
-            if (com.aivora.app.data.realtime.RealtimeClient.connected.value) continue
-            try {
-                val remote = api.getConversations().items.map { it.toLocalChat() }
-                InMemoryChatStore.replaceFromRemote(remote)
-                com.aivora.app.data.local.ChatListCache.save(context, remote)
-            } catch (_: Exception) { /* ignore */ }
+        // Backup poll only while foreground + WS down.
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                kotlinx.coroutines.delay(20_000)
+                if (RealtimeClient.connected.value) continue
+                ChatRepository.refreshConversations(context)
+            }
         }
     }
 

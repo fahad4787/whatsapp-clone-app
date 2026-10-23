@@ -36,6 +36,26 @@ val AivoraTweenMed = tween<Float>(durationMillis = 160, easing = AivoraEmphasize
 const val AivoraNavFadeMs = 120
 const val AivoraNavSlideMs = 120
 
+/** System animator scale, refreshed from Activity resume. */
+object MotionPrefs {
+    @Volatile
+    var animatorDurationScale: Float = 1f
+        private set
+
+    fun refresh(context: android.content.Context) {
+        animatorDurationScale = runCatching {
+            Settings.Global.getFloat(
+                context.contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f,
+            )
+        }.getOrDefault(1f)
+    }
+
+    fun scaledNavFadeMs(): Int =
+        (AivoraNavFadeMs * animatorDurationScale).toInt().coerceAtLeast(0)
+}
+
 @Composable
 fun rememberReducedMotion(): Boolean {
     val context = LocalContext.current

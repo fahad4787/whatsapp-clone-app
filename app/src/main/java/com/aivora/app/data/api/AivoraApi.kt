@@ -455,6 +455,7 @@ interface AivoraApi {
         @Path("id") id: String,
         @Query("q") q: String? = null,
         @Query("limit") limit: Int? = null,
+        @Query("before") before: String? = null,
     ): com.aivora.app.data.model.MessageListDto
 
     @GET("api/me/username")

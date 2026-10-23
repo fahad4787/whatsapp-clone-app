@@ -9,26 +9,28 @@ import androidx.compose.animation.fadeOut
 import androidx.navigation.NavBackStackEntry
 import com.aivora.app.ui.motion.AivoraEmphasizedAccel
 import com.aivora.app.ui.motion.AivoraEmphasizedDecel
-import com.aivora.app.ui.motion.AivoraNavFadeMs
+import com.aivora.app.ui.motion.MotionPrefs
 
 /**
  * Lightweight fade-only navigation — cheaper on low-RAM devices than slide+fade.
+ * Duration follows system animator scale (0 = instant).
  */
-private val FadeInSpec = tween<Float>(AivoraNavFadeMs, easing = AivoraEmphasizedDecel)
-private val FadeOutSpec = tween<Float>(AivoraNavFadeMs - 20, easing = AivoraEmphasizedAccel)
-
 val NavEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-    fadeIn(FadeInSpec)
+    val ms = MotionPrefs.scaledNavFadeMs()
+    if (ms == 0) EnterTransition.None else fadeIn(tween(ms, easing = AivoraEmphasizedDecel))
 }
 
 val NavExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-    fadeOut(FadeOutSpec)
+    val ms = MotionPrefs.scaledNavFadeMs()
+    if (ms == 0) ExitTransition.None else fadeOut(tween((ms - 20).coerceAtLeast(0), easing = AivoraEmphasizedAccel))
 }
 
 val NavPopEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-    fadeIn(FadeInSpec)
+    val ms = MotionPrefs.scaledNavFadeMs()
+    if (ms == 0) EnterTransition.None else fadeIn(tween(ms, easing = AivoraEmphasizedDecel))
 }
 
 val NavPopExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-    fadeOut(FadeOutSpec)
+    val ms = MotionPrefs.scaledNavFadeMs()
+    if (ms == 0) ExitTransition.None else fadeOut(tween((ms - 20).coerceAtLeast(0), easing = AivoraEmphasizedAccel))
 }

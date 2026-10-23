@@ -261,6 +261,26 @@ object InMemoryChatStore {
     }
 
     /**
+     * Prepend older history (scroll-up). Keeps newest messages; soft-cap at 2× window.
+     * @return number of newly inserted messages
+     */
+    fun prependOlderMessages(chatId: String, older: List<LocalMessage>): Int {
+        if (older.isEmpty()) return 0
+        val flow = messageFlow(chatId)
+        var added = 0
+        flow.update { current ->
+            val have = current.map { it.id }.toHashSet()
+            val unique = older.filter { it.id !in have }
+            added = unique.size
+            if (unique.isEmpty()) return@update current
+            val merged = unique + current
+            val softMax = MAX_IN_MEMORY_MESSAGES * 2
+            if (merged.size > softMax) merged.takeLast(softMax) else merged
+        }
+        return added
+    }
+
+    /**
      * Replace the message list for a chat (e.g. after a remote fetch/poll).
      * Pass [expectedEpoch] from [messageEpoch] before the network call so a
      * clear/delete that happened meanwhile is not overwritten.

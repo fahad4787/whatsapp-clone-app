@@ -35,7 +35,19 @@ object NetworkModule {
             .build()
     }
 
-    fun okHttp(tokenProvider: () -> String?): OkHttpClient {
+    /** Process-wide HTTP stack — one connection pool for the whole app. */
+    private val sharedClient: OkHttpClient by lazy { buildOkHttp() }
+
+    private val sharedApi: AivoraApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(BuildConfig.API_BASE_URL)
+            .client(sharedClient)
+            .addConverterFactory(json.asConverterFactory(jsonMedia))
+            .build()
+            .create(AivoraApi::class.java)
+    }
+
+    private fun buildOkHttp(): OkHttpClient {
         val log = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         }
@@ -43,8 +55,11 @@ object NetworkModule {
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .addInterceptor { chain ->
+                val token = runCatching {
+                    SessionStore.accessToken(AivoraApp.instance)
+                }.getOrNull()
                 val req = chain.request().newBuilder().apply {
-                    tokenProvider()?.let { header("Authorization", "Bearer $it") }
+                    token?.let { header("Authorization", "Bearer $it") }
                     header("Accept", "application/json")
                 }.build()
                 chain.proceed(req)
@@ -54,13 +69,13 @@ object NetworkModule {
             .build()
     }
 
-    fun api(client: OkHttpClient): AivoraApi =
-        Retrofit.Builder()
-            .baseUrl(BuildConfig.API_BASE_URL)
-            .client(client)
-            .addConverterFactory(json.asConverterFactory(jsonMedia))
-            .build()
-            .create(AivoraApi::class.java)
+    /** Shared OkHttp client (token from [SessionStore]). Extra arg kept for call-site compat. */
+    @Suppress("UNUSED_PARAMETER")
+    fun okHttp(tokenProvider: () -> String? = { null }): OkHttpClient = sharedClient
+
+    /** Shared Retrofit API. Extra arg kept for call-site compat. */
+    @Suppress("UNUSED_PARAMETER")
+    fun api(client: OkHttpClient = sharedClient): AivoraApi = sharedApi
 
     /**
      * Synchronously rotate tokens. Returns new access token, or null if session is dead.

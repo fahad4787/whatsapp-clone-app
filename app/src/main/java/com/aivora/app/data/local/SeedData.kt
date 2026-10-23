@@ -81,6 +81,8 @@ data class LocalMessage(
     val starred: Boolean = false,
     val forwarded: Boolean = false,
     val conversationId: String? = null,
+    /** ISO created_at from server — used for older-history paging. */
+    val createdAtIso: String? = null,
 )
 
 /** Seed data for the in-memory store (no persistence). */

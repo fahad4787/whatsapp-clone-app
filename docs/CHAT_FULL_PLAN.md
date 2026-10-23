@@ -1,7 +1,7 @@
 # Full chat plan (Wave 9+)
 
 Date: 2026-10-23  
-Status: **Foundation pause (PERF)** after Wave 12 — see `PERF_FOUNDATION.md`. Then Wave 13 groups.
+Status: **PERF F0–F5 done** after Wave 12 — see `PERF_FOUNDATION.md`. Next: Wave 13 groups.
 
 ## Principle
 

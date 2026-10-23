@@ -18,9 +18,11 @@ import com.aivora.app.data.SessionRestorer
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.push.MessageNotifier
 import com.aivora.app.data.push.PushRegistrar
+import com.aivora.app.ui.motion.MotionPrefs
 import com.aivora.app.ui.navigation.AivoraNavHost
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraTheme
+import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -32,9 +34,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // Defer channel + permission so first frame isn't blocked.
+        MotionPrefs.refresh(this)
+        // After first frame + short settle — never block cold paint with FCM/permission.
         lifecycleScope.launch {
-            delay(400)
+            awaitFrame()
+            delay(250)
             MessageNotifier.ensureChannel(this@MainActivity)
             if (Build.VERSION.SDK_INT >= 33) {
                 requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -50,6 +54,11 @@ class MainActivity : ComponentActivity() {
             }
             AivoraAppRoot(startDestination = start)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        MotionPrefs.refresh(this)
     }
 }
 

@@ -114,13 +114,16 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.snapshotFlow
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
-import com.aivora.app.data.api.NetworkModule
+import com.aivora.app.data.ChatRepository
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.LocalMediaKind
 import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.LocalReplyPreview
-import com.aivora.app.data.local.MessageCache
 import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.EmptyRequestBody
@@ -145,13 +148,13 @@ import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.media.VoiceRecorder
 import com.aivora.app.ui.media.hasMicPermission
 import com.aivora.app.ui.media.rememberMediaActions
-import com.aivora.app.ui.motion.AivoraNavSlideMs
 import com.aivora.app.ui.motion.AivoraTweenFast
 import com.aivora.app.ui.motion.rememberAivoraHaptics
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.random.Random
@@ -167,9 +170,8 @@ fun ChatIdScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val api = remember {
-        NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
-    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val api = remember { ChatRepository.api() }
     val dark = isSystemInDarkTheme()
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
@@ -386,27 +388,43 @@ fun ChatIdScreen(
     // Disk → paint, then network refresh (websocket is primary)
     LaunchedEffect(chatId, useRemote) {
         if (!useRemote) return@LaunchedEffect
-        InMemoryChatStore.hydrateMessages(chatId, MessageCache.load(context, chatId))
+        ChatRepository.hydrateMessagesFromDisk(context, chatId)
     }
     LaunchedEffect(chatId, myUserId, useRemote) {
         if (!useRemote || myUserId == null) return@LaunchedEffect
-        // One fetch on open; while WebSocket is up, skip HTTP polls (WhatsApp-style).
-        suspend fun pullOnce() {
-            val epoch = InMemoryChatStore.messageEpoch(chatId)
-            try {
-                val items = api.getConversationsIdMessages(chatId).items
-                    .map { it.toLocalMessage(myUserId!!) }
-                InMemoryChatStore.replaceMessages(chatId, items, expectedEpoch = epoch)
-                InMemoryChatStore.persistMessages(context, chatId)
-                runCatching { api.postConversationsIdRead(chatId) }
-            } catch (_: Exception) { /* keep cache */ }
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            ChatRepository.refreshMessages(context, chatId, myUserId!!)
+            while (true) {
+                delay(25_000)
+                if (RealtimeClient.connected.value) continue
+                ChatRepository.refreshMessages(context, chatId, myUserId!!)
+            }
         }
-        pullOnce()
-        while (true) {
-            delay(25_000)
-            if (RealtimeClient.connected.value) continue
-            pullOnce()
-        }
+    }
+    // Scroll-up → older history (keep anchor so list doesn't jump)
+    var loadingOlder by remember(chatId) { mutableStateOf(false) }
+    var reachedStart by remember(chatId) { mutableStateOf(false) }
+    LaunchedEffect(chatId, myUserId, useRemote, listState) {
+        if (!useRemote || myUserId == null) return@LaunchedEffect
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collect { first ->
+                if (first > 2 || loadingOlder || reachedStart) return@collect
+                loadingOlder = true
+                val anchorId = messages.firstOrNull()?.id
+                val added = ChatRepository.loadOlderMessages(chatId, myUserId!!)
+                if (added == 0) {
+                    reachedStart = true
+                } else if (anchorId != null) {
+                    val newIndex = InMemoryChatStore.messages(chatId).value
+                        .indexOfFirst { it.id == anchorId }
+                    if (newIndex >= 0) {
+                        // +1 for date separator item above messages
+                        listState.scrollToItem(newIndex + 1)
+                    }
+                }
+                loadingOlder = false
+            }
     }
 
     // Typing only when the composer has real text — focus / keyboard alone must not notify peers.
@@ -488,51 +506,24 @@ fun ChatIdScreen(
             onCall = { onNavigate(Routes.audioCall(chat.title)) },
             onVideo = { onNavigate(Routes.videoCall(chat.title)) },
             onOpenProfile = { onNavigate(Routes.ProfileId.replace("{id}", chatId)) },
-            menuItems = listOf(
-                OverflowMenuItem(
-                    if (chat.isGroup) "Group info" else "View contact",
-                    Icons.Default.Person,
-                ) { onNavigate(Routes.ProfileId.replace("{id}", chatId)) },
-                OverflowMenuItem("Search", Icons.Default.Search) {
-                    showSearch = true
-                },
-                OverflowMenuItem("Media", Icons.Default.Photo) {
-                    onNavigate(Routes.chatMedia(chatId))
-                },
-                OverflowMenuItem(
-                    if (chat.isMuted) "Unmute" else "Mute notifications",
-                    if (chat.isMuted) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
-                ) {
-                    scope.launch {
-                        if (!ChatControls.toggleMute(api, useRemote, chat)) {
-                            Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                },
-                OverflowMenuItem(
-                    if (chat.pinned) "Unpin" else "Pin",
-                    Icons.Default.PushPin,
-                ) {
-                    scope.launch {
-                        if (!ChatControls.togglePin(api, useRemote, chat)) {
-                            Toast.makeText(context, "Could not pin (max 3)", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                },
-                OverflowMenuItem(
-                    if (chat.archived) "Unarchive" else "Archive",
-                    if (chat.archived) Icons.Default.Unarchive else Icons.Default.Archive,
-                ) {
-                    val willArchive = !chat.archived
-                    scope.launch {
-                        if (!ChatControls.toggleArchive(api, useRemote, chat)) {
-                            Toast.makeText(context, "Could not archive", Toast.LENGTH_SHORT).show()
-                        } else if (willArchive) {
-                            onBack?.invoke()
-                        }
-                    }
-                },
-                OverflowMenuItem("Report", Icons.Default.Flag, danger = true) {
+            menuItems = ChatControls.overflowMenuItems(
+                chat = chat,
+                scope = scope,
+                context = context,
+                api = api,
+                useRemote = useRemote,
+                includeSearch = true,
+                includeClear = true,
+                includeReport = !chat.isGroup,
+                includeMedia = true,
+                onDismiss = { showChatMenu = false },
+                onSearch = { showSearch = true },
+                onClear = { showClearChat = true },
+                onViewInfo = { onNavigate(Routes.ProfileId.replace("{id}", chatId)) },
+                onMedia = { onNavigate(Routes.chatMedia(chatId)) },
+                onBlockRequest = { showBlockConfirm = true },
+                onAfterArchive = { archived -> if (archived) onBack?.invoke() },
+                onReport = {
                     if (useRemote) {
                         scope.launch {
                             try {
@@ -554,27 +545,6 @@ fun ChatIdScreen(
                     } else {
                         showReportSent = true
                     }
-                },
-                OverflowMenuItem(
-                    if (chat.blockedByMe) "Unblock" else "Block",
-                    Icons.Default.Block,
-                    danger = !chat.blockedByMe,
-                ) {
-                    if (chat.blockedByMe) {
-                        scope.launch {
-                            val ok = ChatControls.unblock(api, useRemote, chat)
-                            Toast.makeText(
-                                context,
-                                if (ok) "Contact unblocked" else "Could not unblock",
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                    } else {
-                        showBlockConfirm = true
-                    }
-                },
-                OverflowMenuItem("Clear chat", Icons.Default.Delete, danger = true) {
-                    showClearChat = true
                 },
             ),
         )
