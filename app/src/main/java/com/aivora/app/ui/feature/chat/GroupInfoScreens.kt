@@ -51,17 +51,18 @@ import com.aivora.app.data.model.GroupMemberRoleBody
 import com.aivora.app.data.model.GroupMembersBody
 import com.aivora.app.data.model.GroupPrivacyBody
 import com.aivora.app.data.model.MemberDto
-import com.aivora.app.data.model.UserDto
 import com.aivora.app.data.toLocalChat
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraBottomSheet
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.AivoraSheetAction
 import com.aivora.app.ui.components.AivoraSheetActionList
+import com.aivora.app.ui.components.PeopleSelectList
 import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.components.SearchField
+import com.aivora.app.ui.components.SettingsCard
 import com.aivora.app.ui.components.SettingsItem
-import com.aivora.app.ui.components.SettingsList
+import com.aivora.app.ui.components.rememberPeopleSearch
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 import kotlinx.coroutines.Dispatchers
@@ -159,35 +160,41 @@ fun GroupInfoScreen(
                 }
             }
 
-            SettingsList(
-                listOf(
-                    null to buildList {
+            SettingsCard(
+                items = buildList {
+                    add(
+                        SettingsItem(
+                            title = "Media, links, and docs",
+                            icon = Icons.Default.Photo,
+                            onClick = { onNavigate(Routes.chatMedia(chatId)) },
+                        ),
+                    )
+                    if (canEditInfo) {
                         add(
-                            SettingsItem("Media, links, and docs", null, Icons.Default.Photo) {
-                                onNavigate(Routes.chatMedia(chatId))
-                            },
+                            SettingsItem(
+                                title = "Edit group info",
+                                icon = Icons.Default.Edit,
+                                onClick = { editOpen = true },
+                            ),
                         )
-                        if (canEditInfo) {
-                            add(
-                                SettingsItem("Edit group info", null, Icons.Default.Edit) {
-                                    editOpen = true
-                                },
-                            )
-                            add(
-                                SettingsItem("Change group photo", null, Icons.Default.CameraAlt) {
-                                    pickAvatar.launch("image/*")
-                                },
-                            )
-                        }
-                        if (isAdmin) {
-                            add(
-                                SettingsItem("Add participants", null, Icons.Default.PersonAdd) {
-                                    addOpen = true
-                                },
-                            )
-                        }
-                    },
-                ),
+                        add(
+                            SettingsItem(
+                                title = "Change group photo",
+                                icon = Icons.Default.CameraAlt,
+                                onClick = { pickAvatar.launch("image/*") },
+                            ),
+                        )
+                    }
+                    if (isAdmin) {
+                        add(
+                            SettingsItem(
+                                title = "Add participants",
+                                icon = Icons.Default.PersonAdd,
+                                onClick = { addOpen = true },
+                            ),
+                        )
+                    }
+                },
             )
 
             if (isAdmin && conv != null) {
@@ -269,23 +276,27 @@ fun GroupInfoScreen(
                 HorizontalDivider(color = AivoraColors.ChatDivider)
             }
 
-            SettingsList(
-                listOf(
-                    null to buildList {
+            SettingsCard(
+                items = buildList {
+                    add(
+                        SettingsItem(
+                            title = "Exit group",
+                            icon = Icons.Default.ExitToApp,
+                            danger = true,
+                            onClick = { confirmLeave = true },
+                        ),
+                    )
+                    if (isAdmin) {
                         add(
-                            SettingsItem("Exit group", null, Icons.Default.ExitToApp, danger = true) {
-                                confirmLeave = true
-                            },
+                            SettingsItem(
+                                title = "Delete group",
+                                icon = Icons.Default.Delete,
+                                danger = true,
+                                onClick = { confirmDissolve = true },
+                            ),
                         )
-                        if (isAdmin) {
-                            add(
-                                SettingsItem("Delete group", null, Icons.Default.Delete, danger = true) {
-                                    confirmDissolve = true
-                                },
-                            )
-                        }
-                    },
-                ),
+                    }
+                },
             )
         }
     }
@@ -496,47 +507,24 @@ private fun AddParticipantsSheet(
     onDismiss: () -> Unit,
     onAdd: (List<String>) -> Unit,
 ) {
-    val context = LocalContext.current
-    val api = remember { ChatRepository.api() }
     var query by remember { mutableStateOf("") }
-    var people by remember { mutableStateOf<List<UserDto>>(emptyList()) }
     var selected by remember { mutableStateOf(setOf<String>()) }
-
-    LaunchedEffect(query) {
-        val q = query.trim()
-        people = runCatching { api.getPeopleSearch(q.ifBlank { null }, limit = 100).items }
-            .getOrDefault(emptyList())
-            .filter { it.id !in excludeIds }
-    }
+    val search = rememberPeopleSearch(query, excludeIds)
 
     AivoraBottomSheet(onDismiss = onDismiss, title = "Add participants") {
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             SearchField(value = query, onValueChange = { query = it }, placeholder = "Search people")
             Spacer(Modifier.height(8.dp))
-            people.take(12).forEach { user ->
-                val id = user.id ?: return@forEach
-                val name = user.displayName?.takeIf { it.isNotBlank() }
-                    ?: user.phoneDisplay
-                    ?: user.phone
-                    ?: "User"
-                val on = id in selected
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            selected = if (on) selected - id else selected + id
-                        }
-                        .padding(vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Avatar(name, size = 40)
-                    Text(
-                        name + if (on) "  ✓" else "",
-                        modifier = Modifier.padding(start = 12.dp),
-                        fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                    )
-                }
-            }
+            PeopleSelectList(
+                people = search.people,
+                selectedIds = selected,
+                onToggle = { id ->
+                    selected = if (id in selected) selected - id else selected + id
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(280.dp),
+            )
             Spacer(Modifier.height(8.dp))
             PrimaryButton(
                 text = if (selected.isEmpty()) "Add" else "Add (${selected.size})",

@@ -29,8 +29,15 @@ data class TypingData(
 @Serializable
 data class PresenceData(
     @SerialName("user_id") val userId: String? = null,
+    @SerialName("conversation_id") val conversationId: String? = null,
     val online: Boolean = false,
     @SerialName("last_seen_at") val lastSeenAt: String? = null,
+)
+
+@Serializable
+data class PresenceSnapshotData(
+    @SerialName("conversation_id") val conversationId: String? = null,
+    @SerialName("online_user_ids") val onlineUserIds: List<String> = emptyList(),
 )
 
 @Serializable

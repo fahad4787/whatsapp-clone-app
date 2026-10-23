@@ -58,6 +58,14 @@ object RealtimeClient {
     private val _presence = MutableSharedFlow<PresenceData>(extraBufferCapacity = 8)
     val presence: SharedFlow<PresenceData> = _presence.asSharedFlow()
 
+    /** userId → online in any currently tracked chat room. */
+    private val _onlineUsers = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val onlineUsers: StateFlow<Map<String, Boolean>> = _onlineUsers.asStateFlow()
+
+    /** conversationId → set of online peer user ids (chat open in that room). */
+    private val _roomOnline = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+    val roomOnline: StateFlow<Map<String, Set<String>>> = _roomOnline.asStateFlow()
+
     private val joinedRooms = mutableSetOf<String>()
     private val client: OkHttpClient = OkHttpClient.Builder()
         .pingInterval(25, TimeUnit.SECONDS)
@@ -95,6 +103,8 @@ object RealtimeClient {
         if (conversationId.isBlank()) return
         synchronized(joinedRooms) { joinedRooms.remove(conversationId) }
         send("leave", buildJsonObject { put("conversation_id", conversationId) })
+        // Drop local room presence; peers get offline via server leave broadcast.
+        _roomOnline.value = _roomOnline.value.toMutableMap().also { it.remove(conversationId) }
     }
 
     fun setTyping(conversationId: String, typing: Boolean) {
@@ -229,15 +239,46 @@ object RealtimeClient {
             }
             "presence" -> {
                 val obj = frame.data?.jsonObject ?: return
-                _presence.tryEmit(
-                    PresenceData(
-                        userId = obj.string("user_id"),
-                        online = obj.boolean("online") ?: false,
-                        lastSeenAt = obj.string("last_seen_at"),
-                    ),
+                val userId = obj.string("user_id") ?: return
+                val online = obj.boolean("online") ?: false
+                val conversationId = obj.string("conversation_id")
+                val event = PresenceData(
+                    userId = userId,
+                    conversationId = conversationId,
+                    online = online,
+                    lastSeenAt = obj.string("last_seen_at"),
                 )
+                _presence.tryEmit(event)
+                _onlineUsers.value = _onlineUsers.value.toMutableMap().also { it[userId] = online }
+                if (!conversationId.isNullOrBlank()) {
+                    _roomOnline.value = _roomOnline.value.toMutableMap().also { rooms ->
+                        val cur = rooms[conversationId].orEmpty().toMutableSet()
+                        if (online) cur.add(userId) else cur.remove(userId)
+                        rooms[conversationId] = cur
+                    }
+                }
+            }
+            "presence_snapshot" -> {
+                val obj = frame.data?.jsonObject ?: return
+                val conversationId = obj.string("conversation_id") ?: return
+                val ids = obj["online_user_ids"]?.jsonArray
+                    ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                    ?.toSet()
+                    .orEmpty()
+                _roomOnline.value = _roomOnline.value.toMutableMap().also { it[conversationId] = ids }
+                _onlineUsers.value = _onlineUsers.value.toMutableMap().also { map ->
+                    ids.forEach { map[it] = true }
+                }
             }
         }
+    }
+
+    fun isUserOnline(userId: String?): Boolean =
+        !userId.isNullOrBlank() && (_onlineUsers.value[userId] == true)
+
+    fun onlineCountInChat(conversationId: String, excludeUserId: String?): Int {
+        val set = _roomOnline.value[conversationId].orEmpty()
+        return if (excludeUserId.isNullOrBlank()) set.size else set.count { it != excludeUserId }
     }
 
     private fun ackDelivered(messageIds: List<String>) {

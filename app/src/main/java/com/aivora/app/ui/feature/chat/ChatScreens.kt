@@ -202,7 +202,6 @@ fun ChatIdScreen(
     var forwardTarget by remember { mutableStateOf<LocalMessage?>(null) }
     var replyTo by remember(chatId) { mutableStateOf<LocalMessage?>(null) }
     var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
-    var peerOnline by remember { mutableStateOf(true) }
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
     // Per-chat list state so reopen doesn't flash a previous scroll offset.
     val listState = remember(chatId) { androidx.compose.foundation.lazy.LazyListState() }
@@ -317,10 +316,24 @@ fun ChatIdScreen(
     }
     val firstName = chat.title.substringBefore(' ').ifBlank { chat.title }
     val hidePresence = chat.blockedByMe || chat.blockedMe
+    val roomOnlineMap by RealtimeClient.roomOnline.collectAsState()
+    val groupOnlineCount = remember(chatId, roomOnlineMap, myUserId) {
+        RealtimeClient.onlineCountInChat(chatId, myUserId)
+    }
+    val peerOnline = remember(chatId, chat.peerUserId, roomOnlineMap, hidePresence) {
+        if (hidePresence || chat.isGroup) false
+        else {
+            val peerId = chat.peerUserId
+            !peerId.isNullOrBlank() && (roomOnlineMap[chatId]?.contains(peerId) == true)
+        }
+    }
     val subtitle = when {
         hidePresence -> ""
         peerTyping -> "typing…"
-        chat.isGroup -> "tap for group info"
+        chat.isGroup -> when {
+            groupOnlineCount > 0 -> "$groupOnlineCount online · tap for info"
+            else -> "tap for group info"
+        }
         peerOnline -> "Online"
         else -> "Offline"
     }
@@ -370,19 +383,6 @@ fun ChatIdScreen(
         } finally {
             RealtimeClient.leave(chatId)
             RealtimeClient.setTyping(chatId, false)
-        }
-    }
-
-    LaunchedEffect(useRemote, hidePresence) {
-        if (!useRemote) return@LaunchedEffect
-        if (hidePresence) {
-            peerOnline = false
-            return@LaunchedEffect
-        }
-        RealtimeClient.presence.collect { event ->
-            if (event.userId != null && event.userId != myUserId) {
-                peerOnline = event.online
-            }
         }
     }
 

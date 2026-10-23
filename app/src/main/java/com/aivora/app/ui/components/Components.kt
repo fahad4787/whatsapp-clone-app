@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -59,6 +61,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.motion.pressScale
 import com.aivora.app.ui.theme.AivoraColors
@@ -236,6 +239,45 @@ fun SettingsRow(item: SettingsItem) {
     }
 }
 
+/** Non-lazy settings card — safe inside verticalScroll parents (Group info). */
+@Composable
+fun SettingsCard(
+    items: List<SettingsItem>,
+    modifier: Modifier = Modifier,
+    header: String? = null,
+) {
+    if (items.isEmpty()) return
+    Column(modifier = modifier.padding(horizontal = AivoraDimens.CardHorizontal, vertical = AivoraDimens.Space2)) {
+        if (header != null) {
+            Text(
+                header,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+            )
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                .background(AivoraColors.SurfaceMuted),
+        ) {
+            items.forEachIndexed { index, row ->
+                SettingsRow(row)
+                if (index < items.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(
+                            start = if (row.iconRes != null || row.icon != null) 54.dp else 16.dp,
+                        ),
+                        color = AivoraColors.Divider,
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun SettingsList(
     sections: List<Pair<String?, List<SettingsItem>>>,
@@ -348,40 +390,92 @@ fun RadioGroup(
     }
 }
 
-/** Themed filter chip — selected state always uses brand green. */
+data class AivoraFilterOption(
+    val label: String,
+    val badge: Int? = null,
+)
+
+/**
+ * Figma conversation filters (`15:905`): muted track, white elevated active segment.
+ * Inactive = no fill / no outline; active = white + soft shadow + ink semibold.
+ */
 @Composable
-fun ThemeFilterChip(
-    selected: Boolean,
-    onClick: () -> Unit,
-    label: String,
+fun AivoraFilterBar(
+    options: List<AivoraFilterOption>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    androidx.compose.material3.FilterChip(
-        selected = selected,
-        onClick = onClick,
-        modifier = modifier,
-        label = {
-            Text(
-                label,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            )
-        },
-        border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
-            enabled = true,
-            selected = selected,
-            borderColor = AivoraColors.Divider,
-            selectedBorderColor = Color.Transparent,
-            borderWidth = 1.dp,
-            selectedBorderWidth = 0.dp,
-        ),
-        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
-            containerColor = Color.Transparent,
-            labelColor = AivoraColors.TextSecondary,
-            selectedContainerColor = AivoraColors.LightSurface,
-            selectedLabelColor = AivoraColors.Ink,
-        ),
-        shape = RoundedCornerShape(AivoraDimens.RadiusFull),
-    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = AivoraDimens.CardHorizontal)
+            .height(44.dp)
+            .clip(RoundedCornerShape(AivoraDimens.RadiusSm))
+            .background(AivoraColors.SurfaceMuted)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        options.forEachIndexed { index, option ->
+            val selected = index == selectedIndex
+            val interaction = remember { MutableInteractionSource() }
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .then(
+                        if (selected) {
+                            Modifier
+                                .shadow(
+                                    elevation = 3.dp,
+                                    shape = RoundedCornerShape(4.dp),
+                                    ambientColor = Color(0xFF292341).copy(alpha = 0.08f),
+                                    spotColor = Color(0xFF292341).copy(alpha = 0.08f),
+                                )
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(AivoraColors.LightSurface)
+                        } else {
+                            Modifier.clip(RoundedCornerShape(14.dp))
+                        },
+                    )
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        onClick = { onSelect(index) },
+                    ),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    option.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (selected) AivoraColors.InkMuted else Color(0xFF72748D),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val badge = option.badge
+                if (badge != null && badge > 0) {
+                    Spacer(Modifier.width(5.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(AivoraColors.Primary),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            if (badge > 99) "99+" else "$badge",
+                            color = AivoraColors.OnPrimary,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -510,7 +604,13 @@ fun EmptyState(
 }
 
 @Composable
-fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+fun PrimaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    @DrawableRes iconRes: Int? = null,
+) {
     val interaction = remember { MutableInteractionSource() }
     Button(
         onClick = onClick,
@@ -520,11 +620,24 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
             .fillMaxWidth()
             .height(52.dp)
             .pressScale(interaction, pressedScale = 0.98f),
-        colors = ButtonDefaults.buttonColors(containerColor = AivoraColors.Primary),
-        shape = RoundedCornerShape(14.dp),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 6.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = AivoraColors.Primary,
+            contentColor = AivoraColors.OnPrimary,
+            disabledContainerColor = Color(0xFFE9ECEA),
+            disabledContentColor = AivoraColors.TextTertiary,
+        ),
+        shape = RoundedCornerShape(AivoraDimens.RadiusMd),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
     ) {
-        Text(text, fontWeight = FontWeight.SemiBold)
+        if (iconRes != null) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(text, fontWeight = FontWeight.Medium, fontSize = 16.sp)
     }
 }
 
@@ -545,16 +658,3 @@ fun InfoBanner(text: String) {
     )
 }
 
-/** Backward-compatible alias used by older stubs. */
-@Composable
-fun PlaceholderScreen(
-    title: String,
-    subtitle: String? = null,
-    onBack: (() -> Unit)? = null,
-    content: @Composable () -> Unit = {},
-) {
-    AivoraScaffold(title = title, onBack = onBack) {
-        if (subtitle != null) InfoBanner(subtitle)
-        content()
-    }
-}
