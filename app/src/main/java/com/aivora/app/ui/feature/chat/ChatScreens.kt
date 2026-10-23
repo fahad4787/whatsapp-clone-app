@@ -304,12 +304,12 @@ fun ChatIdScreen(
                             try {
                                 val peerId = InMemoryChatStore.chat(chatId).peerUserId
                                 api.postReports(
-                                    mapOf(
-                                        "target_user_id" to peerId,
-                                        "target_conversation_id" to chatId,
-                                        "reason" to "Reported from chat",
-                                        "message_ids" to emptyList<String>(),
-                                        "block" to false,
+                                    com.aivora.app.data.model.ReportRequestBody(
+                                        targetUserId = peerId,
+                                        targetConversationId = chatId,
+                                        reason = "Reported from chat",
+                                        messageIds = emptyList(),
+                                        block = false,
                                     ),
                                 )
                                 showReportSent = true

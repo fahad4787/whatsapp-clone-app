@@ -71,7 +71,7 @@ interface AivoraApi {
 
     @POST("api/reports")
     suspend fun postReports(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Body body: com.aivora.app.data.model.ReportRequestBody,
     ): okhttp3.ResponseBody
 
     @POST("api/conversations/{id}/clear-unstarred")
