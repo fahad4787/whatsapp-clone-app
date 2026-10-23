@@ -256,11 +256,13 @@ fun LoginScreen(
                                                 nationalNumber = phone,
                                             ),
                                         )
-                                        e164Phone = result.phone
+                                        val verifiedPhone = result.phone
+                                            ?: "+${dial.filter { it.isDigit() }}$phone"
+                                        e164Phone = verifiedPhone
                                         otp = ""
                                         if (BuildConfig.DEV_AUTO_OTP) {
                                             // Server OTP_DEV_BYPASS accepts 000000; OTP flow stays for release.
-                                            val fail = completeVerify(result.phone, "000000")
+                                            val fail = completeVerify(verifiedPhone, "000000")
                                             if (fail != null) {
                                                 error = fail
                                                 step = 1
