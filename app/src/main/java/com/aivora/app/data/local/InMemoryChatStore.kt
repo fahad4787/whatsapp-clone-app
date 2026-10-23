@@ -314,19 +314,29 @@ object InMemoryChatStore {
         return true
     }
 
-    /** Insert or replace one message by id (websocket push). */
+    /** Insert or replace one message by id (websocket push / react / star). */
     fun upsertMessage(chatId: String, message: LocalMessage) {
-        val alreadyHad = messageFlow(chatId).value.any { it.id == message.id }
-        messageFlow(chatId).update { list ->
-            val existing = list.find { it.id == message.id }
-            val merged = if (existing != null && message.mine) {
-                message.copy(status = maxStatus(existing.status, message.status))
-            } else {
-                message
+        val flow = messageFlow(chatId)
+        val before = flow.value
+        val existingIdx = before.indexOfFirst { it.id == message.id }
+        val alreadyHad = existingIdx >= 0
+        flow.update { list ->
+            val existing = if (existingIdx >= 0) list[existingIdx] else null
+            val merged = when {
+                existing == null -> message
+                message.mine -> message.copy(status = maxStatus(existing.status, message.status))
+                else -> message
             }
-            val next = list.filterNot { it.id == message.id } + merged
-            if (next.size > MAX_IN_MEMORY_MESSAGES) next.takeLast(MAX_IN_MEMORY_MESSAGES) else next
+            if (existingIdx >= 0) {
+                // Keep order — reacting must not move the bubble to the bottom.
+                list.toMutableList().also { it[existingIdx] = merged }
+            } else {
+                val next = list + merged
+                if (next.size > MAX_IN_MEMORY_MESSAGES) next.takeLast(MAX_IN_MEMORY_MESSAGES) else next
+            }
         }
+        val after = flow.value
+        val isLatest = after.lastOrNull()?.id == message.id
         _chats.update { list ->
             val current = list.find { it.id == chatId }
                 ?: LocalChat(chatId, "Chat", message.body, message.time)
@@ -335,12 +345,11 @@ object InMemoryChatStore {
                 alreadyHad -> current.unread
                 else -> current.unread + 1
             }
+            // Only bump home preview for new / latest messages (not mid-thread reacts).
+            val preview = if (!alreadyHad || isLatest) message.body else current.preview
+            val time = if (!alreadyHad || isLatest) message.time else current.time
             listOf(
-                current.copy(
-                    preview = message.body,
-                    time = message.time,
-                    unread = unread,
-                ),
+                current.copy(preview = preview, time = time, unread = unread),
             ) + list.filterNot { it.id == chatId }
         }
     }

@@ -201,7 +201,8 @@ fun ChatIdScreen(
     var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
     var peerOnline by remember { mutableStateOf(true) }
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
-    val listState = rememberLazyListState()
+    // Per-chat list state so reopen doesn't flash a previous scroll offset.
+    val listState = remember(chatId) { androidx.compose.foundation.lazy.LazyListState() }
     val wallpaper = if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
     fun uploadPickedUri(uri: Uri) {
@@ -428,14 +429,22 @@ fun ChatIdScreen(
         typingSent = false
     }
 
-    // Open at latest message instantly (no top→bottom animation). Animate only
-    // when already near the bottom and new content arrives.
+    // Open pinned to latest; follow new messages only (react/star must not jump scroll).
     var didInitialScroll by remember(chatId) { mutableStateOf(false) }
-    LaunchedEffect(chatId) { didInitialScroll = false }
-    LaunchedEffect(messages.size, peerTyping, imeVisible) {
+    var prevMsgCount by remember(chatId) { mutableStateOf(-1) }
+    LaunchedEffect(chatId) {
+        didInitialScroll = false
+        prevMsgCount = -1
+    }
+    LaunchedEffect(messages.size, messages.lastOrNull()?.id, peerTyping, imeVisible) {
         if (messages.isEmpty()) return@LaunchedEffect
         val index = (messages.lastIndex + if (peerTyping) 1 else 0).coerceAtLeast(0)
+        val grew = prevMsgCount >= 0 && messages.size > prevMsgCount
+        prevMsgCount = messages.size
         if (!didInitialScroll) {
+            listState.scrollToItem(index)
+            // Second pass after layout so we don't flash mid-thread then jump.
+            delay(16)
             listState.scrollToItem(index)
             didInitialScroll = true
             return@LaunchedEffect
@@ -443,8 +452,12 @@ fun ChatIdScreen(
         if (listState.isScrollInProgress) return@LaunchedEffect
         val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
         val nearBottom = lastVisible >= index - 3
-        if (nearBottom || imeVisible) {
-            listState.scrollToItem(index) // snap — animateScroll fights finger scroll on low-RAM
+        if (grew && nearBottom) {
+            listState.scrollToItem(index)
+        } else if (imeVisible && nearBottom) {
+            listState.scrollToItem(index)
+        } else if (peerTyping && nearBottom) {
+            listState.scrollToItem(index)
         }
     }
 
@@ -1702,35 +1715,92 @@ private fun VoiceWaveform(
 private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = null) {
     val context = LocalContext.current
     var playing by remember(mediaUrl) { mutableStateOf(false) }
+    var ready by remember(mediaUrl) { mutableStateOf(false) }
     var progress by remember(mediaUrl) { mutableStateOf(0f) }
     var positionSec by remember(mediaUrl) { mutableStateOf(0) }
-    var player by remember(mediaUrl) { mutableStateOf<MediaPlayer?>(null) }
+    var playWhenReady by remember(mediaUrl) { mutableStateOf(false) }
+    val playerHolder = remember(mediaUrl) { arrayOf<MediaPlayer?>(null) }
+
     DisposableEffect(mediaUrl) {
-        onDispose {
-            runCatching {
-                player?.stop()
-                player?.release()
-            }
-            player = null
+        val url = mediaUrl
+        if (url.isNullOrBlank()) {
+            onDispose { }
+        } else {
+            ready = false
             playing = false
             progress = 0f
             positionSec = 0
+            playWhenReady = false
+            val mp = MediaPlayer()
+            playerHolder[0] = mp
+            try {
+                mp.setDataSource(context, Uri.parse(url))
+                mp.setOnPreparedListener {
+                    ready = true
+                    if (playWhenReady) {
+                        playWhenReady = false
+                        runCatching { mp.start() }
+                        playing = true
+                    }
+                }
+                mp.setOnCompletionListener {
+                    playing = false
+                    progress = 0f
+                    positionSec = 0
+                    runCatching { mp.seekTo(0) }
+                }
+                // Non-blocking — play/pause stays instant after this.
+                mp.prepareAsync()
+            } catch (_: Exception) {
+                ready = false
+                playerHolder[0] = null
+                runCatching { mp.release() }
+            }
+            onDispose {
+                playWhenReady = false
+                playing = false
+                ready = false
+                playerHolder[0] = null
+                runCatching {
+                    mp.reset()
+                    mp.release()
+                }
+            }
         }
     }
-    LaunchedEffect(playing, player) {
-        val mp = player ?: return@LaunchedEffect
+
+    LaunchedEffect(playing, mediaUrl) {
         while (playing) {
-            val dur = mp.duration.coerceAtLeast(1)
+            val mp = playerHolder[0] ?: break
+            val dur = runCatching { mp.duration }.getOrDefault(0).coerceAtLeast(1)
             val pos = runCatching { mp.currentPosition }.getOrDefault(0)
             progress = pos.toFloat() / dur.toFloat()
             positionSec = (pos / 1000).coerceAtLeast(0)
-            delay(40)
+            delay(50)
         }
     }
+
     val bars = remember(seed) {
         val rnd = Random(seed)
         FloatArray(28) { 0.22f + rnd.nextFloat() * 0.78f }
     }
+
+    fun togglePlay() {
+        if (mediaUrl.isNullOrBlank()) return
+        val mp = playerHolder[0]
+        if (playing && mp != null) {
+            runCatching { mp.pause() }
+            playing = false
+            return
+        }
+        if (ready && mp != null) {
+            runCatching { mp.start() }
+            playing = true
+        } else {
+            playWhenReady = true
+        }
+    }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1741,42 +1811,15 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
                 .size(40.dp)
                 .clip(CircleShape)
                 .background(AivoraColors.Primary)
-                .clickable(enabled = !mediaUrl.isNullOrBlank()) {
-                    val url = mediaUrl ?: return@clickable
-                    try {
-                        val current = player
-                        if (playing && current != null) {
-                            current.pause()
-                            playing = false
-                        } else if (current != null && progress > 0f && progress < 0.99f) {
-                            current.start()
-                            playing = true
-                        } else {
-                            val mp = current ?: MediaPlayer().also { player = it }
-                            if (progress <= 0f || progress >= 0.99f) {
-                                mp.reset()
-                                mp.setDataSource(context, Uri.parse(url))
-                                mp.setOnCompletionListener {
-                                    playing = false
-                                    progress = 1f
-                                    positionSec = durationSec
-                                }
-                                mp.prepare()
-                            }
-                            mp.start()
-                            playing = true
-                        }
-                    } catch (_: Exception) {
-                        playing = false
-                        runCatching {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                        }
-                    }
-                },
+                .clickable(enabled = !mediaUrl.isNullOrBlank(), onClick = { togglePlay() }),
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                if (playing) "❚❚" else "▶",
+                when {
+                    playing -> "❚❚"
+                    playWhenReady && !ready -> "…"
+                    else -> "▶"
+                },
                 color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
