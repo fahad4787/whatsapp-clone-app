@@ -81,7 +81,13 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
             closed = p.closed,
             totalVoters = p.totalVoters,
             options = p.options.map { o ->
-                LocalPollOption(id = o.id.orEmpty(), text = o.text.orEmpty(), votes = o.votes, mine = o.mine)
+                // Never trust DTO `mine` from WS (computed for the voter, not the viewer).
+                LocalPollOption(
+                    id = o.id.orEmpty(),
+                    text = o.text.orEmpty(),
+                    votes = o.votes,
+                    mine = o.voterIds.contains(myUserId),
+                )
             },
         )
     }
@@ -98,6 +104,12 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         }
     }
     val localEvent = if (deleted) null else event?.let { e ->
+        val myAnswer = when {
+            e.going.orEmpty().any { it.userId == myUserId } -> "going"
+            e.maybe.orEmpty().any { it.userId == myUserId } -> "maybe"
+            e.notGoing.orEmpty().any { it.userId == myUserId } -> "not_going"
+            else -> null
+        }
         LocalEvent(
             title = e.title.orEmpty(),
             description = e.description,
@@ -109,7 +121,7 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
             going = e.counts?.going ?: 0,
             maybe = e.counts?.maybe ?: 0,
             notGoing = e.counts?.notGoing ?: 0,
-            myAnswer = e.myAnswer,
+            myAnswer = myAnswer,
         )
     }
     val disappeared = !deleted && (
@@ -167,5 +179,6 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         event = localEvent,
         expiresAtIso = expiresAt,
         disappeared = disappeared,
+        system = system,
     )
 }

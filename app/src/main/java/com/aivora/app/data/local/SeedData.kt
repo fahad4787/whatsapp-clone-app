@@ -127,6 +127,8 @@ data class LocalMessage(
     val event: LocalEvent? = null,
     val expiresAtIso: String? = null,
     val disappeared: Boolean = false,
+    /** Centered WhatsApp-style info (e.g. disappearing messages). */
+    val system: Boolean = false,
 )
 
 /** Seed data for the in-memory store (no persistence). */

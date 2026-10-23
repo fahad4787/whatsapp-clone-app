@@ -25,8 +25,8 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -34,9 +34,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
@@ -48,12 +50,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.SessionStore
@@ -63,6 +69,7 @@ import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
+import com.aivora.app.ui.theme.AivoraTheme
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -291,64 +298,82 @@ fun EventCreateChatScreen(
         )
     }
 
-    if (showDate) {
-        val state = rememberDatePickerState(
-            initialSelectedDateMillis = (date ?: LocalDate.now())
-                .atStartOfDay(ZoneOffset.UTC)
-                .toInstant()
-                .toEpochMilli(),
-        )
-        DatePickerDialog(
-            onDismissRequest = { showDate = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        state.selectedDateMillis?.let { millis ->
-                            date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
-                        }
-                        showDate = false
+    // Force light Aivora chrome so pickers don't follow system dark / purple defaults.
+    if (showDate || showStartTime || showEndTime || showZone) {
+        AivoraTheme(darkTheme = false) {
+            if (showDate) {
+                val state = rememberDatePickerState(
+                    initialSelectedDateMillis = (date ?: LocalDate.now())
+                        .atStartOfDay(ZoneOffset.UTC)
+                        .toInstant()
+                        .toEpochMilli(),
+                )
+                DatePickerDialog(
+                    onDismissRequest = { showDate = false },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                state.selectedDateMillis?.let { millis ->
+                                    date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                                }
+                                showDate = false
+                            },
+                        ) { Text("OK", color = AivoraColors.Primary, fontWeight = FontWeight.SemiBold) }
                     },
-                ) { Text("OK", color = AivoraColors.Primary) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDate = false }) {
-                    Text("Cancel", color = AivoraColors.TextSecondary)
+                    dismissButton = {
+                        TextButton(onClick = { showDate = false }) {
+                            Text("Cancel", color = AivoraColors.TextSecondary)
+                        }
+                    },
+                    colors = DatePickerDefaults.colors(
+                        containerColor = AivoraColors.LightSurface,
+                    ),
+                ) {
+                    DatePicker(
+                        state = state,
+                        colors = DatePickerDefaults.colors(
+                            containerColor = AivoraColors.LightSurface,
+                            selectedDayContainerColor = AivoraColors.Primary,
+                            selectedDayContentColor = Color.White,
+                            todayDateBorderColor = AivoraColors.Primary,
+                            selectedYearContainerColor = AivoraColors.Primary,
+                            selectedYearContentColor = Color.White,
+                        ),
+                    )
                 }
-            },
-        ) {
-            DatePicker(state = state)
+            }
+            if (showStartTime) {
+                EventTimePickerDialog(
+                    initial = startTime ?: LocalTime.now().withSecond(0).withNano(0),
+                    onDismiss = { showStartTime = false },
+                    onConfirm = {
+                        startTime = it
+                        showStartTime = false
+                    },
+                )
+            }
+            if (showEndTime) {
+                EventTimePickerDialog(
+                    initial = endTime
+                        ?: (startTime?.plusHours(1) ?: LocalTime.now().plusHours(1).withSecond(0).withNano(0)),
+                    onDismiss = { showEndTime = false },
+                    onConfirm = {
+                        endTime = it
+                        showEndTime = false
+                    },
+                )
+            }
+            if (showZone) {
+                TimezonePickerDialog(
+                    selected = zoneId,
+                    onDismiss = { showZone = false },
+                    onSelect = {
+                        zoneId = it
+                        showZone = false
+                    },
+                )
+            }
         }
-    }
-
-    if (showStartTime) {
-        EventTimePickerDialog(
-            initial = startTime ?: LocalTime.now().withSecond(0).withNano(0),
-            onDismiss = { showStartTime = false },
-            onConfirm = {
-                startTime = it
-                showStartTime = false
-            },
-        )
-    }
-    if (showEndTime) {
-        EventTimePickerDialog(
-            initial = endTime ?: (startTime?.plusHours(1) ?: LocalTime.now().plusHours(1).withSecond(0).withNano(0)),
-            onDismiss = { showEndTime = false },
-            onConfirm = {
-                endTime = it
-                showEndTime = false
-            },
-        )
-    }
-    if (showZone) {
-        TimezonePickerDialog(
-            selected = zoneId,
-            onDismiss = { showZone = false },
-            onSelect = {
-                zoneId = it
-                showZone = false
-            },
-        )
     }
 }
 
@@ -364,20 +389,66 @@ private fun EventTimePickerDialog(
         initialMinute = initial.minute,
         is24Hour = false,
     )
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(LocalTime.of(state.hour, state.minute)) },
-            ) { Text("OK", color = AivoraColors.Primary) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = AivoraColors.TextSecondary)
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = AivoraColors.LightSurface,
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    "Select time",
+                    fontWeight = FontWeight.SemiBold,
+                    color = AivoraColors.Ink,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                )
+                TimePicker(
+                    state = state,
+                    colors = TimePickerDefaults.colors(
+                        clockDialColor = AivoraColors.SurfaceMuted,
+                        clockDialSelectedContentColor = Color.White,
+                        clockDialUnselectedContentColor = AivoraColors.Ink,
+                        selectorColor = AivoraColors.Primary,
+                        containerColor = AivoraColors.LightSurface,
+                        periodSelectorBorderColor = AivoraColors.BorderMuted,
+                        periodSelectorSelectedContainerColor = AivoraColors.PrimarySoft,
+                        periodSelectorUnselectedContainerColor = AivoraColors.SurfaceMuted,
+                        periodSelectorSelectedContentColor = AivoraColors.PrimaryDark,
+                        periodSelectorUnselectedContentColor = AivoraColors.TextSecondary,
+                        timeSelectorSelectedContainerColor = AivoraColors.PrimarySoft,
+                        timeSelectorUnselectedContainerColor = AivoraColors.SurfaceMuted,
+                        timeSelectorSelectedContentColor = AivoraColors.PrimaryDark,
+                        timeSelectorUnselectedContentColor = AivoraColors.Ink,
+                    ),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel", color = AivoraColors.TextSecondary)
+                    }
+                    TextButton(
+                        onClick = { onConfirm(LocalTime.of(state.hour, state.minute)) },
+                    ) {
+                        Text("OK", color = AivoraColors.Primary, fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
-        },
-        text = { TimePicker(state = state) },
-    )
+        }
+    }
 }
 
 @Composable
@@ -391,30 +462,57 @@ private fun TimezonePickerDialog(
         ids.addAll(CommonZones)
         ids.map { ZoneId.of(it) }
     }
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Timezone", fontWeight = FontWeight.SemiBold) },
-        text = {
-            LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
-                items(zones, key = { it.id }) { z ->
-                    Text(
-                        formatZoneLabel(z),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(z) }
-                            .padding(vertical = 12.dp),
-                        fontWeight = if (z.id == selected.id) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (z.id == selected.id) AivoraColors.Primary else AivoraColors.Ink,
-                    )
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = AivoraColors.LightSurface,
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .fillMaxWidth()
+                .heightIn(max = 480.dp),
+        ) {
+            Column(modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)) {
+                Text(
+                    "Timezone",
+                    fontWeight = FontWeight.SemiBold,
+                    color = AivoraColors.Ink,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .heightIn(max = 360.dp)
+                        .padding(horizontal = 8.dp),
+                ) {
+                    items(zones, key = { it.id }) { z ->
+                        val selectedRow = z.id == selected.id
+                        Text(
+                            formatZoneLabel(z),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (selectedRow) AivoraColors.PrimarySoft else Color.Transparent)
+                                .clickable { onSelect(z) }
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                            fontWeight = if (selectedRow) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (selectedRow) AivoraColors.PrimaryDark else AivoraColors.Ink,
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(horizontal = 8.dp),
+                ) {
+                    Text("Cancel", color = AivoraColors.TextSecondary)
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = AivoraColors.TextSecondary)
-            }
-        },
-    )
+        }
+    }
 }
 
 private fun formatZoneLabel(zone: ZoneId): String {

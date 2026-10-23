@@ -637,43 +637,47 @@ fun ChatIdScreen(
                         }
                     },
                 ) { msg ->
-                    MessageRow(
-                        message = msg,
-                        isGroup = chat.isGroup,
-                        dark = dark,
-                        // WhatsApp: if they blocked you, ticks stay single (never delivered/read).
-                        forceSingleTick = chat.blockedMe,
-                        onLongPress = {
-                            haptics.tick()
-                            actionTarget = msg
-                        },
-                        onVote = { optionId ->
-                            val uid = myUserId ?: SessionStore.userId(context)
-                            if (useRemote && uid != null) {
+                    if (msg.system) {
+                        SystemNotice(msg.body)
+                    } else {
+                        MessageRow(
+                            message = msg,
+                            isGroup = chat.isGroup,
+                            dark = dark,
+                            // WhatsApp: if they blocked you, ticks stay single (never delivered/read).
+                            forceSingleTick = chat.blockedMe,
+                            onLongPress = {
                                 haptics.tick()
-                                scope.launch {
-                                    runCatching { api.postMessagesIdVote(msg.id, VoteBody(optionId = optionId)) }
-                                        .onSuccess { InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid)) }
-                                        .onFailure {
-                                            Toast.makeText(context, "Could not vote", Toast.LENGTH_SHORT).show()
-                                        }
+                                actionTarget = msg
+                            },
+                            onVote = { optionId ->
+                                val uid = myUserId ?: SessionStore.userId(context)
+                                if (useRemote && uid != null) {
+                                    haptics.tick()
+                                    scope.launch {
+                                        runCatching { api.postMessagesIdVote(msg.id, VoteBody(optionId = optionId)) }
+                                            .onSuccess { InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid)) }
+                                            .onFailure {
+                                                Toast.makeText(context, "Could not vote", Toast.LENGTH_SHORT).show()
+                                            }
+                                    }
                                 }
-                            }
-                        },
-                        onRsvp = { answer ->
-                            val uid = myUserId ?: SessionStore.userId(context)
-                            if (useRemote && uid != null) {
-                                haptics.tick()
-                                scope.launch {
-                                    runCatching { api.postMessagesIdRsvp(msg.id, RsvpBody(answer = answer)) }
-                                        .onSuccess { InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid)) }
-                                        .onFailure {
-                                            Toast.makeText(context, "Could not RSVP", Toast.LENGTH_SHORT).show()
-                                        }
+                            },
+                            onRsvp = { answer ->
+                                val uid = myUserId ?: SessionStore.userId(context)
+                                if (useRemote && uid != null) {
+                                    haptics.tick()
+                                    scope.launch {
+                                        runCatching { api.postMessagesIdRsvp(msg.id, RsvpBody(answer = answer)) }
+                                            .onSuccess { InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid)) }
+                                            .onFailure {
+                                                Toast.makeText(context, "Could not RSVP", Toast.LENGTH_SHORT).show()
+                                            }
+                                    }
                                 }
-                            }
-                        },
-                    )
+                            },
+                        )
+                    }
                 }
                 if (peerTyping) {
                     item(key = "typing") {
@@ -1336,6 +1340,26 @@ private fun DateSeparator(label: String) {
         HorizontalDivider(
             modifier = Modifier.weight(1f),
             color = AivoraColors.ChatDivider,
+        )
+    }
+}
+
+/** WhatsApp-style centered info strip (disappearing messages, etc.). */
+@Composable
+private fun SystemNotice(body: String) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            body,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(AivoraColors.SoftMint)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = AivoraColors.InfoGreen,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
     }
 }

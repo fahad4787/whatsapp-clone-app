@@ -33,4 +33,5 @@ data class MessageDto(
     @SerialName("reactions") val reactions: List<ReactionSummaryDto>? = null,
     @SerialName("starred") val starred: Boolean = false,
     @SerialName("silenced") val silenced: Boolean = false,
+    @SerialName("system") val system: Boolean = false,
 )
