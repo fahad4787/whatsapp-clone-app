@@ -52,11 +52,11 @@ Goal: **WhatsApp-class feel on low-RAM phones** — cold start, chat open, scrol
 **Exit:** open long chat → already at bottom; long-press icons match ⋮; new user name saves and shows in Your Details.
 
 ### F1 — Instant home (disk cache)
-1. Persist last conversation list (JSON in prefs / DataStore) after each successful fetch  
-2. On Home open: paint cache **first**, then refresh in background  
-3. Persist last ~N messages per open chat for instant reopen  
+1. Persist last conversation list (JSON in prefs / DataStore) after each successful fetch — **Done** (`ChatListCache`)  
+2. On Home open: paint cache **first**, then refresh in background — **Done**  
+3. Persist last ~N messages per open chat for instant reopen — **Done** (`MessageCache`, 80 msgs × 30 chats)
 
-**Exit:** cold start with session shows chat list &lt; 300ms without waiting on network.
+**Exit:** cold start with session shows chat list &lt; 300ms without waiting on network. — **Shipping**
 
 ### F2 — Startup budget
 1. Defer FCM / notification permission until after first frame  

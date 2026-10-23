@@ -1,5 +1,6 @@
 package com.aivora.app.data.local
 
+import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -9,7 +10,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Process-lifetime chat/message source of truth. Nothing is written to disk.
+ * Process-lifetime chat/message source of truth.
+ * Disk snapshots via [ChatListCache] / [MessageCache] for instant reopen.
  */
 object InMemoryChatStore {
     /** Empty until remote load or [useOfflineSeed] — avoids flashing SeedData after login. */
@@ -60,6 +62,19 @@ object InMemoryChatStore {
         usingRemote = true
         _chats.value = cached
         cached.forEach { messageFlows.getOrPut(it.id) { MutableStateFlow(emptyList()) } }
+    }
+
+    /** Paint cached messages when opening a chat that has an empty in-memory list. */
+    fun hydrateMessages(chatId: String, cached: List<LocalMessage>) {
+        if (cached.isEmpty()) return
+        val flow = messageFlow(chatId)
+        if (flow.value.isNotEmpty()) return
+        flow.value = cached
+    }
+
+    fun persistMessages(context: Context, chatId: String) {
+        val msgs = messageFlows[chatId]?.value ?: return
+        MessageCache.save(context, chatId, msgs)
     }
 
     fun upsertChat(chat: LocalChat) {
@@ -169,9 +184,10 @@ object InMemoryChatStore {
         }
     }
 
-    fun clearChat(chatId: String) {
+    fun clearChat(chatId: String, context: Context? = null) {
         bumpEpoch(chatId)
         messageFlow(chatId).value = emptyList()
+        context?.let { MessageCache.clearChat(it, chatId) }
         _chats.update { list ->
             list.map {
                 if (it.id == chatId) it.copy(preview = "No messages", time = "Now", unread = 0)
@@ -181,9 +197,10 @@ object InMemoryChatStore {
     }
 
     /** Remove the conversation from the home list (after clear / leave). */
-    fun removeChat(chatId: String) {
+    fun removeChat(chatId: String, context: Context? = null) {
         bumpEpoch(chatId)
         messageFlows.remove(chatId)
+        context?.let { MessageCache.clearChat(it, chatId) }
         _chats.update { list -> list.filterNot { it.id == chatId } }
     }
 

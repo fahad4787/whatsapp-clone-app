@@ -112,6 +112,7 @@ import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.LocalMediaKind
 import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.LocalReplyPreview
+import com.aivora.app.data.local.MessageCache
 import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.EmptyRequestBody
@@ -265,7 +266,10 @@ fun ChatIdScreen(
 
     DisposableEffect(chatId) {
         InMemoryChatStore.setViewingChat(chatId)
-        onDispose { InMemoryChatStore.setViewingChat(null) }
+        onDispose {
+            InMemoryChatStore.persistMessages(context, chatId)
+            InMemoryChatStore.setViewingChat(null)
+        }
     }
 
     LaunchedEffect(chatId, messages.size) {
@@ -321,7 +325,11 @@ fun ChatIdScreen(
         }
     }
 
-    // Initial history + slow backup poll (websocket is primary)
+    // Disk → paint, then network refresh (websocket is primary)
+    LaunchedEffect(chatId, useRemote) {
+        if (!useRemote) return@LaunchedEffect
+        InMemoryChatStore.hydrateMessages(chatId, MessageCache.load(context, chatId))
+    }
     LaunchedEffect(chatId, myUserId, useRemote) {
         if (!useRemote || myUserId == null) return@LaunchedEffect
         while (true) {
@@ -330,8 +338,9 @@ fun ChatIdScreen(
                 val items = api.getConversationsIdMessages(chatId).items
                     .map { it.toLocalMessage(myUserId!!) }
                 InMemoryChatStore.replaceMessages(chatId, items, expectedEpoch = epoch)
+                MessageCache.save(context, chatId, items)
                 runCatching { api.postConversationsIdRead(chatId) }
-            } catch (_: Exception) { /* keep last list */ }
+            } catch (_: Exception) { /* keep cache / last list */ }
             delay(15_000)
         }
     }
@@ -771,16 +780,16 @@ fun ChatIdScreen(
                             api.postConversationsIdClear(chatId)
                         }.isSuccess
                         if (ok) {
-                            InMemoryChatStore.clearChat(chatId)
-                            InMemoryChatStore.removeChat(chatId)
+                            InMemoryChatStore.clearChat(chatId, context)
+                            InMemoryChatStore.removeChat(chatId, context)
                             onBack?.invoke()
                         } else {
                             Toast.makeText(context, "Could not clear chat", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } else {
-                    InMemoryChatStore.clearChat(chatId)
-                    InMemoryChatStore.removeChat(chatId)
+                    InMemoryChatStore.clearChat(chatId, context)
+                    InMemoryChatStore.removeChat(chatId, context)
                     onBack?.invoke()
                 }
             },

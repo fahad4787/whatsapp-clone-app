@@ -187,19 +187,21 @@ object RealtimeClient {
                 val uid = myUserIdProvider?.invoke() ?: return
                 val local = dto.toLocalMessage(uid)
                 InMemoryChatStore.upsertMessage(chatId, local)
+                val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
+                if (app != null) {
+                    InMemoryChatStore.persistMessages(app, chatId)
+                    com.aivora.app.data.local.ChatListCache.save(app, InMemoryChatStore.chats.value)
+                }
                 if (!local.mine && !local.deletedForEveryone) {
                     ackDelivered(listOfNotNull(dto.id))
-                    if (!InMemoryChatStore.isViewing(chatId)) {
-                        val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
-                        if (app != null) {
-                            val preview = when {
-                                !local.mediaUri.isNullOrBlank() -> "Photo"
-                                local.body.isNotBlank() -> local.body
-                                else -> "New message"
-                            }
-                            val title = InMemoryChatStore.chat(chatId).title.ifBlank { "Aivora" }
-                            com.aivora.app.data.push.MessageNotifier.show(app, title, preview, chatId)
+                    if (!InMemoryChatStore.isViewing(chatId) && app != null) {
+                        val preview = when {
+                            !local.mediaUri.isNullOrBlank() -> "Photo"
+                            local.body.isNotBlank() -> local.body
+                            else -> "New message"
                         }
+                        val title = InMemoryChatStore.chat(chatId).title.ifBlank { "Aivora" }
+                        com.aivora.app.data.push.MessageNotifier.show(app, title, preview, chatId)
                     }
                 }
             }
