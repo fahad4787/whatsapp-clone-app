@@ -231,10 +231,11 @@ fun ChatIdScreen(
     LaunchedEffect(chatId, myUserId, useRemote) {
         if (!useRemote || myUserId == null) return@LaunchedEffect
         while (true) {
+            val epoch = InMemoryChatStore.messageEpoch(chatId)
             try {
                 val items = api.getConversationsIdMessages(chatId).items
                     .map { it.toLocalMessage(myUserId!!) }
-                InMemoryChatStore.replaceMessages(chatId, items)
+                InMemoryChatStore.replaceMessages(chatId, items, expectedEpoch = epoch)
                 runCatching { api.postConversationsIdRead(chatId, emptyMap()) }
             } catch (_: Exception) { /* keep last list */ }
             delay(15_000)
@@ -460,136 +461,155 @@ fun ChatIdScreen(
     }
 
     if (showClearChat) {
-        AlertDialog(
-            onDismissRequest = { showClearChat = false },
-            shape = RoundedCornerShape(20.dp),
-            title = { Text("Clear this chat?", fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    "Messages will be removed from this device. This can’t be undone.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showClearChat = false
-                        if (useRemote) {
-                            scope.launch {
-                                runCatching { api.postConversationsIdClear(chatId, emptyMap()) }
-                                InMemoryChatStore.clearChat(chatId)
-                            }
-                        } else {
+        AivoraAlertDialog(
+            title = "Clear this chat?",
+            body = "Messages will be removed for you on this account. This can’t be undone.",
+            confirmLabel = "Clear",
+            confirmDanger = true,
+            onConfirm = {
+                showClearChat = false
+                if (useRemote) {
+                    scope.launch {
+                        val ok = runCatching {
+                            api.postConversationsIdClear(chatId, emptyMap())
+                        }.isSuccess
+                        if (ok) {
                             InMemoryChatStore.clearChat(chatId)
+                        } else {
+                            Toast.makeText(context, "Could not clear chat", Toast.LENGTH_SHORT).show()
                         }
-                    },
-                ) {
-                    Text("Clear", color = AivoraColors.Danger, fontWeight = FontWeight.SemiBold)
+                    }
+                } else {
+                    InMemoryChatStore.clearChat(chatId)
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { showClearChat = false }) {
-                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            },
+            onDismiss = { showClearChat = false },
         )
     }
 
     deleteTarget?.let { target ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            shape = RoundedCornerShape(20.dp),
-            title = { Text("Delete message?", fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    if (target.mine) {
-                        "Delete for you, or for everyone in this chat."
-                    } else {
-                        "This removes the message from your chat only."
-                    },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        AivoraAlertDialog(
+            title = "Delete message?",
+            body = if (target.mine) {
+                "Delete for you, or for everyone in this chat."
+            } else {
+                "This removes the message from your chat only."
             },
-            confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    if (target.mine && !target.deletedForEveryone) {
-                        TextButton(
-                            onClick = {
-                                val id = target.id
-                                deleteTarget = null
-                                if (useRemote) {
-                                    scope.launch {
-                                        runCatching { api.deleteMessagesId(id, "everyone") }
-                                            .onSuccess {
-                                                InMemoryChatStore.upsertMessage(
-                                                    chatId,
-                                                    target.copy(
-                                                        body = "This message was deleted",
-                                                        mediaUri = null,
-                                                        deletedForEveryone = true,
-                                                    ),
-                                                )
-                                            }
-                                    }
-                                } else {
-                                    InMemoryChatStore.upsertMessage(
-                                        chatId,
-                                        target.copy(
-                                            body = "This message was deleted",
-                                            mediaUri = null,
-                                            deletedForEveryone = true,
-                                        ),
-                                    )
-                                }
-                            },
-                        ) {
-                            Text("Delete for everyone", color = AivoraColors.Danger, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                    TextButton(
-                        onClick = {
-                            val id = target.id
-                            deleteTarget = null
-                            if (useRemote) {
-                                scope.launch {
-                                    runCatching { api.deleteMessagesId(id, "me") }
-                                    InMemoryChatStore.removeMessage(chatId, id)
-                                }
-                            } else {
-                                InMemoryChatStore.removeMessage(chatId, id)
+            confirmLabel = "Delete for me",
+            confirmDanger = true,
+            secondaryLabel = if (target.mine && !target.deletedForEveryone) "Delete for everyone" else null,
+            secondaryDanger = true,
+            onSecondary = {
+                val id = target.id
+                deleteTarget = null
+                if (useRemote) {
+                    scope.launch {
+                        runCatching { api.deleteMessagesId(id, "everyone") }
+                            .onSuccess {
+                                InMemoryChatStore.upsertMessage(
+                                    chatId,
+                                    target.copy(
+                                        body = "This message was deleted",
+                                        mediaUri = null,
+                                        deletedForEveryone = true,
+                                    ),
+                                )
                             }
-                        },
-                    ) {
-                        Text("Delete for me", color = AivoraColors.Danger, fontWeight = FontWeight.SemiBold)
+                            .onFailure {
+                                Toast.makeText(context, "Could not delete", Toast.LENGTH_SHORT).show()
+                            }
                     }
+                } else {
+                    InMemoryChatStore.upsertMessage(
+                        chatId,
+                        target.copy(
+                            body = "This message was deleted",
+                            mediaUri = null,
+                            deletedForEveryone = true,
+                        ),
+                    )
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) {
-                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            onConfirm = {
+                val id = target.id
+                deleteTarget = null
+                if (useRemote) {
+                    scope.launch {
+                        runCatching { api.deleteMessagesId(id, "me") }
+                            .onSuccess { InMemoryChatStore.removeMessage(chatId, id) }
+                            .onFailure {
+                                Toast.makeText(context, "Could not delete", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                } else {
+                    InMemoryChatStore.removeMessage(chatId, id)
                 }
             },
+            onDismiss = { deleteTarget = null },
         )
     }
 
     if (showReportSent) {
-        AlertDialog(
-            onDismissRequest = { showReportSent = false },
-            shape = RoundedCornerShape(20.dp),
-            title = { Text("Report sent", fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    "Thanks. Our team will review this in the admin panel.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showReportSent = false }) {
-                    Text("OK", fontWeight = FontWeight.SemiBold)
-                }
-            },
+        AivoraAlertDialog(
+            title = "Report sent",
+            body = "Thanks. Our team will review this in the admin panel.",
+            confirmLabel = "OK",
+            onConfirm = { showReportSent = false },
+            onDismiss = { showReportSent = false },
         )
     }
+}
+
+@Composable
+private fun AivoraAlertDialog(
+    title: String,
+    body: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    confirmDanger: Boolean = false,
+    secondaryLabel: String? = null,
+    secondaryDanger: Boolean = false,
+    onSecondary: (() -> Unit)? = null,
+) {
+    val dark = isSystemInDarkTheme()
+    val container = if (dark) AivoraColors.DarkSurface else AivoraColors.LightSurface
+    val ink = if (dark) Color.White else AivoraColors.Ink
+    val muted = AivoraColors.TextSecondary
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(20.dp),
+        containerColor = container,
+        titleContentColor = ink,
+        textContentColor = muted,
+        title = { Text(title, fontWeight = FontWeight.Bold, color = ink) },
+        text = { Text(body, color = muted) },
+        confirmButton = {
+            Column(horizontalAlignment = Alignment.End) {
+                if (secondaryLabel != null && onSecondary != null) {
+                    TextButton(onClick = onSecondary) {
+                        Text(
+                            secondaryLabel,
+                            color = if (secondaryDanger) AivoraColors.Danger else AivoraColors.Primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+                TextButton(onClick = onConfirm) {
+                    Text(
+                        confirmLabel,
+                        color = if (confirmDanger) AivoraColors.Danger else AivoraColors.Primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = muted)
+            }
+        },
+    )
 }
 
 @Composable
@@ -855,17 +875,14 @@ private fun MessageRow(
                 )
                 if (mine && !message.deletedForEveryone) {
                     Spacer(modifier = Modifier.width(4.dp))
-                    val tickIcon = when (message.status) {
-                        MessageDeliveryStatus.Read -> AivoraIcons.TicksRead
-                        else -> AivoraIcons.Ticks
-                    }
+                    // Always use the ticks vector + explicit tint (TicksRead XML theme-tint hides blue).
                     Icon(
-                        painter = painterResource(tickIcon),
+                        painter = painterResource(AivoraIcons.Ticks),
                         contentDescription = message.status.name,
                         tint = when (message.status) {
-                            MessageDeliveryStatus.Read -> Color.Unspecified
+                            MessageDeliveryStatus.Read -> Color(0xFF53BDEB)
                             MessageDeliveryStatus.Delivered -> AivoraColors.TextSecondary
-                            else -> AivoraColors.TextSecondary.copy(alpha = 0.7f)
+                            else -> AivoraColors.TextSecondary.copy(alpha = 0.55f)
                         },
                         modifier = Modifier.size(width = 16.dp, height = 14.dp),
                     )

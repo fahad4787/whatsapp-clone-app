@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Process-lifetime chat/message source of truth. Nothing is written to disk.
@@ -20,6 +21,8 @@ object InMemoryChatStore {
     @Volatile private var viewingChatId: String? = null
 
     private val messageFlows = ConcurrentHashMap<String, MutableStateFlow<List<LocalMessage>>>()
+    /** Bumped on clear/delete so in-flight message polls cannot restore wiped history. */
+    private val messageEpoch = ConcurrentHashMap<String, AtomicInteger>()
 
     fun setViewingChat(chatId: String?) {
         viewingChatId = chatId
@@ -27,6 +30,12 @@ object InMemoryChatStore {
     }
 
     fun isViewing(chatId: String): Boolean = viewingChatId == chatId
+
+    fun messageEpoch(chatId: String): Int =
+        messageEpoch.getOrPut(chatId) { AtomicInteger(0) }.get()
+
+    private fun bumpEpoch(chatId: String): Int =
+        messageEpoch.getOrPut(chatId) { AtomicInteger(0) }.incrementAndGet()
 
     fun replaceFromRemote(remote: List<LocalChat>) {
         usingRemote = true
@@ -116,6 +125,7 @@ object InMemoryChatStore {
     }
 
     fun clearChat(chatId: String) {
+        bumpEpoch(chatId)
         messageFlow(chatId).value = emptyList()
         _chats.update { list ->
             list.map {
@@ -126,6 +136,7 @@ object InMemoryChatStore {
     }
 
     fun removeMessage(chatId: String, messageId: String) {
+        bumpEpoch(chatId)
         messageFlow(chatId).update { list -> list.filterNot { it.id == messageId } }
         val last = messageFlow(chatId).value.lastOrNull()
         _chats.update { list ->
@@ -162,8 +173,13 @@ object InMemoryChatStore {
         return if (order.indexOf(b) >= order.indexOf(a)) b else a
     }
 
-    /** Replace the message list for a chat (e.g. after a remote fetch/poll). */
-    fun replaceMessages(chatId: String, messages: List<LocalMessage>) {
+    /**
+     * Replace the message list for a chat (e.g. after a remote fetch/poll).
+     * Pass [expectedEpoch] from [messageEpoch] before the network call so a
+     * clear/delete that happened meanwhile is not overwritten.
+     */
+    fun replaceMessages(chatId: String, messages: List<LocalMessage>, expectedEpoch: Int? = null) {
+        if (expectedEpoch != null && expectedEpoch != messageEpoch(chatId)) return
         messageFlow(chatId).value = messages
         val last = messages.lastOrNull()
         if (last != null) {
