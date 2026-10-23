@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.ContactPage
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Poll
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
+import android.widget.Toast
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -132,6 +134,7 @@ fun ChatIdScreen(
     var showAttach by remember { mutableStateOf(false) }
     var showChatMenu by remember { mutableStateOf(false) }
     var showClearChat by remember { mutableStateOf(false) }
+    var showReportSent by remember { mutableStateOf(false) }
     var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
     var peerOnline by remember { mutableStateOf(true) }
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
@@ -295,6 +298,29 @@ fun ChatIdScreen(
                 },
                 OverflowMenuItem("Search", Icons.Default.Search) { },
                 OverflowMenuItem("Mute notifications", Icons.Default.NotificationsOff) { },
+                OverflowMenuItem("Report", Icons.Default.Flag, danger = true) {
+                    if (useRemote) {
+                        scope.launch {
+                            try {
+                                val peerId = InMemoryChatStore.chat(chatId).peerUserId
+                                api.postReports(
+                                    mapOf(
+                                        "target_user_id" to peerId,
+                                        "target_conversation_id" to chatId,
+                                        "reason" to "Reported from chat",
+                                        "message_ids" to emptyList<String>(),
+                                        "block" to false,
+                                    ),
+                                )
+                                showReportSent = true
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "Could not send report", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } else {
+                        showReportSent = true
+                    }
+                },
                 OverflowMenuItem("Clear chat", Icons.Default.Delete, danger = true) {
                     showClearChat = true
                 },
@@ -451,6 +477,25 @@ fun ChatIdScreen(
             dismissButton = {
                 TextButton(onClick = { showClearChat = false }) {
                     Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+        )
+    }
+
+    if (showReportSent) {
+        AlertDialog(
+            onDismissRequest = { showReportSent = false },
+            shape = RoundedCornerShape(20.dp),
+            title = { Text("Report sent", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Thanks. Our team will review this in the admin panel.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showReportSent = false }) {
+                    Text("OK", fontWeight = FontWeight.SemiBold)
                 }
             },
         )

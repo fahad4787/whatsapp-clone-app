@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **Wave 7 in progress** — FCM push (needs your Firebase project keys). Waves 0–6 done on staging.
+Status: **Wave 8 done** — thin admin (users/ban, reports, metrics). Waves 0–7 done on staging.
 
 ## Locked constraints
 
@@ -208,11 +208,11 @@ Status: **Wave 7 in progress** — FCM push (needs your Firebase project keys). 
 ---
 
 ### Wave 8 — Thin admin (moderation)  
-| # | Feature | Test gate |
-|---|---------|-----------|
-| 8.1 | Users list / search / ban | Banned user can’t auth |
-| 8.2 | Reports queue (`POST /api/reports` + admin UI) | Report → resolve |
-| 8.3 | Basic metrics (users, messages/day) | Dashboard numbers match DB |
+| # | Feature | Test gate | Status |
+|---|---------|-----------|--------|
+| 8.1 | Users list / search / ban | Banned user can’t auth | Done |
+| 8.2 | Reports queue (`POST /api/reports` + admin UI) | Report → resolve | Done |
+| 8.3 | Basic metrics (users, messages/day) | Dashboard numbers match DB | Done |
 
 **Exit:** you can moderate staging users without SQL.
 
@@ -241,4 +241,6 @@ Status: **Wave 7 in progress** — FCM push (needs your Firebase project keys). 
 - [x] Render API staging live: `https://whatsapp-clone-backend-hep1.onrender.com` (`/health` ok)  
 - [x] Admin staging live: `https://whatsapp-clone-admin-frontend.onrender.com`  
 - [x] API `CORS_ORIGIN` includes admin URL — dashboard shows API healthy  
-- [ ] (Later) Firebase for FCM when we reach Wave 7  
+- [x] Wave 7 FCM live on staging  
+- [x] Wave 8 admin moderation (users / reports / metrics)  
+

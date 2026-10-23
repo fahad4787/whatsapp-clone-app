@@ -20,5 +20,6 @@ fun ConversationDto.toLocalChat(): LocalChat {
         unread = unreadCount,
         isGroup = type.equals("group", ignoreCase = true),
         archived = archived,
+        peerUserId = peer?.id,
     )
 }

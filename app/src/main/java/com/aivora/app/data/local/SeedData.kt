@@ -9,6 +9,8 @@ data class LocalChat(
     val isGroup: Boolean = false,
     val favorite: Boolean = false,
     val archived: Boolean = false,
+    /** Peer user id for 1:1 chats (reports / profile). */
+    val peerUserId: String? = null,
 )
 
 data class LocalMessage(
@@ -18,6 +20,8 @@ data class LocalMessage(
     val time: String,
     val mediaUri: String? = null,
     val senderName: String? = null,
+    /** When non-null, message is a voice note (duration in seconds). */
+    val voiceDurationSec: Int? = null,
 )
 
 /** Seed data for the in-memory store (no persistence). */
@@ -44,8 +48,22 @@ object SeedData {
         )
         else -> listOf(
             LocalMessage("m1", false, "Hey! Found a spot for our Sunday catch-up?", "4:24 PM"),
+            LocalMessage(
+                id = "m1v",
+                mine = false,
+                body = "Voice message",
+                time = "4:24 PM",
+                voiceDurationSec = 18,
+            ),
             LocalMessage("m2", true, "Yes! Chai and a long walk?", "4:25 PM"),
             LocalMessage("m3", true, "This view + chai. Sunday sorted?", "4:26 PM"),
+            LocalMessage(
+                id = "m3v",
+                mine = true,
+                body = "Voice message",
+                time = "4:27 PM",
+                voiceDurationSec = 9,
+            ),
             LocalMessage("m4", false, "Perfect. See you at 5!", "4:28 PM"),
             LocalMessage("m5", true, "Yes, joining in 5.", "4:28 PM"),
         )
