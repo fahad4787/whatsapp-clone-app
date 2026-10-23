@@ -159,7 +159,6 @@ interface AivoraApi {
     @POST("api/conversations/{id}/clear")
     suspend fun postConversationsIdClear(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
     ): okhttp3.ResponseBody
 
     @POST("api/blocks")
@@ -180,7 +179,6 @@ interface AivoraApi {
     @POST("api/conversations/{id}/read")
     suspend fun postConversationsIdRead(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
     ): okhttp3.ResponseBody
 
     @POST("api/conversations/{id}/messages")

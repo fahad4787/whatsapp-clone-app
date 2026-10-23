@@ -135,6 +135,13 @@ object InMemoryChatStore {
         }
     }
 
+    /** Remove the conversation from the home list (after clear / leave). */
+    fun removeChat(chatId: String) {
+        bumpEpoch(chatId)
+        messageFlows.remove(chatId)
+        _chats.update { list -> list.filterNot { it.id == chatId } }
+    }
+
     fun removeMessage(chatId: String, messageId: String) {
         bumpEpoch(chatId)
         messageFlow(chatId).update { list -> list.filterNot { it.id == messageId } }

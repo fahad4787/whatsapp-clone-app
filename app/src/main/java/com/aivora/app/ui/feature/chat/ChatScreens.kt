@@ -185,7 +185,11 @@ fun ChatIdScreen(
     LaunchedEffect(chatId, messages.size) {
         InMemoryChatStore.markRead(chatId)
         if (useRemote) {
-            runCatching { api.postConversationsIdRead(chatId, emptyMap()) }
+            runCatching { api.postConversationsIdRead(chatId) }
+                .onSuccess { InMemoryChatStore.markRead(chatId) }
+                .onFailure {
+                    android.util.Log.w("Chat", "mark read failed", it)
+                }
         }
     }
 
@@ -236,7 +240,7 @@ fun ChatIdScreen(
                 val items = api.getConversationsIdMessages(chatId).items
                     .map { it.toLocalMessage(myUserId!!) }
                 InMemoryChatStore.replaceMessages(chatId, items, expectedEpoch = epoch)
-                runCatching { api.postConversationsIdRead(chatId, emptyMap()) }
+                runCatching { api.postConversationsIdRead(chatId) }
             } catch (_: Exception) { /* keep last list */ }
             delay(15_000)
         }
@@ -463,24 +467,28 @@ fun ChatIdScreen(
     if (showClearChat) {
         AivoraAlertDialog(
             title = "Clear this chat?",
-            body = "Messages will be removed for you on this account. This can’t be undone.",
-            confirmLabel = "Clear",
+            body = "All messages will be removed for you and this chat leaves your list. This can’t be undone.",
+            confirmLabel = "Clear chat",
             confirmDanger = true,
             onConfirm = {
                 showClearChat = false
                 if (useRemote) {
                     scope.launch {
                         val ok = runCatching {
-                            api.postConversationsIdClear(chatId, emptyMap())
+                            api.postConversationsIdClear(chatId)
                         }.isSuccess
                         if (ok) {
                             InMemoryChatStore.clearChat(chatId)
+                            InMemoryChatStore.removeChat(chatId)
+                            onBack?.invoke()
                         } else {
                             Toast.makeText(context, "Could not clear chat", Toast.LENGTH_SHORT).show()
                         }
                     }
                 } else {
                     InMemoryChatStore.clearChat(chatId)
+                    InMemoryChatStore.removeChat(chatId)
+                    onBack?.invoke()
                 }
             },
             onDismiss = { showClearChat = false },
