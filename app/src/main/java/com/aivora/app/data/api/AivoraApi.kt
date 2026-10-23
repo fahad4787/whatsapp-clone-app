@@ -48,11 +48,16 @@ interface AivoraApi {
             @Body body: Map<String, @JvmSuppressWildcards Any?>,
     ): okhttp3.ResponseBody
 
+    @PUT("api/me/push-token")
+    suspend fun putMePushToken(
+        @Body body: com.aivora.app.data.model.PushTokenBody,
+    ): com.aivora.app.data.model.DeviceDto
+
     @PATCH("api/me/devices/{id}/push-token")
     suspend fun patchMeDevicesIdPushToken(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.PushTokenBody,
+    ): com.aivora.app.data.model.DeviceDto
 
     @POST("api/auth/link/claim")
     suspend fun postAuthLinkClaim(
@@ -602,7 +607,7 @@ interface AivoraApi {
     ): okhttp3.ResponseBody
 
     @GET("api/me/devices")
-    suspend fun getMeDevices(): okhttp3.ResponseBody
+    suspend fun getMeDevices(): com.aivora.app.data.model.DeviceListDto
 
     @GET("api/maps/search")
     suspend fun getMapsSearch(): okhttp3.ResponseBody

@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **Wave 6 in progress** — media/image messages. Waves 0–5 done on staging (realtime verified).
+Status: **Wave 7 in progress** — FCM push (needs your Firebase project keys). Waves 0–6 done on staging.
 
 ## Locked constraints
 

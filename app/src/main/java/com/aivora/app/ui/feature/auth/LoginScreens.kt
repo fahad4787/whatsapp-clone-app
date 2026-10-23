@@ -112,6 +112,7 @@ fun LoginScreen(
             val me = api.getMe()
             me.id?.let { SessionStore.saveUserId(context, it) }
         } catch (_: Exception) { /* optional */ }
+        com.aivora.app.data.push.PushRegistrar.refresh(context)
         return null
     }
 
