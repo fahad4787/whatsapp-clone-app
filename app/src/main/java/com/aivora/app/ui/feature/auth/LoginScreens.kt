@@ -54,6 +54,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aivora.app.BuildConfig
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.DeviceInfo
@@ -88,6 +89,31 @@ fun LoginScreen(
     var otp by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+
+    suspend fun completeVerify(targetPhone: String, code: String): String? {
+        val tokens = api.postAuthOtpVerify(
+            OtpVerifyBody(
+                phone = targetPhone,
+                code = code,
+                device = DeviceInfo(
+                    platform = "android",
+                    deviceName = android.os.Build.MODEL,
+                    appVersion = BuildConfig.VERSION_NAME,
+                ),
+            ),
+        )
+        val access = tokens.access
+        val refresh = tokens.refresh
+        if (access.isNullOrBlank() || refresh.isNullOrBlank()) {
+            return "Invalid server response"
+        }
+        SessionStore.save(context, access, refresh, targetPhone)
+        try {
+            val me = api.getMe()
+            me.id?.let { SessionStore.saveUserId(context, it) }
+        } catch (_: Exception) { /* optional */ }
+        return null
+    }
 
     Box(
         modifier = Modifier
@@ -175,7 +201,11 @@ fun LoginScreen(
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "We’ll text you a code to confirm it’s you.",
+                            if (BuildConfig.DEV_AUTO_OTP) {
+                                "Dev build: enter phone and continue — OTP is skipped (still required in release)."
+                            } else {
+                                "We’ll text you a code to confirm it’s you."
+                            },
                             fontSize = 14.sp,
                             color = AivoraColors.TextSecondary,
                             lineHeight = 18.sp,
@@ -204,7 +234,12 @@ fun LoginScreen(
 
                         Spacer(Modifier.height(22.dp))
                         PrimaryButton(
-                            text = if (busy) "Sending…" else "Send code",
+                            text = when {
+                                busy && BuildConfig.DEV_AUTO_OTP -> "Signing in…"
+                                busy -> "Sending…"
+                                BuildConfig.DEV_AUTO_OTP -> "Continue"
+                                else -> "Send code"
+                            },
                             enabled = !busy,
                             onClick = {
                                 if (phone.length < 7) {
@@ -223,7 +258,18 @@ fun LoginScreen(
                                         )
                                         e164Phone = result.phone
                                         otp = ""
-                                        step = 1
+                                        if (BuildConfig.DEV_AUTO_OTP) {
+                                            // Server OTP_DEV_BYPASS accepts 000000; OTP flow stays for release.
+                                            val fail = completeVerify(result.phone, "000000")
+                                            if (fail != null) {
+                                                error = fail
+                                                step = 1
+                                            } else {
+                                                onVerified()
+                                            }
+                                        } else {
+                                            step = 1
+                                        }
                                     } catch (e: Exception) {
                                         error = e.message ?: "Could not send code"
                                     } finally {
@@ -290,29 +336,9 @@ fun LoginScreen(
                                 error = null
                                 scope.launch {
                                     try {
-                                        val tokens = api.postAuthOtpVerify(
-                                            OtpVerifyBody(
-                                                phone = targetPhone,
-                                                code = otp,
-                                                device = DeviceInfo(
-                                                    platform = "android",
-                                                    deviceName = android.os.Build.MODEL,
-                                                    appVersion = com.aivora.app.BuildConfig.VERSION_NAME,
-                                                ),
-                                            ),
-                                        )
-                                        val access = tokens.access
-                                        val refresh = tokens.refresh
-                                        if (access.isNullOrBlank() || refresh.isNullOrBlank()) {
-                                            error = "Invalid server response"
-                                        } else {
-                                            SessionStore.save(context, access, refresh, targetPhone)
-                                            try {
-                                                val me = api.getMe()
-                                                me.id?.let { SessionStore.saveUserId(context, it) }
-                                            } catch (_: Exception) { /* optional */ }
-                                            onVerified()
-                                        }
+                                        val fail = completeVerify(targetPhone, otp)
+                                        if (fail != null) error = fail
+                                        else onVerified()
                                     } catch (e: Exception) {
                                         error = e.message ?: "Invalid code"
                                     } finally {

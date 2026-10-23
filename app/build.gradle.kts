@@ -18,11 +18,17 @@ android {
         versionName = "1.0.0-dev"
         buildConfigField("String", "API_BASE_URL", "\"https://whatsapp-clone-backend-hep1.onrender.com/\"")
         buildConfigField("String", "WS_BASE_URL", "\"wss://whatsapp-clone-backend-hep1.onrender.com/ws/\"")
+        // OTP stays for release / final; debug auto-verifies with 000000 (server OTP_DEV_BYPASS).
+        buildConfigField("boolean", "DEV_AUTO_OTP", "false")
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "DEV_AUTO_OTP", "true")
+        }
         release {
             isMinifyEnabled = false
+            buildConfigField("boolean", "DEV_AUTO_OTP", "false")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
