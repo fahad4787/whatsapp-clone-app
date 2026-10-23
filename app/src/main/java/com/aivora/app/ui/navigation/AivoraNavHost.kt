@@ -1,7 +1,6 @@
 package com.aivora.app.ui.navigation
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionLayout
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -9,15 +8,14 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.aivora.app.BuildConfig
 import com.aivora.app.ui.feature.auth.LoginScreen
 import com.aivora.app.ui.feature.auth.ProfileSetupScreen
 import com.aivora.app.ui.feature.calls.AudioCallScreen
 import com.aivora.app.ui.feature.calls.NewCallScreen
 import com.aivora.app.ui.feature.calls.ScheduledCallsScreen
 import com.aivora.app.ui.feature.calls.VideoCallScreen
-import android.net.Uri
 import com.aivora.app.ui.feature.camera.CameraCaptureScreen
-import com.aivora.app.ui.feature.camera.GalleryPickerScreen
 import com.aivora.app.ui.feature.channels.ChannelSlugScreen
 import com.aivora.app.ui.feature.channels.ChannelsScreen
 import com.aivora.app.ui.feature.chat.ChatIdScreen
@@ -34,8 +32,9 @@ import com.aivora.app.ui.feature.home.HomeScreen
 import com.aivora.app.ui.feature.locked.LockedChatsScreen
 import com.aivora.app.ui.feature.profile.ProfileIdScreen
 import com.aivora.app.ui.feature.profile.YourDetailsScreen
-import com.aivora.app.ui.feature.status.NewStatusScreen
-import com.aivora.app.ui.feature.status.StatusViewerScreen
+import com.aivora.app.ui.feature.settings.HelpCenterScreen
+import com.aivora.app.ui.feature.settings.HelpFeedbackScreen
+import com.aivora.app.ui.feature.settings.InviteFriendScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountAddScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountChangeNumberScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountDeletedScreen
@@ -60,15 +59,13 @@ import com.aivora.app.ui.feature.settings.SettingsChatsScreen
 import com.aivora.app.ui.feature.settings.SettingsChatsTranscriptsScreen
 import com.aivora.app.ui.feature.settings.SettingsChatsTransferScreen
 import com.aivora.app.ui.feature.settings.SettingsCommunitiesScreen
-import com.aivora.app.ui.feature.settings.HelpCenterScreen
-import com.aivora.app.ui.feature.settings.HelpFeedbackScreen
-import com.aivora.app.ui.feature.settings.InviteFriendScreen
 import com.aivora.app.ui.feature.settings.SettingsDeleteAccountScreen
 import com.aivora.app.ui.feature.settings.SettingsDevicesLinkScreen
 import com.aivora.app.ui.feature.settings.SettingsDevicesScreen
 import com.aivora.app.ui.feature.settings.SettingsListsEditIdScreen
 import com.aivora.app.ui.feature.settings.SettingsListsNewScreen
 import com.aivora.app.ui.feature.settings.SettingsListsReorderScreen
+import com.aivora.app.ui.feature.settings.SettingsManageStorageScreen
 import com.aivora.app.ui.feature.settings.SettingsNotificationsScreen
 import com.aivora.app.ui.feature.settings.SettingsPermissionsScreen
 import com.aivora.app.ui.feature.settings.SettingsPrivacyAboutScreen
@@ -88,12 +85,12 @@ import com.aivora.app.ui.feature.settings.SettingsPrivacyStatusScreen
 import com.aivora.app.ui.feature.settings.SettingsProfileScreen
 import com.aivora.app.ui.feature.settings.SettingsQrScreen
 import com.aivora.app.ui.feature.settings.SettingsStarredScreen
-import com.aivora.app.ui.feature.settings.SettingsManageStorageScreen
 import com.aivora.app.ui.feature.settings.SettingsStorageScreen
 import com.aivora.app.ui.feature.settings.SettingsTwoStepScreen
+import com.aivora.app.ui.feature.status.NewStatusScreen
+import com.aivora.app.ui.feature.status.StatusViewerScreen
 import com.aivora.app.ui.feature.transfer.TransferNewPhoneScreen
 
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AivoraNavHost(
     navController: NavHostController,
@@ -103,10 +100,10 @@ fun AivoraNavHost(
     val go: (String) -> Unit = { route -> navController.navigateSingleTop(route) }
     val back: () -> Unit = { navController.safePopBackStack() }
 
-    SharedTransitionLayout(modifier = modifier) {
     NavHost(
         navController = navController,
         startDestination = startDestination,
+        modifier = modifier,
         enterTransition = NavEnter,
         exitTransition = NavExit,
         popEnterTransition = NavPopEnter,
@@ -131,17 +128,6 @@ fun AivoraNavHost(
         ) { entry ->
             val raw = entry.arguments?.getString("target").orEmpty()
             CameraCaptureScreen(
-                target = android.net.Uri.decode(raw),
-                onBack = back,
-                onNavigate = go,
-            )
-        }
-        composable(
-            route = Routes.Gallery,
-            arguments = listOf(navArgument("target") { type = NavType.StringType }),
-        ) { entry ->
-            val raw = entry.arguments?.getString("target").orEmpty()
-            GalleryPickerScreen(
                 target = android.net.Uri.decode(raw),
                 onBack = back,
                 onNavigate = go,
@@ -175,8 +161,6 @@ fun AivoraNavHost(
                 chatId = entry.arguments?.getString("id").orEmpty(),
                 onBack = back,
                 onNavigate = go,
-                sharedTransitionScope = this@SharedTransitionLayout,
-                animatedVisibilityScope = this,
             )
         }
         composable(
@@ -228,11 +212,7 @@ fun AivoraNavHost(
             )
         }
         composable(Routes.Home) {
-            HomeScreen(
-                onNavigate = go,
-                sharedTransitionScope = this@SharedTransitionLayout,
-                animatedVisibilityScope = this,
-            )
+            HomeScreen(onNavigate = go)
         }
         composable(
             route = Routes.LockedChats,
@@ -243,7 +223,12 @@ fun AivoraNavHost(
             LoginScreen(
                 onNavigate = go,
                 onVerified = {
-                    navController.navigateClearing(Routes.ProfileSetup, Routes.Login, inclusive = false)
+                    // Debug: same as OTP skip — go straight home. Release still shows profile setup.
+                    if (BuildConfig.DEV_AUTO_OTP) {
+                        navController.navigateClearing(Routes.Home, Routes.Login, inclusive = true)
+                    } else {
+                        navController.navigateClearing(Routes.ProfileSetup, Routes.Login, inclusive = false)
+                    }
                 },
                 onSkipHome = {
                     navController.navigateClearing(Routes.Home, Routes.Login, inclusive = true)
@@ -266,6 +251,9 @@ fun AivoraNavHost(
         }
         composable(Routes.NewCall) {
             NewCallScreen(onBack = back, onNavigate = go)
+        }
+        composable(Routes.Keypad) {
+            NewCallScreen(onBack = back, onNavigate = go, startKeypad = true)
         }
         composable(
             route = Routes.AudioCall,
@@ -513,5 +501,4 @@ fun AivoraNavHost(
             YourDetailsScreen(onBack = back, onNavigate = go)
         }
     }
-    } // SharedTransitionLayout
 }
