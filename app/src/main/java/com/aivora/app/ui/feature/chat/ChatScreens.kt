@@ -3,6 +3,7 @@ package com.aivora.app.ui.feature.chat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -170,6 +171,7 @@ fun ChatIdScreen(
     val chats by InMemoryChatStore.chats.collectAsState()
     val chat = remember(chatId, chats) { InMemoryChatStore.chat(chatId) }
     val messages by InMemoryChatStore.messages(chatId).collectAsState()
+    // reuse `chats` for forward sheet — avoid a second collectAsState on the same flow
     var text by remember(chatId) { mutableStateOf("") }
     var searchQuery by remember(chatId) { mutableStateOf("") }
     var showSearch by remember(chatId) { mutableStateOf(false) }
@@ -192,7 +194,6 @@ fun ChatIdScreen(
     var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
     var peerOnline by remember { mutableStateOf(true) }
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
-    val allChats by InMemoryChatStore.chats.collectAsState()
     val listState = rememberLazyListState()
     val wallpaper = if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
@@ -341,7 +342,7 @@ fun ChatIdScreen(
                 MessageCache.save(context, chatId, items)
                 runCatching { api.postConversationsIdRead(chatId) }
             } catch (_: Exception) { /* keep cache / last list */ }
-            delay(15_000)
+            delay(20_000)
         }
     }
 
@@ -377,10 +378,11 @@ fun ChatIdScreen(
             didInitialScroll = true
             return@LaunchedEffect
         }
+        if (listState.isScrollInProgress) return@LaunchedEffect
         val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
         val nearBottom = lastVisible >= index - 3
         if (nearBottom || imeVisible) {
-            listState.animateScrollToItem(index)
+            listState.scrollToItem(index) // snap — animateScroll fights finger scroll on low-RAM
         }
     }
 
@@ -547,13 +549,24 @@ fun ChatIdScreen(
         LazyColumn(
             state = listState,
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             ) {
-                item(key = "date") {
+                item(key = "date", contentType = "date") {
                     DateSeparator(label = "Today")
                 }
-                items(visibleMessages, key = { it.id }) { msg ->
+                items(
+                    items = visibleMessages,
+                    key = { it.id },
+                    contentType = { msg ->
+                        when {
+                            msg.voiceDurationSec != null -> "voice"
+                            msg.mediaKind != null -> msg.mediaKind.name
+                            msg.linkPreview != null -> "link"
+                            else -> "text"
+                        }
+                    },
+                ) { msg ->
                     MessageRow(
                         message = msg,
                         isGroup = chat.isGroup,
@@ -919,7 +932,7 @@ fun ChatIdScreen(
     }
 
     forwardTarget?.let { target ->
-        val destinations = allChats.filter { it.id != chatId }
+        val destinations = chats.filter { it.id != chatId }
         AivoraBottomSheet(
             onDismiss = { forwardTarget = null },
             title = "Forward to…",
@@ -1262,7 +1275,8 @@ private fun MessageRow(
         horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Bottom,
     ) {
-        if (!mine) {
+        // Avatars only in groups — 1:1 WhatsApp style + cheaper scroll.
+        if (!mine && isGroup) {
             Avatar(message.senderName ?: "Peer", size = 16)
             Spacer(modifier = Modifier.width(4.dp))
         }
@@ -1271,15 +1285,16 @@ private fun MessageRow(
             dark -> AivoraColors.BubbleOtherDark
             else -> AivoraColors.BubbleOtherLight
         }
+        val shape = if (mine) BubbleMineShape else BubbleOtherShape
         Column(
             modifier = Modifier
                 .widthIn(max = if (voiceSecs != null) 280.dp else 260.dp)
                 .wrapContentWidth()
-                .clip(bubbleShape(mine))
+                .clip(shape)
                 .background(bubbleBg)
                 .then(
                     if (!mine && !dark) {
-                        Modifier.border(1.dp, AivoraColors.ChatDivider, bubbleShape(mine))
+                        Modifier.border(1.dp, AivoraColors.ChatDivider, shape)
                     } else {
                         Modifier
                     },
@@ -1372,6 +1387,7 @@ private fun MessageRow(
                                 contentDescription = "Video",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop,
+                                // Prefer decode size over full bitmap while scrolling.
                             )
                             Box(
                                 modifier = Modifier
@@ -1642,8 +1658,10 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
     }
     val bars = remember(seed) {
         val rnd = Random(seed)
-        List(28) { 0.25f + rnd.nextFloat() * 0.75f }
+        FloatArray(24) { 0.25f + rnd.nextFloat() * 0.75f }
     }
+    val activeColor = AivoraColors.Primary
+    val idleColor = AivoraColors.Primary.copy(alpha = 0.28f)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1687,24 +1705,24 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(28.dp),
             ) {
-                bars.forEachIndexed { i, h ->
-                    val active = i < bars.size / 3
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height((28 * h).dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(
-                                if (active) AivoraColors.Primary
-                                else AivoraColors.Primary.copy(alpha = 0.28f),
-                            ),
+                val n = bars.size
+                val gap = 2.dp.toPx()
+                val barW = ((size.width - gap * (n - 1)) / n).coerceAtLeast(1f)
+                val activeUntil = n / 3
+                for (i in 0 until n) {
+                    val h = size.height * bars[i]
+                    val x = i * (barW + gap)
+                    val y = (size.height - h) / 2f
+                    drawRoundRect(
+                        color = if (i < activeUntil) activeColor else idleColor,
+                        topLeft = androidx.compose.ui.geometry.Offset(x, y),
+                        size = androidx.compose.ui.geometry.Size(barW, h),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
                     )
                 }
             }
@@ -1869,9 +1887,15 @@ private fun ChatComposer(
     }
 }
 
-private fun bubbleShape(mine: Boolean) = RoundedCornerShape(
+private val BubbleMineShape = RoundedCornerShape(
     topStart = 16.dp,
     topEnd = 16.dp,
-    bottomStart = if (mine) 16.dp else 4.dp,
-    bottomEnd = if (mine) 4.dp else 16.dp,
+    bottomStart = 16.dp,
+    bottomEnd = 4.dp,
+)
+private val BubbleOtherShape = RoundedCornerShape(
+    topStart = 16.dp,
+    topEnd = 16.dp,
+    bottomStart = 4.dp,
+    bottomEnd = 16.dp,
 )

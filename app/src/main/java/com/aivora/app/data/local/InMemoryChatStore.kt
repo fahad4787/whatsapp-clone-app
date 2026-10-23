@@ -249,12 +249,20 @@ object InMemoryChatStore {
      */
     fun replaceMessages(chatId: String, messages: List<LocalMessage>, expectedEpoch: Int? = null) {
         if (expectedEpoch != null && expectedEpoch != messageEpoch(chatId)) return
-        messageFlow(chatId).value = messages
+        val flow = messageFlow(chatId)
+        // Skip identical snapshots — avoids janky full recomposition while scrolling.
+        if (sameMessageSnapshot(flow.value, messages)) return
+        flow.value = messages
         val last = messages.lastOrNull()
         if (last != null) {
             _chats.update { list ->
                 val current = list.find { it.id == chatId }
                     ?: LocalChat(chatId, "Chat", last.body, last.time)
+                if (current.preview == last.body && current.time == last.time && current.unread == 0 &&
+                    list.firstOrNull()?.id == chatId
+                ) {
+                    return@update list
+                }
                 listOf(
                     current.copy(preview = last.body, time = last.time, unread = 0),
                 ) + list.filterNot { it.id == chatId }
@@ -266,6 +274,21 @@ object InMemoryChatStore {
                 }
             }
         }
+    }
+
+    private fun sameMessageSnapshot(a: List<LocalMessage>, b: List<LocalMessage>): Boolean {
+        if (a.size != b.size) return false
+        for (i in a.indices) {
+            val x = a[i]
+            val y = b[i]
+            if (x.id != y.id || x.status != y.status || x.body != y.body ||
+                x.starred != y.starred || x.deletedForEveryone != y.deletedForEveryone ||
+                x.reactions != y.reactions
+            ) {
+                return false
+            }
+        }
+        return true
     }
 
     /** Insert or replace one message by id (websocket push). */
