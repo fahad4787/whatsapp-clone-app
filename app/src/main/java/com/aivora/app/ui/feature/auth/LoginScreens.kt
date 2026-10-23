@@ -84,8 +84,17 @@ fun LoginScreen(
     var step by remember { mutableIntStateOf(0) }
     var country by remember { mutableStateOf("Pakistan") }
     var dial by remember { mutableStateOf("+92") }
-    var phone by remember { mutableStateOf("") }
-    var e164Phone by remember { mutableStateOf<String?>(null) }
+    // Prefill last signed-in number so rebuilds don't force retyping.
+    var phone by remember {
+        mutableStateOf(
+            SessionStore.phone(context)
+                ?.removePrefix("+92")
+                ?.removePrefix("92")
+                ?.filter { it.isDigit() }
+                .orEmpty(),
+        )
+    }
+    var e164Phone by remember { mutableStateOf(SessionStore.phone(context)) }
     var otp by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }

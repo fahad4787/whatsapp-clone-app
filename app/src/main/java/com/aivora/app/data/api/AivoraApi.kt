@@ -248,6 +248,11 @@ interface AivoraApi {
         @Body body: com.aivora.app.data.model.OtpVerifyBody,
     ): com.aivora.app.data.model.RefreshResult
 
+    @POST("api/auth/refresh")
+    suspend fun postAuthRefresh(
+        @Body body: com.aivora.app.data.model.RefreshBody,
+    ): com.aivora.app.data.model.RefreshResult
+
     @POST("api/scheduled-calls")
     suspend fun postScheduledCalls(
         @Body body: Map<String, @JvmSuppressWildcards Any?>,
