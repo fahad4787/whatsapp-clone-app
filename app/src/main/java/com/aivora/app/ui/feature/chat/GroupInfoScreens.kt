@@ -1,6 +1,9 @@
 package com.aivora.app.ui.feature.chat
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExitToApp
@@ -60,7 +64,12 @@ import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 @Composable
 fun GroupInfoScreen(
@@ -83,6 +92,29 @@ fun GroupInfoScreen(
     fun applyConv(next: ConversationDto) {
         conv = next
         InMemoryChatStore.upsertChat(next.toLocalChat())
+    }
+
+    val pickAvatar = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val bytes = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                } ?: error("Could not read image")
+                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                val part = MultipartBody.Part.createFormData(
+                    "file",
+                    "group.jpg",
+                    bytes.toRequestBody(mime.toMediaTypeOrNull()),
+                )
+                api.postConversationsIdAvatar(chatId, part)
+            }.onSuccess { applyConv(it) }
+                .onFailure {
+                    Toast.makeText(context, "Could not update photo", Toast.LENGTH_SHORT).show()
+                }
+        }
     }
 
     LaunchedEffect(chatId) {
@@ -139,6 +171,11 @@ fun GroupInfoScreen(
                             add(
                                 SettingsItem("Edit group info", null, Icons.Default.Edit) {
                                     editOpen = true
+                                },
+                            )
+                            add(
+                                SettingsItem("Change group photo", null, Icons.Default.CameraAlt) {
+                                    pickAvatar.launch("image/*")
                                 },
                             )
                         }
