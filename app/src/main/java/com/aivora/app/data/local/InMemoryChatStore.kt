@@ -12,7 +12,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * Process-lifetime chat/message source of truth. Nothing is written to disk.
  */
 object InMemoryChatStore {
-    private val _chats = MutableStateFlow(SeedData.chats)
+    /** Empty until remote load or [useOfflineSeed] — avoids flashing SeedData after login. */
+    private val _chats = MutableStateFlow<List<LocalChat>>(emptyList())
     val chats: StateFlow<List<LocalChat>> = _chats.asStateFlow()
     @Volatile var usingRemote: Boolean = false
         private set
@@ -37,9 +38,18 @@ object InMemoryChatStore {
     private fun bumpEpoch(chatId: String): Int =
         messageEpoch.getOrPut(chatId) { AtomicInteger(0) }.incrementAndGet()
 
+    /** Demo list only when logged out / no API session. */
+    fun useOfflineSeed() {
+        if (usingRemote) return
+        if (_chats.value.isEmpty()) {
+            _chats.value = SeedData.chats
+        }
+    }
+
     fun replaceFromRemote(remote: List<LocalChat>) {
         usingRemote = true
-        // Server unread_count is authoritative (local WS bumps until the next refresh).
+        // Drop any leftover seed chats/messages.
+        messageFlows.keys.retainAll(remote.map { it.id }.toSet())
         _chats.value = remote
         remote.forEach { messageFlows.getOrPut(it.id) { MutableStateFlow(emptyList()) } }
     }

@@ -133,8 +133,9 @@ fun ChatIdScreen(
     val haptics = rememberAivoraHaptics()
     val chat = remember(chatId) { InMemoryChatStore.chat(chatId) }
     val messages by InMemoryChatStore.messages(chatId).collectAsState()
-    var text by remember { mutableStateOf("") }
-    var peerTyping by remember { mutableStateOf(false) }
+    var text by remember(chatId) { mutableStateOf("") }
+    var peerTyping by remember(chatId) { mutableStateOf(false) }
+    var typingSent by remember(chatId) { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
     var showChatMenu by remember { mutableStateOf(false) }
     var showClearChat by remember { mutableStateOf(false) }
@@ -246,15 +247,24 @@ fun ChatIdScreen(
         }
     }
 
+    // Typing only when the composer has real text — focus / keyboard alone must not notify peers.
     LaunchedEffect(text, useRemote, chatId) {
         if (!useRemote) return@LaunchedEffect
-        if (text.isBlank()) {
-            RealtimeClient.setTyping(chatId, false)
+        val hasText = text.trim().isNotEmpty()
+        if (!hasText) {
+            if (typingSent) {
+                RealtimeClient.setTyping(chatId, false)
+                typingSent = false
+            }
             return@LaunchedEffect
         }
+        delay(300)
+        if (text.trim().isEmpty()) return@LaunchedEffect
         RealtimeClient.setTyping(chatId, true)
-        delay(1200)
+        typingSent = true
+        delay(1_500)
         RealtimeClient.setTyping(chatId, false)
+        typingSent = false
     }
 
     // Defer list settle until after slide enter so they don't fight.

@@ -141,7 +141,10 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         val token = com.aivora.app.data.local.SessionStore.accessToken(context)
-        if (token.isNullOrBlank()) return@LaunchedEffect
+        if (token.isNullOrBlank()) {
+            InMemoryChatStore.useOfflineSeed()
+            return@LaunchedEffect
+        }
         try {
             val api = com.aivora.app.data.api.NetworkModule.api(
                 com.aivora.app.data.api.NetworkModule.okHttp { token },
@@ -153,7 +156,7 @@ fun HomeScreen(
             InMemoryChatStore.replaceFromRemote(remote)
             com.aivora.app.data.realtime.RealtimeClient.startFromSession(context)
         } catch (_: Exception) {
-            /* keep seed / last local list offline */
+            /* keep last remote list if any; do not flash seed while logged in */
         }
         // Keep unread badges in sync with the server.
         while (true) {
