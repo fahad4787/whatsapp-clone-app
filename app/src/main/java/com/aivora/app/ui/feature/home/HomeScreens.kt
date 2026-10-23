@@ -155,6 +155,19 @@ fun HomeScreen(
         } catch (_: Exception) {
             /* keep seed / last local list offline */
         }
+        // Keep unread badges in sync with the server.
+        while (true) {
+            kotlinx.coroutines.delay(8_000)
+            try {
+                val api = com.aivora.app.data.api.NetworkModule.api(
+                    com.aivora.app.data.api.NetworkModule.okHttp {
+                        com.aivora.app.data.local.SessionStore.accessToken(context)
+                    },
+                )
+                val remote = api.getConversations().items.map { it.toLocalChat() }
+                InMemoryChatStore.replaceFromRemote(remote)
+            } catch (_: Exception) { /* ignore */ }
+        }
     }
 
     LaunchedEffect(pagerState) {

@@ -16,10 +16,19 @@ object InMemoryChatStore {
     @Volatile var usingRemote: Boolean = false
         private set
 
+    /** Chat currently open on screen — incoming messages there do not bump unread. */
+    @Volatile private var viewingChatId: String? = null
+
     private val messageFlows = ConcurrentHashMap<String, MutableStateFlow<List<LocalMessage>>>()
+
+    fun setViewingChat(chatId: String?) {
+        viewingChatId = chatId
+        if (chatId != null) markRead(chatId)
+    }
 
     fun replaceFromRemote(remote: List<LocalChat>) {
         usingRemote = true
+        // Server unread_count is authoritative (local WS bumps until the next refresh).
         _chats.value = remote
         remote.forEach { messageFlows.getOrPut(it.id) { MutableStateFlow(emptyList()) } }
     }
@@ -142,7 +151,10 @@ object InMemoryChatStore {
                 current.copy(
                     preview = message.body,
                     time = message.time,
-                    unread = if (message.mine) 0 else current.unread + 1,
+                    unread = when {
+                        message.mine || viewingChatId == chatId -> 0
+                        else -> current.unread + 1
+                    },
                 ),
             ) + list.filterNot { it.id == chatId }
         }

@@ -56,6 +56,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -168,8 +169,16 @@ fun ChatIdScreen(
         else -> "Offline"
     }
 
-    LaunchedEffect(chatId) {
+    DisposableEffect(chatId) {
+        InMemoryChatStore.setViewingChat(chatId)
+        onDispose { InMemoryChatStore.setViewingChat(null) }
+    }
+
+    LaunchedEffect(chatId, messages.size) {
         InMemoryChatStore.markRead(chatId)
+        if (useRemote) {
+            runCatching { api.postConversationsIdRead(chatId, emptyMap()) }
+        }
     }
 
     LaunchedEffect(Unit) {
