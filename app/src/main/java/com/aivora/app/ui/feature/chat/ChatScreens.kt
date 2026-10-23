@@ -99,6 +99,9 @@ import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.LocalReplyPreview
 import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.EmptyRequestBody
+import com.aivora.app.data.model.ForwardMessageBody
+import com.aivora.app.data.model.ReactionBody
 import com.aivora.app.data.model.ReplyPreviewDto
 import com.aivora.app.data.model.SendMessageBody
 import com.aivora.app.data.realtime.RealtimeClient
@@ -577,7 +580,7 @@ fun ChatIdScreen(
                                                 api.deleteMessagesIdStar(target.id)
                                                 target.copy(starred = false)
                                             } else {
-                                                val dto = api.postMessagesIdStar(target.id, emptyMap())
+                                                val dto = api.postMessagesIdStar(target.id, EmptyRequestBody())
                                                 if (uid != null) dto.toLocalMessage(uid)
                                                 else target.copy(starred = true)
                                             }
@@ -638,7 +641,7 @@ fun ChatIdScreen(
                                         runCatching {
                                             api.postMessagesIdReactions(
                                                 target.id,
-                                                mapOf("emoji" to emoji),
+                                                ReactionBody(emoji = emoji),
                                             )
                                         }.onSuccess { dto ->
                                             val uid = myUserId ?: SessionStore.userId(context)
@@ -686,7 +689,7 @@ fun ChatIdScreen(
                                     runCatching {
                                         api.postMessagesIdForward(
                                             target.id,
-                                            mapOf("conversation_id" to dest.id),
+                                            ForwardMessageBody(conversationId = dest.id),
                                         )
                                     }.onSuccess { dto ->
                                         val uid = myUserId ?: SessionStore.userId(context)

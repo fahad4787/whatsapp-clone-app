@@ -150,7 +150,7 @@ interface AivoraApi {
     @POST("api/messages/{id}/reactions")
     suspend fun postMessagesIdReactions(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Body body: com.aivora.app.data.model.ReactionBody,
     ): com.aivora.app.data.model.MessageDto
 
     @GET("api/me/two-step")
@@ -488,7 +488,7 @@ interface AivoraApi {
     @POST("api/messages/{id}/star")
     suspend fun postMessagesIdStar(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Body body: com.aivora.app.data.model.EmptyRequestBody,
     ): com.aivora.app.data.model.MessageDto
 
     @DELETE("api/me/passkeys/{id}")
@@ -630,7 +630,7 @@ interface AivoraApi {
     @POST("api/messages/{id}/forward")
     suspend fun postMessagesIdForward(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Body body: com.aivora.app.data.model.ForwardMessageBody,
     ): com.aivora.app.data.model.MessageDto
 
     @POST("api/channels/{slug}/report")
