@@ -71,12 +71,8 @@ fun NewGroupScreen(
 
     LaunchedEffect(query) {
         val q = query.trim()
-        if (q.length < 3) {
-            people = emptyList()
-            return@LaunchedEffect
-        }
         try {
-            people = api.getPeopleSearch(q).items
+            people = api.getPeopleSearch(q.ifBlank { null }, limit = 100).items
             error = null
         } catch (e: Exception) {
             error = e.message ?: "Could not load people"
@@ -95,7 +91,11 @@ fun NewGroupScreen(
         )
         SearchField(query, { query = it }, "Search contacts")
         Text(
-            "Choose the people you want in this group.",
+            if (selected.isEmpty()) {
+                "Select one or more contacts for this group."
+            } else {
+                "${selected.size} selected"
+            },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 13.sp,

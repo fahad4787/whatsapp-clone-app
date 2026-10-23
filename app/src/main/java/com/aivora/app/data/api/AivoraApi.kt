@@ -67,6 +67,7 @@ interface AivoraApi {
     @GET("api/people/search")
     suspend fun getPeopleSearch(
         @Query("q") q: String? = null,
+        @Query("limit") limit: Int? = null,
     ): com.aivora.app.data.model.PeopleSearchDto
 
     @POST("api/reports")

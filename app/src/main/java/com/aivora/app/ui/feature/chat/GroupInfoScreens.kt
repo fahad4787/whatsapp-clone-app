@@ -504,11 +504,7 @@ private fun AddParticipantsSheet(
 
     LaunchedEffect(query) {
         val q = query.trim()
-        if (q.length < 3) {
-            people = emptyList()
-            return@LaunchedEffect
-        }
-        people = runCatching { api.getPeopleSearch(q).items }
+        people = runCatching { api.getPeopleSearch(q.ifBlank { null }, limit = 100).items }
             .getOrDefault(emptyList())
             .filter { it.id !in excludeIds }
     }
