@@ -356,18 +356,23 @@ fun ChatIdScreen(
         typingSent = false
     }
 
-    // Defer list settle until after slide enter so they don't fight.
-    var entered by remember { mutableStateOf(false) }
-    LaunchedEffect(chatId) {
-        entered = false
-        delay(AivoraNavSlideMs.toLong())
-        entered = true
-    }
-    LaunchedEffect(messages.size, peerTyping, imeVisible, entered) {
+    // Open at latest message instantly (no top→bottom animation). Animate only
+    // when already near the bottom and new content arrives.
+    var didInitialScroll by remember(chatId) { mutableStateOf(false) }
+    LaunchedEffect(chatId) { didInitialScroll = false }
+    LaunchedEffect(messages.size, peerTyping, imeVisible) {
         if (messages.isEmpty()) return@LaunchedEffect
         val index = (messages.lastIndex + if (peerTyping) 1 else 0).coerceAtLeast(0)
-        if (entered) listState.animateScrollToItem(index)
-        else listState.scrollToItem(index)
+        if (!didInitialScroll) {
+            listState.scrollToItem(index)
+            didInitialScroll = true
+            return@LaunchedEffect
+        }
+        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        val nearBottom = lastVisible >= index - 3
+        if (nearBottom || imeVisible) {
+            listState.animateScrollToItem(index)
+        }
     }
 
     LaunchedEffect(peerTyping) {

@@ -156,30 +156,33 @@ fun HomeScreen(
             InMemoryChatStore.useOfflineSeed()
             return@LaunchedEffect
         }
+        // Paint cached list immediately (WhatsApp-style cold start).
+        InMemoryChatStore.hydrateFromCache(
+            com.aivora.app.data.local.ChatListCache.load(context),
+        )
+        val api = com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
+        )
         try {
-            val api = com.aivora.app.data.api.NetworkModule.api(
-                com.aivora.app.data.api.NetworkModule.okHttp { token },
-            )
             if (com.aivora.app.data.local.SessionStore.userId(context) == null) {
                 runCatching { api.getMe().id?.let { com.aivora.app.data.local.SessionStore.saveUserId(context, it) } }
             }
             val remote = api.getConversations().items.map { it.toLocalChat() }
             InMemoryChatStore.replaceFromRemote(remote)
+            com.aivora.app.data.local.ChatListCache.save(context, remote)
             com.aivora.app.data.realtime.RealtimeClient.startFromSession(context)
         } catch (_: Exception) {
-            /* keep last remote list if any; do not flash seed while logged in */
+            /* keep cache / last remote list; do not flash seed while logged in */
         }
-        // Keep unread badges in sync with the server.
+        // Keep unread badges in sync with the server (reuse one client).
         while (true) {
-            kotlinx.coroutines.delay(8_000)
+            kotlinx.coroutines.delay(12_000)
             try {
-                val api = com.aivora.app.data.api.NetworkModule.api(
-                    com.aivora.app.data.api.NetworkModule.okHttp {
-                        com.aivora.app.data.local.SessionStore.accessToken(context)
-                    },
-                )
                 val remote = api.getConversations().items.map { it.toLocalChat() }
                 InMemoryChatStore.replaceFromRemote(remote)
+                com.aivora.app.data.local.ChatListCache.save(context, remote)
             } catch (_: Exception) { /* ignore */ }
         }
     }

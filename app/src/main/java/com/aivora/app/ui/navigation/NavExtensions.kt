@@ -2,14 +2,24 @@ package com.aivora.app.ui.navigation
 
 import androidx.navigation.NavHostController
 
+/** Detail routes skip launchSingleTop so reopen still runs enter transition. */
+fun isDetailRoute(route: String?): Boolean {
+    if (route.isNullOrBlank()) return false
+    val base = route.substringBefore('?')
+    return when {
+        base == Routes.Home || base == Routes.Login || base == Routes.ProfileSetup -> false
+        else -> true
+    }
+}
+
 /**
- * Navigate forward. Slide destinations skip launchSingleTop so enter/exit
- * animations always run (reopening the same chat still slides).
+ * Navigate forward. Detail destinations skip launchSingleTop so enter/exit
+ * animations always run (reopening the same chat still fades in).
  */
 fun NavHostController.navigateSingleTop(route: String) {
     val base = route.substringBefore('?')
     navigate(route) {
-        launchSingleTop = !isSlideRoute(base)
+        launchSingleTop = !isDetailRoute(base)
     }
 }
 

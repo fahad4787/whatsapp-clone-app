@@ -8,7 +8,6 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.aivora.app.BuildConfig
 import com.aivora.app.ui.feature.auth.LoginScreen
 import com.aivora.app.ui.feature.auth.ProfileSetupScreen
 import com.aivora.app.ui.feature.calls.AudioCallScreen
@@ -233,12 +232,8 @@ fun AivoraNavHost(
             LoginScreen(
                 onNavigate = go,
                 onVerified = {
-                    // Debug: same as OTP skip — go straight home. Release still shows profile setup.
-                    if (BuildConfig.DEV_AUTO_OTP) {
-                        navController.navigateClearing(Routes.Home, Routes.Login, inclusive = true)
-                    } else {
-                        navController.navigateClearing(Routes.ProfileSetup, Routes.Login, inclusive = false)
-                    }
+                    // Always offer profile setup after OTP; screen skips itself if name already set.
+                    navController.navigateClearing(Routes.ProfileSetup, Routes.Login, inclusive = false)
                 },
                 onSkipHome = {
                     navController.navigateClearing(Routes.Home, Routes.Login, inclusive = true)

@@ -213,12 +213,23 @@ fun AivoraSheetActionList(
                     .padding(horizontal = 18.dp, vertical = 15.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    action.icon,
-                    contentDescription = null,
-                    tint = if (action.danger) AivoraColors.Danger else AivoraColors.InkMuted,
-                    modifier = Modifier.size(22.dp),
-                )
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            (if (action.danger) AivoraColors.Danger else AivoraColors.Primary)
+                                .copy(alpha = 0.14f),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        action.icon,
+                        contentDescription = null,
+                        tint = if (action.danger) AivoraColors.Danger else AivoraColors.Primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
                 Spacer(Modifier.width(16.dp))
                 Text(
                     action.label,

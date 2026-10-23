@@ -1,6 +1,7 @@
 package com.aivora.app.ui.motion
 
 import android.provider.Settings
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -15,18 +16,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 
-/** Snappy — prefer this for UI chrome (no bounce, short travel). */
+/** Emphasized decelerate — settles quickly without bounce. */
+val AivoraEmphasizedDecel = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)
+val AivoraEmphasizedAccel = CubicBezierEasing(0.3f, 0.0f, 1.0f, 1.0f)
+
+/** Snappy chrome (buttons, small state). */
 val AivoraSnap = spring<Float>(
     dampingRatio = Spring.DampingRatioNoBouncy,
     stiffness = Spring.StiffnessHigh,
 )
 
-val AivoraTweenFast = tween<Float>(durationMillis = 140, easing = FastOutSlowInEasing)
-val AivoraTweenMed = tween<Float>(durationMillis = 180, easing = FastOutSlowInEasing)
+val AivoraTweenFast = tween<Float>(durationMillis = 120, easing = FastOutSlowInEasing)
+val AivoraTweenMed = tween<Float>(durationMillis = 160, easing = AivoraEmphasizedDecel)
 
-/** Nav push slide / fade — keep NavTransitions in sync with these. */
-const val AivoraNavFadeMs = 180
-const val AivoraNavSlideMs = 300
+/**
+ * Nav timings — short fade only (low-RAM friendly).
+ * Keep [NavTransitions] in sync with these.
+ */
+const val AivoraNavFadeMs = 120
+const val AivoraNavSlideMs = 120
 
 @Composable
 fun rememberReducedMotion(): Boolean {

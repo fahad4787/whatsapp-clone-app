@@ -54,6 +54,14 @@ object InMemoryChatStore {
         remote.forEach { messageFlows.getOrPut(it.id) { MutableStateFlow(emptyList()) } }
     }
 
+    /** Instant paint from disk before network returns (session cold start). */
+    fun hydrateFromCache(cached: List<LocalChat>) {
+        if (cached.isEmpty() || _chats.value.isNotEmpty()) return
+        usingRemote = true
+        _chats.value = cached
+        cached.forEach { messageFlows.getOrPut(it.id) { MutableStateFlow(emptyList()) } }
+    }
+
     fun upsertChat(chat: LocalChat) {
         _chats.update { listOf(chat) + it.filterNot { c -> c.id == chat.id } }
         messageFlows.getOrPut(chat.id) { MutableStateFlow(emptyList()) }

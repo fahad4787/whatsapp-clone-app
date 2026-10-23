@@ -1,7 +1,7 @@
 # Full chat plan (Wave 9+)
 
 Date: 2026-10-23  
-Status: **Wave 12 shipping** — Waves 0–11 done. Goal: make **1:1 and group chat** feel complete before status/channels/calls.
+Status: **Foundation pause (PERF)** after Wave 12 — see `PERF_FOUNDATION.md`. Then Wave 13 groups.
 
 ## Principle
 

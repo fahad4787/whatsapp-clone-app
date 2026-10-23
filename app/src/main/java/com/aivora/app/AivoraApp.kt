@@ -1,13 +1,12 @@
 package com.aivora.app
 
 import android.app.Application
-import com.aivora.app.data.push.PushRegistrar
 
 class AivoraApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        PushRegistrar.refresh(this)
+        // Push registration runs after first Activity frame (see MainActivity) — keeps cold start light.
     }
 
     companion object {
