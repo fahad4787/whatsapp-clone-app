@@ -26,6 +26,8 @@ object InMemoryChatStore {
         if (chatId != null) markRead(chatId)
     }
 
+    fun isViewing(chatId: String): Boolean = viewingChatId == chatId
+
     fun replaceFromRemote(remote: List<LocalChat>) {
         usingRemote = true
         // Server unread_count is authoritative (local WS bumps until the next refresh).

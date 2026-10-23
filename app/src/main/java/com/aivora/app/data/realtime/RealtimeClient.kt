@@ -182,7 +182,21 @@ object RealtimeClient {
                 }.getOrNull() ?: return
                 val chatId = dto.conversationId ?: return
                 val uid = myUserIdProvider?.invoke() ?: return
-                InMemoryChatStore.upsertMessage(chatId, dto.toLocalMessage(uid))
+                val local = dto.toLocalMessage(uid)
+                InMemoryChatStore.upsertMessage(chatId, local)
+                // Heads-up while app is open on home (FCM alone often won't show in foreground).
+                if (!local.mine && !InMemoryChatStore.isViewing(chatId)) {
+                    val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
+                    if (app != null) {
+                        val preview = when {
+                            !local.mediaUri.isNullOrBlank() -> "Photo"
+                            local.body.isNotBlank() -> local.body
+                            else -> "New message"
+                        }
+                        val title = InMemoryChatStore.chat(chatId).title.ifBlank { "Aivora" }
+                        com.aivora.app.data.push.MessageNotifier.show(app, title, preview, chatId)
+                    }
+                }
             }
             "typing" -> {
                 val obj = frame.data?.jsonObject ?: return
