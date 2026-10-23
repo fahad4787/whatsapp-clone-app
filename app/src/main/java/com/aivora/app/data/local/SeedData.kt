@@ -18,7 +18,14 @@ data class LocalChat(
     val blockedMe: Boolean = false,
     /** Peer user id for 1:1 chats (reports / profile). */
     val peerUserId: String? = null,
+    /** Group: "admin" | "member". */
+    val myRole: String? = null,
+    val description: String? = null,
+    val avatarUrl: String? = null,
+    val onlyAdminsCanSend: Boolean = false,
+    val onlyAdminsCanEditInfo: Boolean = false,
 ) {
+    val isGroupAdmin: Boolean get() = myRole.equals("admin", ignoreCase = true)
     val isMuted: Boolean
         get() {
             val until = mutedUntil ?: return false

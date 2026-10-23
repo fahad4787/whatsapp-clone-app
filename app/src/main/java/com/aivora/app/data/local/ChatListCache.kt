@@ -30,6 +30,11 @@ object ChatListCache {
         val blockedByMe: Boolean = false,
         val blockedMe: Boolean = false,
         val peerUserId: String? = null,
+        val myRole: String? = null,
+        val description: String? = null,
+        val avatarUrl: String? = null,
+        val onlyAdminsCanSend: Boolean = false,
+        val onlyAdminsCanEditInfo: Boolean = false,
     )
 
     fun load(context: Context): List<LocalChat> {
@@ -52,6 +57,11 @@ object ChatListCache {
                     blockedByMe = it.blockedByMe,
                     blockedMe = it.blockedMe,
                     peerUserId = it.peerUserId,
+                    myRole = it.myRole,
+                    description = it.description,
+                    avatarUrl = it.avatarUrl,
+                    onlyAdminsCanSend = it.onlyAdminsCanSend,
+                    onlyAdminsCanEditInfo = it.onlyAdminsCanEditInfo,
                 )
             }
         }.getOrDefault(emptyList())
@@ -73,6 +83,11 @@ object ChatListCache {
                 blockedByMe = it.blockedByMe,
                 blockedMe = it.blockedMe,
                 peerUserId = it.peerUserId,
+                myRole = it.myRole,
+                description = it.description,
+                avatarUrl = it.avatarUrl,
+                onlyAdminsCanSend = it.onlyAdminsCanSend,
+                onlyAdminsCanEditInfo = it.onlyAdminsCanEditInfo,
             )
         }
         runCatching {

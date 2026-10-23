@@ -26,5 +26,10 @@ fun ConversationDto.toLocalChat(): LocalChat {
         blockedByMe = blockedByMe,
         blockedMe = blockedMe,
         peerUserId = peer?.id,
+        myRole = myRole,
+        description = description,
+        avatarUrl = avatarUrl ?: avatarThumb,
+        onlyAdminsCanSend = onlyAdminsCanSend,
+        onlyAdminsCanEditInfo = onlyAdminsCanEditInfo,
     )
 }

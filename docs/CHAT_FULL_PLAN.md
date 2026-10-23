@@ -74,15 +74,15 @@ Biggest gaps for “full chat”: message actions, conversation controls, voice/
 ---
 
 ### Wave 13 — Groups as real groups
-**Goal:** group chat is operable, not create-only.
+**Goal:** group chat is operable, not create-only. See `WAVE13_GROUPS.md`.
 
-| # | Feature | Exit |
-|---|---------|------|
-| 13.1 | Add / remove members | Membership updates live |
-| 13.2 | Promote / demote admin | Role enforced on actions |
-| 13.3 | Group info edit (title, icon, description) | Visible to members |
-| 13.4 | Leave group / dissolve (admin) | Correct list state |
-| 13.5 | “Only admins can send / edit info” flags | Non-admins blocked |
+| # | Feature | Exit | Status |
+|---|---------|------|--------|
+| 13.1 | Add / remove members | Membership updates live | Done |
+| 13.2 | Promote / demote admin | Role enforced on actions | Done |
+| 13.3 | Group info edit (title, icon, description) | Visible to members | Done |
+| 13.4 | Leave group / dissolve (admin) | Correct list state | Done |
+| 13.5 | “Only admins can send / edit info” flags | Non-admins blocked | Done |
 
 ---
 

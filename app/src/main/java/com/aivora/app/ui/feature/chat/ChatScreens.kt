@@ -135,6 +135,7 @@ import com.aivora.app.data.realtime.RealtimeClient
 import com.aivora.app.data.sendAttachmentMessage
 import com.aivora.app.data.sendImageMessage
 import com.aivora.app.data.sendVoiceFile
+import com.aivora.app.data.toLocalChat
 import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraBottomSheet
@@ -389,6 +390,11 @@ fun ChatIdScreen(
     LaunchedEffect(chatId, useRemote) {
         if (!useRemote) return@LaunchedEffect
         ChatRepository.hydrateMessagesFromDisk(context, chatId)
+        // Refresh group role / privacy flags for composer gate.
+        runCatching {
+            val remote = api.getConversationsId(chatId)
+            InMemoryChatStore.upsertChat(remote.toLocalChat())
+        }
     }
     LaunchedEffect(chatId, myUserId, useRemote) {
         if (!useRemote || myUserId == null) return@LaunchedEffect
@@ -668,6 +674,25 @@ fun ChatIdScreen(
                         fontSize = 16.sp,
                     )
                 }
+            }
+        } else if (chat.isGroup && chat.onlyAdminsCanSend && !chat.isGroupAdmin) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
+            ) {
+                HorizontalDivider(color = AivoraColors.ChatDivider, thickness = 1.dp)
+                Text(
+                    "Only admins can send messages",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
             }
         } else {
             ChatComposer(

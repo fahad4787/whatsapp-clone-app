@@ -91,6 +91,14 @@ fun ProfileIdScreen(
     onNavigate: (String) -> Unit = {},
 ) {
     val chat = com.aivora.app.data.local.InMemoryChatStore.chat(profileId.ifBlank { "1" })
+    if (chat.isGroup) {
+        com.aivora.app.ui.feature.chat.GroupInfoScreen(
+            chatId = chat.id,
+            onBack = onBack,
+            onNavigate = onNavigate,
+        )
+        return
+    }
     AivoraScaffold(title = "Contact info", onBack = onBack) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Avatar(chat.title, size = 96)

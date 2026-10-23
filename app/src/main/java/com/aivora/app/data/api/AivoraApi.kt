@@ -146,8 +146,8 @@ interface AivoraApi {
     suspend fun putConversationsIdMembersUserId(
         @Path("id") id: String,
         @Path("userId") userId: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.GroupMemberRoleBody,
+    ): com.aivora.app.data.model.ConversationDto
 
     @POST("api/messages/{id}/reactions")
     suspend fun postMessagesIdReactions(
@@ -221,8 +221,8 @@ interface AivoraApi {
     @PUT("api/conversations/{id}/privacy")
     suspend fun putConversationsIdPrivacy(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.GroupPrivacyBody,
+    ): com.aivora.app.data.model.ConversationDto
 
     @GET("api/me/auto-download")
     suspend fun getMeAutoDownload(): okhttp3.ResponseBody
@@ -429,7 +429,7 @@ interface AivoraApi {
     suspend fun deleteConversationsIdMembersUserId(
         @Path("id") id: String,
         @Path("userId") userId: String,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.ConversationDto
 
     @POST("api/calls/{id}/invite")
     suspend fun postCallsIdInvite(
@@ -520,11 +520,12 @@ interface AivoraApi {
     @GET("api/me/data")
     suspend fun getMeData(): okhttp3.ResponseBody
 
+    @Multipart
     @POST("api/conversations/{id}/avatar")
     suspend fun postConversationsIdAvatar(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Part file: MultipartBody.Part,
+    ): com.aivora.app.data.model.ConversationDto
 
     @POST("api/call-links")
     suspend fun postCallLinks(
@@ -652,13 +653,13 @@ interface AivoraApi {
     @POST("api/conversations/{id}/members")
     suspend fun postConversationsIdMembers(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.GroupMembersBody,
+    ): com.aivora.app.data.model.ConversationDto
 
     @POST("api/conversations/{id}/leave")
     suspend fun postConversationsIdLeave(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Body body: com.aivora.app.data.model.EmptyRequestBody = com.aivora.app.data.model.EmptyRequestBody(),
     ): okhttp3.ResponseBody
 
     @POST("api/auth/logout")
@@ -669,8 +670,8 @@ interface AivoraApi {
     @PUT("api/conversations/{id}/info")
     suspend fun putConversationsIdInfo(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.GroupInfoBody,
+    ): com.aivora.app.data.model.ConversationDto
 
     @POST("api/auth/email/verify")
     suspend fun postAuthEmailVerify(
