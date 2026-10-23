@@ -163,8 +163,8 @@ interface AivoraApi {
 
     @POST("api/blocks")
     suspend fun postBlocks(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.BlockBody,
+    ): com.aivora.app.data.model.BlockItemDto
 
     @POST("api/auth/link/cancel")
     suspend fun postAuthLinkCancel(
@@ -451,6 +451,8 @@ interface AivoraApi {
     @GET("api/conversations/{id}/messages")
     suspend fun getConversationsIdMessages(
         @Path("id") id: String,
+        @Query("q") q: String? = null,
+        @Query("limit") limit: Int? = null,
     ): com.aivora.app.data.model.MessageListDto
 
     @GET("api/me/username")
@@ -459,8 +461,8 @@ interface AivoraApi {
     @PUT("api/conversations/{id}/settings")
     suspend fun putConversationsIdSettings(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.ConversationSettingsBody,
+    ): com.aivora.app.data.model.ConversationDto
 
     @GET("api/calls/history")
     suspend fun getCallsHistory(): okhttp3.ResponseBody
@@ -540,7 +542,7 @@ interface AivoraApi {
     ): com.aivora.app.data.model.ConversationDto
 
     @GET("api/blocks")
-    suspend fun getBlocks(): okhttp3.ResponseBody
+    suspend fun getBlocks(): com.aivora.app.data.model.BlockListDto
 
     @POST("api/status")
     suspend fun postStatus(

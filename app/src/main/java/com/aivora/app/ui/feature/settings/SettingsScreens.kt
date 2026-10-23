@@ -109,6 +109,7 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VpnKey
+import kotlinx.coroutines.launch
 
 @Composable
 private fun SettingsMutedCard(content: @Composable ColumnScope.() -> Unit) {
@@ -927,42 +928,77 @@ fun SettingsBlockedScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val api = remember {
+        com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
+        )
+    }
+    val useRemote = !com.aivora.app.data.local.SessionStore.accessToken(context).isNullOrBlank()
+    var blocked by remember { mutableStateOf<List<com.aivora.app.data.model.BlockItemDto>>(emptyList()) }
+    var loading by remember { mutableStateOf(useRemote) }
+
+    fun reload() {
+        if (!useRemote) {
+            loading = false
+            return
+        }
+        scope.launch {
+            loading = true
+            blocked = runCatching { api.getBlocks().items }.getOrDefault(emptyList())
+            loading = false
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(useRemote) { reload() }
+
     AivoraScaffold(title = "Blocked contacts", onBack = onBack) {
         Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier
-                .padding(horizontal = AivoraDimens.CardHorizontal)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
-                .background(AivoraColors.SurfaceMuted)
-                .clickable { }
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Default.PersonAdd, contentDescription = null, tint = AivoraColors.Primary)
-            Spacer(Modifier.size(14.dp))
-            Text(
-                "Add blocked contact",
-                color = AivoraColors.Primary,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                painter = painterResource(AivoraIcons.ChevronRight),
-                contentDescription = null,
-                tint = AivoraColors.IconSecondary,
-                modifier = Modifier.size(20.dp),
-            )
+        when {
+            loading -> {
+                Text(
+                    "Loading…",
+                    color = AivoraColors.TextSecondary,
+                    modifier = Modifier.padding(24.dp),
+                )
+            }
+            blocked.isEmpty() -> {
+                EmptyState(
+                    title = "No blocked contacts",
+                    body = "Block someone from a chat menu. They can’t message you until you unblock.",
+                    icon = Icons.Default.Block,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize(),
+                )
+            }
+            else -> {
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(blocked, key = { it.id.orEmpty() }) { item ->
+                        val name = item.user?.displayName
+                            ?: item.user?.phoneDisplay
+                            ?: item.user?.phone
+                            ?: "Contact"
+                        PersonRow(
+                            name = name,
+                            subtitle = "Blocked · Tap to unblock",
+                            onClick = {
+                                val id = item.id ?: return@PersonRow
+                                scope.launch {
+                                    runCatching { api.deleteBlocksId(id) }
+                                        .onSuccess { reload() }
+                                }
+                            },
+                        )
+                    }
+                }
+            }
         }
-        Spacer(Modifier.height(8.dp))
-        PersonRow(
-            name = "Sarah Beth",
-            subtitle = "Blocked · Tap to unblock",
-            onClick = { },
-        )
-        Spacer(Modifier.weight(1f))
         SettingsFootnote(
-            "Blocked contacts can’t call or message you, or see your status updates. Blocking doesn’t delete chat history or erase earlier messages.",
+            "Blocked contacts can’t call or message you. Blocking doesn’t delete chat history.",
         )
     }
 }

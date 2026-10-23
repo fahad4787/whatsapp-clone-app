@@ -46,15 +46,20 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Poll
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Unarchive
 import android.widget.Toast
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -99,11 +104,14 @@ import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.LocalReplyPreview
 import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.BlockBody
+import com.aivora.app.data.model.ConversationSettingsBody
 import com.aivora.app.data.model.EmptyRequestBody
 import com.aivora.app.data.model.ForwardMessageBody
 import com.aivora.app.data.model.ReactionBody
 import com.aivora.app.data.model.ReplyPreviewDto
 import com.aivora.app.data.model.SendMessageBody
+import com.aivora.app.data.toLocalChat
 import com.aivora.app.data.realtime.RealtimeClient
 import com.aivora.app.data.sendImageMessage
 import com.aivora.app.data.toLocalMessage
@@ -147,15 +155,23 @@ fun ChatIdScreen(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val haptics = rememberAivoraHaptics()
-    val chat = remember(chatId) { InMemoryChatStore.chat(chatId) }
+    val chats by InMemoryChatStore.chats.collectAsState()
+    val chat = remember(chatId, chats) { InMemoryChatStore.chat(chatId) }
     val messages by InMemoryChatStore.messages(chatId).collectAsState()
     var text by remember(chatId) { mutableStateOf("") }
+    var searchQuery by remember(chatId) { mutableStateOf("") }
+    var showSearch by remember(chatId) { mutableStateOf(false) }
     var peerTyping by remember(chatId) { mutableStateOf(false) }
     var typingSent by remember(chatId) { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
     var showChatMenu by remember { mutableStateOf(false) }
     var showClearChat by remember { mutableStateOf(false) }
     var showReportSent by remember { mutableStateOf(false) }
+    var showBlockConfirm by remember { mutableStateOf(false) }
+    val visibleMessages = remember(messages, searchQuery, showSearch) {
+        if (!showSearch || searchQuery.isBlank()) messages
+        else messages.filter { it.body.contains(searchQuery, ignoreCase = true) }
+    }
     var actionTarget by remember { mutableStateOf<LocalMessage?>(null) }
     var deleteTarget by remember { mutableStateOf<LocalMessage?>(null) }
     var reactTarget by remember { mutableStateOf<LocalMessage?>(null) }
@@ -334,11 +350,79 @@ fun ChatIdScreen(
                     if (chat.isGroup) "Group info" else "View contact",
                     Icons.Default.Person,
                 ) { onNavigate(Routes.ProfileId.replace("{id}", chatId)) },
-                OverflowMenuItem("Media, links and docs", Icons.Default.Image) {
-                    // Viewer screen deferred to backend phase
+                OverflowMenuItem("Search", Icons.Default.Search) {
+                    showSearch = true
                 },
-                OverflowMenuItem("Search", Icons.Default.Search) { },
-                OverflowMenuItem("Mute notifications", Icons.Default.NotificationsOff) { },
+                OverflowMenuItem(
+                    if (chat.isMuted) "Unmute" else "Mute notifications",
+                    if (chat.isMuted) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
+                ) {
+                    if (useRemote) {
+                        scope.launch {
+                            runCatching {
+                                api.putConversationsIdSettings(
+                                    chatId,
+                                    ConversationSettingsBody(muted = !chat.isMuted),
+                                )
+                            }.onSuccess { dto ->
+                                InMemoryChatStore.upsertChat(dto.toLocalChat())
+                            }.onFailure {
+                                Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } else {
+                        InMemoryChatStore.upsertChat(
+                            chat.copy(
+                                mutedUntil = if (chat.isMuted) null
+                                else java.time.Instant.now().plusSeconds(8 * 3600).toString(),
+                            ),
+                        )
+                    }
+                },
+                OverflowMenuItem(
+                    if (chat.pinned) "Unpin" else "Pin",
+                    Icons.Default.PushPin,
+                ) {
+                    if (useRemote) {
+                        scope.launch {
+                            runCatching {
+                                api.putConversationsIdSettings(
+                                    chatId,
+                                    ConversationSettingsBody(pinned = !chat.pinned),
+                                )
+                            }.onSuccess { dto ->
+                                InMemoryChatStore.upsertChat(dto.toLocalChat())
+                            }.onFailure {
+                                Toast.makeText(context, "Could not pin (max 3)", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } else {
+                        InMemoryChatStore.upsertChat(chat.copy(pinned = !chat.pinned, favorite = !chat.pinned))
+                    }
+                },
+                OverflowMenuItem(
+                    if (chat.archived) "Unarchive" else "Archive",
+                    if (chat.archived) Icons.Default.Unarchive else Icons.Default.Archive,
+                ) {
+                    if (useRemote) {
+                        scope.launch {
+                            runCatching {
+                                api.putConversationsIdSettings(
+                                    chatId,
+                                    ConversationSettingsBody(archived = !chat.archived),
+                                )
+                            }.onSuccess { dto ->
+                                InMemoryChatStore.upsertChat(dto.toLocalChat())
+                                if (!chat.archived) onBack?.invoke()
+                            }.onFailure {
+                                Toast.makeText(context, "Could not archive", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    } else {
+                        InMemoryChatStore.upsertChat(chat.copy(archived = !chat.archived))
+                        if (!chat.archived) onBack?.invoke()
+                    }
+                },
                 OverflowMenuItem("Report", Icons.Default.Flag, danger = true) {
                     if (useRemote) {
                         scope.launch {
@@ -362,11 +446,50 @@ fun ChatIdScreen(
                         showReportSent = true
                     }
                 },
+                OverflowMenuItem("Block", Icons.Default.Block, danger = true) {
+                    showBlockConfirm = true
+                },
                 OverflowMenuItem("Clear chat", Icons.Default.Delete, danger = true) {
                     showClearChat = true
                 },
             ),
         )
+
+        if (showSearch) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(AivoraColors.ComposerFill)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = AivoraColors.Ink),
+                    cursorBrush = SolidColor(AivoraColors.Primary),
+                    decorationBox = { inner ->
+                        Box {
+                            if (searchQuery.isEmpty()) {
+                                Text("Search in chat", color = AivoraColors.TextSecondary)
+                            }
+                            inner()
+                        }
+                    },
+                )
+                TextButton(onClick = {
+                    showSearch = false
+                    searchQuery = ""
+                }) {
+                    Text("Close", color = AivoraColors.Primary)
+                }
+            }
+        }
 
         Box(
             modifier = Modifier
@@ -383,7 +506,7 @@ fun ChatIdScreen(
                 item(key = "date") {
                     DateSeparator(label = "Today")
                 }
-                items(messages, key = { it.id }) { msg ->
+                items(visibleMessages, key = { it.id }) { msg ->
                     MessageRow(
                         message = msg,
                         isGroup = chat.isGroup,
@@ -788,6 +911,34 @@ fun ChatIdScreen(
             confirmLabel = "OK",
             onConfirm = { showReportSent = false },
             onDismiss = { showReportSent = false },
+        )
+    }
+
+    if (showBlockConfirm) {
+        AivoraAlertDialog(
+            title = "Block contact?",
+            body = "They won’t be able to message you. You can unblock anytime in Settings.",
+            confirmLabel = "Block",
+            confirmDanger = true,
+            onConfirm = {
+                showBlockConfirm = false
+                val peerId = chat.peerUserId
+                if (useRemote && !peerId.isNullOrBlank()) {
+                    scope.launch {
+                        runCatching {
+                            api.postBlocks(BlockBody(userId = peerId))
+                        }.onSuccess {
+                            Toast.makeText(context, "Contact blocked", Toast.LENGTH_SHORT).show()
+                            onBack?.invoke()
+                        }.onFailure {
+                            Toast.makeText(context, "Could not block", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    Toast.makeText(context, "No peer to block", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onDismiss = { showBlockConfirm = false },
         )
     }
 }

@@ -1,7 +1,7 @@
 # Full chat plan (Wave 9+)
 
 Date: 2026-10-23  
-Status: **Wave 10 shipping** — Waves 0–9 done. Goal: make **1:1 and group chat** feel complete before status/channels/calls.
+Status: **Wave 11 shipping** — Waves 0–10 done. Goal: make **1:1 and group chat** feel complete before status/channels/calls.
 
 ## Principle
 
@@ -50,13 +50,13 @@ Biggest gaps for “full chat”: message actions, conversation controls, voice/
 ### Wave 11 — Conversation controls
 **Goal:** home list + chat settings match WhatsApp basics.
 
-| # | Feature | Exit |
-|---|---------|------|
-| 11.1 | Archive / unarchive (API + home Archived) | Survives restart |
-| 11.2 | Mute / unmute (`muted_until`) + no FCM while muted | Muted chat quiet |
-| 11.3 | Pin chat (max N) | Pinned section on home |
-| 11.4 | Block / unblock + blocked list; block stops messages | Blocked peer can’t message |
-| 11.5 | In-chat search (server `q` or local index v1) | Find old text |
+| # | Feature | Exit | Status |
+|---|---------|------|--------|
+| 11.1 | Archive / unarchive (API + home Archived) | Survives restart | Done |
+| 11.2 | Mute / unmute (`muted_until`) + no FCM while muted | Muted chat quiet | Done |
+| 11.3 | Pin chat (max N) | Pinned section on home | Done |
+| 11.4 | Block / unblock + blocked list; block stops messages | Blocked peer can’t message | Done |
+| 11.5 | In-chat search (server `q` or local index v1) | Find old text | Done |
 
 ---
 

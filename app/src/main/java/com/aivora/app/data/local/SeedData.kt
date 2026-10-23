@@ -9,9 +9,20 @@ data class LocalChat(
     val isGroup: Boolean = false,
     val favorite: Boolean = false,
     val archived: Boolean = false,
+    val pinned: Boolean = false,
+    /** ISO muted-until; null/blank = not muted. */
+    val mutedUntil: String? = null,
     /** Peer user id for 1:1 chats (reports / profile). */
     val peerUserId: String? = null,
-)
+) {
+    val isMuted: Boolean
+        get() {
+            val until = mutedUntil ?: return false
+            return runCatching {
+                java.time.Instant.parse(until).isAfter(java.time.Instant.now())
+            }.getOrDefault(false)
+        }
+}
 
 enum class MessageDeliveryStatus {
     Sending,

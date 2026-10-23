@@ -36,7 +36,9 @@ import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.res.painterResource
@@ -451,7 +453,7 @@ private fun ChatsTab(
                 when (filter) {
                     ChatFilter.All -> !chat.archived
                     ChatFilter.Unread -> !chat.archived && chat.unread > 0
-                    ChatFilter.Favourites -> !chat.archived && chat.favorite
+                    ChatFilter.Favourites -> !chat.archived && (chat.favorite || chat.pinned)
                     ChatFilter.Groups -> !chat.archived && chat.isGroup
                     ChatFilter.Archived -> chat.archived
                 }
@@ -461,6 +463,10 @@ private fun ChatsTab(
                     it.title.contains(query, ignoreCase = true) ||
                     it.preview.contains(query, ignoreCase = true)
             }
+            .sortedWith(
+                compareByDescending<LocalChat> { it.pinned }
+                    .thenByDescending { it.unread > 0 },
+            )
             .toList()
     }
     val barFilters = listOf(
@@ -515,14 +521,35 @@ private fun ChatsTab(
                     Avatar(chat.title, size = 48)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            chat.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = AivoraColors.Ink,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                chat.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = AivoraColors.Ink,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            if (chat.pinned) {
+                                Spacer(Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Default.PushPin,
+                                    contentDescription = "Pinned",
+                                    tint = AivoraColors.TextSecondary,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
+                            if (chat.isMuted) {
+                                Spacer(Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Default.NotificationsOff,
+                                    contentDescription = "Muted",
+                                    tint = AivoraColors.TextSecondary,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
+                        }
                         Text(
                             chat.preview,
                             style = MaterialTheme.typography.bodyMedium,
