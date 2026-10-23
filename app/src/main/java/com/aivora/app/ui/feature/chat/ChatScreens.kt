@@ -1,6 +1,12 @@
 package com.aivora.app.ui.feature.chat
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
@@ -8,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -242,17 +249,66 @@ fun ChatIdScreen(
     )
     val voiceRecorder = remember { VoiceRecorder(context) }
     var recordingVoice by remember { mutableStateOf(false) }
+    var recordingSecs by remember { mutableStateOf(0) }
+    var liveLevels by remember { mutableStateOf(FloatArray(28) { 0.2f }) }
     DisposableEffect(Unit) {
         onDispose { voiceRecorder.cancel() }
+    }
+    LaunchedEffect(recordingVoice) {
+        if (!recordingVoice) {
+            recordingSecs = 0
+            return@LaunchedEffect
+        }
+        while (true) {
+            recordingSecs = voiceRecorder.elapsedSec()
+            val amp = voiceRecorder.amplitude()
+            val prev = liveLevels
+            liveLevels = FloatArray(prev.size) { i ->
+                val target = if (i == prev.lastIndex) amp else prev.getOrElse(i + 1) { amp }
+                prev[i] * 0.35f + target * 0.65f
+            }
+            delay(50)
+        }
     }
     val requestMic = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted && voiceRecorder.start()) {
             recordingVoice = true
-            Toast.makeText(context, "Recording… tap mic again to send", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(context, "Microphone permission needed", Toast.LENGTH_SHORT).show()
+        }
+    }
+    fun finishVoiceSend() {
+        haptics.confirm()
+        val result = voiceRecorder.stop()
+        recordingVoice = false
+        if (result == null) return
+        val (file, secs) = result
+        if (useRemote) {
+            scope.launch {
+                try {
+                    val sent = api.sendVoiceFile(chatId, file, durationSec = secs)
+                    val uid = myUserId ?: SessionStore.userId(context)
+                    if (uid != null) {
+                        InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
+                    }
+                } catch (_: Exception) {
+                    InMemoryChatStore.sendVoice(
+                        chatId,
+                        durationSec = secs,
+                        uri = Uri.fromFile(file).toString(),
+                    )
+                } finally {
+                    file.delete()
+                }
+            }
+        } else {
+            InMemoryChatStore.sendVoice(
+                chatId,
+                durationSec = secs,
+                uri = Uri.fromFile(file).toString(),
+            )
         }
     }
     val firstName = chat.title.substringBefore(' ').ifBlank { chat.title }
@@ -639,6 +695,13 @@ fun ChatIdScreen(
                     if (r.deletedForEveryone) "Original message was deleted" else r.body.ifBlank { "Message" }
                 },
                 onClearReply = { replyTo = null },
+                recording = recordingVoice,
+                recordingSecs = recordingSecs,
+                recordingLevels = liveLevels,
+                onCancelRecording = {
+                    voiceRecorder.cancel()
+                    recordingVoice = false
+                },
                 onAttach = {
                     focusManager.clearFocus(force = true)
                     keyboard?.hide()
@@ -646,99 +709,60 @@ fun ChatIdScreen(
                 },
                 onCamera = { onNavigate(Routes.camera("chat:$chatId")) },
                 onSendOrMic = {
-                    val body = text.trim()
-                    if (body.isNotEmpty()) {
-                        haptics.confirm()
-                        val quoting = replyTo
-                        text = ""
-                        replyTo = null
-                        val replyDto = quoting?.let {
-                            ReplyPreviewDto(id = it.id, text = it.body.takeIf { t -> t.isNotBlank() })
-                        }
-                        val localReply = quoting?.let {
-                            LocalReplyPreview(
-                                id = it.id,
-                                body = if (it.deletedForEveryone) "Original message was deleted" else it.body,
-                                deleted = it.deletedForEveryone,
-                            )
-                        }
-                        if (useRemote) {
-                            RealtimeClient.setTyping(chatId, false)
-                            scope.launch {
-                                try {
-                                    val sent = api.postConversationsIdMessages(
-                                        chatId,
-                                        SendMessageBody(
-                                            text = body,
-                                            clientId = UUID.randomUUID().toString(),
-                                            replyTo = replyDto,
-                                        ),
-                                    )
-                                    val uid = myUserId ?: SessionStore.userId(context)
-                                    if (uid != null) {
-                                        InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
-                                    }
-                                } catch (_: Exception) {
-                                    InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
-                                }
+                    when {
+                        recordingVoice -> finishVoiceSend()
+                        text.trim().isNotEmpty() -> {
+                            haptics.confirm()
+                            val body = text.trim()
+                            val quoting = replyTo
+                            text = ""
+                            replyTo = null
+                            val replyDto = quoting?.let {
+                                ReplyPreviewDto(id = it.id, text = it.body.takeIf { t -> t.isNotBlank() })
                             }
-                        } else {
-                            InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
-                            peerTyping = true
-                        }
-                    } else if (recordingVoice) {
-                        haptics.confirm()
-                        val result = voiceRecorder.stop()
-                        recordingVoice = false
-                        if (result != null) {
-                            val (file, secs) = result
+                            val localReply = quoting?.let {
+                                LocalReplyPreview(
+                                    id = it.id,
+                                    body = if (it.deletedForEveryone) "Original message was deleted" else it.body,
+                                    deleted = it.deletedForEveryone,
+                                )
+                            }
                             if (useRemote) {
+                                RealtimeClient.setTyping(chatId, false)
                                 scope.launch {
                                     try {
-                                        val sent = api.sendVoiceFile(chatId, file, durationSec = secs)
+                                        val sent = api.postConversationsIdMessages(
+                                            chatId,
+                                            SendMessageBody(
+                                                text = body,
+                                                clientId = UUID.randomUUID().toString(),
+                                                replyTo = replyDto,
+                                            ),
+                                        )
                                         val uid = myUserId ?: SessionStore.userId(context)
                                         if (uid != null) {
                                             InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
                                         }
                                     } catch (_: Exception) {
-                                        InMemoryChatStore.sendVoice(
-                                            chatId,
-                                            durationSec = secs,
-                                            uri = Uri.fromFile(file).toString(),
-                                        )
-                                    } finally {
-                                        file.delete()
+                                        InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
                                     }
                                 }
                             } else {
-                                InMemoryChatStore.sendVoice(
-                                    chatId,
-                                    durationSec = secs,
-                                    uri = Uri.fromFile(file).toString(),
-                                )
+                                InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
+                                peerTyping = true
                             }
                         }
-                    } else {
-                        haptics.confirm()
-                        if (context.hasMicPermission()) {
-                            if (voiceRecorder.start()) {
-                                recordingVoice = true
-                                Toast.makeText(context, "Recording… tap again to send", Toast.LENGTH_SHORT).show()
+                        else -> {
+                            haptics.confirm()
+                            if (context.hasMicPermission()) {
+                                if (voiceRecorder.start()) recordingVoice = true
+                            } else {
+                                requestMic.launch(Manifest.permission.RECORD_AUDIO)
                             }
-                        } else {
-                            requestMic.launch(Manifest.permission.RECORD_AUDIO)
                         }
                     }
                 },
             )
-            if (recordingVoice) {
-                Text(
-                    "Recording voice note…",
-                    color = AivoraColors.Primary,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
-                )
-            }
         }
     }
 
@@ -1648,9 +1672,38 @@ private fun LinkPreviewCard(card: com.aivora.app.data.local.LocalLinkPreview) {
 }
 
 @Composable
+private fun VoiceWaveform(
+    levels: FloatArray,
+    progress: Float,
+    modifier: Modifier = Modifier,
+    activeColor: Color = AivoraColors.Primary,
+    idleColor: Color = AivoraColors.Primary.copy(alpha = 0.28f),
+) {
+    Canvas(modifier = modifier.height(28.dp).fillMaxWidth()) {
+        val n = levels.size.coerceAtLeast(1)
+        val gap = 2.dp.toPx()
+        val barW = ((size.width - gap * (n - 1)) / n).coerceAtLeast(1f)
+        val lit = (progress.coerceIn(0f, 1f) * n).toInt()
+        for (i in 0 until n) {
+            val h = size.height * levels[i].coerceIn(0.12f, 1f)
+            val x = i * (barW + gap)
+            val y = (size.height - h) / 2f
+            drawRoundRect(
+                color = if (i < lit) activeColor else idleColor,
+                topLeft = androidx.compose.ui.geometry.Offset(x, y),
+                size = androidx.compose.ui.geometry.Size(barW, h),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
+            )
+        }
+    }
+}
+
+@Composable
 private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = null) {
     val context = LocalContext.current
     var playing by remember(mediaUrl) { mutableStateOf(false) }
+    var progress by remember(mediaUrl) { mutableStateOf(0f) }
+    var positionSec by remember(mediaUrl) { mutableStateOf(0) }
     var player by remember(mediaUrl) { mutableStateOf<MediaPlayer?>(null) }
     DisposableEffect(mediaUrl) {
         onDispose {
@@ -1660,14 +1713,24 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
             }
             player = null
             playing = false
+            progress = 0f
+            positionSec = 0
+        }
+    }
+    LaunchedEffect(playing, player) {
+        val mp = player ?: return@LaunchedEffect
+        while (playing) {
+            val dur = mp.duration.coerceAtLeast(1)
+            val pos = runCatching { mp.currentPosition }.getOrDefault(0)
+            progress = pos.toFloat() / dur.toFloat()
+            positionSec = (pos / 1000).coerceAtLeast(0)
+            delay(40)
         }
     }
     val bars = remember(seed) {
         val rnd = Random(seed)
-        FloatArray(24) { 0.25f + rnd.nextFloat() * 0.75f }
+        FloatArray(28) { 0.22f + rnd.nextFloat() * 0.78f }
     }
-    val activeColor = AivoraColors.Primary
-    val idleColor = AivoraColors.Primary.copy(alpha = 0.28f)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1685,12 +1748,21 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
                         if (playing && current != null) {
                             current.pause()
                             playing = false
+                        } else if (current != null && progress > 0f && progress < 0.99f) {
+                            current.start()
+                            playing = true
                         } else {
                             val mp = current ?: MediaPlayer().also { player = it }
-                            mp.reset()
-                            mp.setDataSource(context, Uri.parse(url))
-                            mp.setOnCompletionListener { playing = false }
-                            mp.prepare()
+                            if (progress <= 0f || progress >= 0.99f) {
+                                mp.reset()
+                                mp.setDataSource(context, Uri.parse(url))
+                                mp.setOnCompletionListener {
+                                    playing = false
+                                    progress = 1f
+                                    positionSec = durationSec
+                                }
+                                mp.prepare()
+                            }
                             mp.start()
                             playing = true
                         }
@@ -1711,33 +1783,16 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(28.dp),
-            ) {
-                val n = bars.size
-                val gap = 2.dp.toPx()
-                val barW = ((size.width - gap * (n - 1)) / n).coerceAtLeast(1f)
-                val activeUntil = n / 3
-                for (i in 0 until n) {
-                    val h = size.height * bars[i]
-                    val x = i * (barW + gap)
-                    val y = (size.height - h) / 2f
-                    drawRoundRect(
-                        color = if (i < activeUntil) activeColor else idleColor,
-                        topLeft = androidx.compose.ui.geometry.Offset(x, y),
-                        size = androidx.compose.ui.geometry.Size(barW, h),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
-                    )
-                }
-            }
+            VoiceWaveform(
+                levels = bars,
+                progress = if (playing || progress > 0f) progress else 0f,
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    "0:00 / ${formatVoiceDuration(durationSec)}",
+                    "${formatVoiceDuration(positionSec)} / ${formatVoiceDuration(durationSec)}",
                     fontSize = 11.sp,
                     color = AivoraColors.TextSecondary,
                 )
@@ -1760,19 +1815,32 @@ private fun ChatComposer(
     placeholder: String,
     replyPreview: String? = null,
     onClearReply: () -> Unit = {},
+    recording: Boolean = false,
+    recordingSecs: Int = 0,
+    recordingLevels: FloatArray = FloatArray(0),
+    onCancelRecording: () -> Unit = {},
     onAttach: () -> Unit,
     onCamera: () -> Unit,
     onSendOrMic: () -> Unit,
 ) {
-    val canSend = value.isNotBlank()
+    val canSend = value.isNotBlank() || recording
+    val pulse = rememberInfiniteTransition(label = "recPulse")
+    val pulseAlpha by pulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(650, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "recAlpha",
+    )
     Column(
         modifier = Modifier
             .background(MaterialTheme.colorScheme.surface)
-            // Keep composer above nav bar and keyboard (edge-to-edge).
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
     ) {
         HorizontalDivider(color = AivoraColors.ChatDivider, thickness = 1.dp)
-        if (replyPreview != null) {
+        if (replyPreview != null && !recording) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1817,48 +1885,93 @@ private fun ChatComposer(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(54.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(AivoraColors.ComposerFill)
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onAttach, modifier = Modifier.size(40.dp)) {
+            if (recording) {
+                IconButton(onClick = onCancelRecording, modifier = Modifier.size(44.dp)) {
                     Icon(
-                        painter = painterResource(AivoraIcons.Attach),
-                        contentDescription = "Attach",
-                        tint = AivoraColors.TextSecondary,
+                        Icons.Default.Delete,
+                        contentDescription = "Cancel recording",
+                        tint = AivoraColors.Danger,
                     )
                 }
-                BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = AivoraColors.Ink),
-                    cursorBrush = SolidColor(AivoraColors.Primary),
-                    decorationBox = { inner ->
-                        Box(contentAlignment = Alignment.CenterStart) {
-                            if (value.isEmpty()) {
-                                Text(
-                                    placeholder,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = AivoraColors.TextSecondary,
-                                )
-                            }
-                            inner()
-                        }
-                    },
-                )
-                IconButton(onClick = onCamera, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        painter = painterResource(AivoraIcons.Camera),
-                        contentDescription = "Camera",
-                        tint = AivoraColors.TextSecondary,
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(54.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(AivoraColors.ComposerFill)
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(AivoraColors.Danger.copy(alpha = pulseAlpha)),
                     )
+                    Text(
+                        formatVoiceDuration(recordingSecs),
+                        color = AivoraColors.Ink,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                        modifier = Modifier.defaultMinSize(minWidth = 40.dp),
+                    )
+                    VoiceWaveform(
+                        levels = if (recordingLevels.isNotEmpty()) {
+                            recordingLevels
+                        } else {
+                            FloatArray(28) { 0.2f }
+                        },
+                        progress = 1f,
+                        modifier = Modifier.weight(1f),
+                        activeColor = AivoraColors.Danger,
+                        idleColor = AivoraColors.Danger.copy(alpha = 0.25f),
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(54.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(AivoraColors.ComposerFill)
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onAttach, modifier = Modifier.size(40.dp)) {
+                        Icon(
+                            painter = painterResource(AivoraIcons.Attach),
+                            contentDescription = "Attach",
+                            tint = AivoraColors.TextSecondary,
+                        )
+                    }
+                    BasicTextField(
+                        value = value,
+                        onValueChange = onValueChange,
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = AivoraColors.Ink),
+                        cursorBrush = SolidColor(AivoraColors.Primary),
+                        decorationBox = { inner ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (value.isEmpty()) {
+                                    Text(
+                                        placeholder,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = AivoraColors.TextSecondary,
+                                    )
+                                }
+                                inner()
+                            }
+                        },
+                    )
+                    IconButton(onClick = onCamera, modifier = Modifier.size(40.dp)) {
+                        Icon(
+                            painter = painterResource(AivoraIcons.Camera),
+                            contentDescription = "Camera",
+                            tint = AivoraColors.TextSecondary,
+                        )
+                    }
                 }
             }
             Box(
@@ -1873,15 +1986,14 @@ private fun ChatComposer(
                     .clickable(onClick = onSendOrMic),
                 contentAlignment = Alignment.Center,
             ) {
-                if (canSend) {
-                    Icon(
+                when {
+                    canSend && (recording || value.isNotBlank()) -> Icon(
                         Icons.Default.Send,
                         contentDescription = "Send",
                         tint = AivoraColors.OnPrimary,
                         modifier = Modifier.size(22.dp),
                     )
-                } else {
-                    Icon(
+                    else -> Icon(
                         painter = painterResource(AivoraIcons.MicFab),
                         contentDescription = "Voice",
                         tint = AivoraColors.OnPrimary,

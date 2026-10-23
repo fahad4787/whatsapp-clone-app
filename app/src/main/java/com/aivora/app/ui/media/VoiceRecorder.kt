@@ -45,6 +45,17 @@ class VoiceRecorder(private val context: Context) {
         }
     }
 
+    /** 0..1 mic level for live waveform while recording. */
+    fun amplitude(): Float {
+        val amp = runCatching { recorder?.maxAmplitude ?: 0 }.getOrDefault(0)
+        return (amp / 16000f).coerceIn(0.12f, 1f)
+    }
+
+    fun elapsedSec(): Int {
+        if (recorder == null || startedAtMs == 0L) return 0
+        return ((System.currentTimeMillis() - startedAtMs) / 1000L).toInt().coerceAtLeast(0)
+    }
+
     /** Stops recording; returns file + duration seconds, or null if cancelled/failed. */
     fun stop(): Pair<File, Int>? {
         val out = file
@@ -52,6 +63,7 @@ class VoiceRecorder(private val context: Context) {
         val rec = recorder
         recorder = null
         file = null
+        startedAtMs = 0L
         if (rec == null || out == null) return null
         return try {
             rec.stop()
@@ -77,6 +89,7 @@ class VoiceRecorder(private val context: Context) {
         val out = file
         recorder = null
         file = null
+        startedAtMs = 0L
         if (rec != null) {
             runCatching {
                 rec.stop()
