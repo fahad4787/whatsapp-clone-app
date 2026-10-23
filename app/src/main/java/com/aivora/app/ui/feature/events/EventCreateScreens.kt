@@ -5,14 +5,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -22,6 +25,9 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,8 +36,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -60,8 +69,31 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 import java.util.UUID
+
+private val DateLabelFmt = DateTimeFormatter.ofPattern("EEE, MMM d, yyyy", Locale.getDefault())
+private val TimeLabelFmt = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
+
+private val CommonZones = listOf(
+    "Asia/Karachi",
+    "Asia/Dubai",
+    "Asia/Kolkata",
+    "Asia/Shanghai",
+    "Asia/Tokyo",
+    "Europe/London",
+    "Europe/Paris",
+    "Europe/Berlin",
+    "America/New_York",
+    "America/Chicago",
+    "America/Denver",
+    "America/Los_Angeles",
+    "Australia/Sydney",
+    "UTC",
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,17 +106,23 @@ fun EventCreateChatScreen(
         if (chatId.isBlank()) "chat"
         else InMemoryChatStore.chat(chatId).title.substringBefore(" ").ifBlank { "chat" }
     }
+    val deviceZone = remember { ZoneId.systemDefault() }
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") }
-    var startTime by remember { mutableStateOf("") }
-    var endTime by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf<LocalDate?>(null) }
+    var startTime by remember { mutableStateOf<LocalTime?>(null) }
+    var endTime by remember { mutableStateOf<LocalTime?>(null) }
+    var zoneId by remember { mutableStateOf(deviceZone) }
     var location by remember { mutableStateOf("") }
-    var type by remember { mutableIntStateOf(0) } // 0 in person, 1 call
+    var type by remember { mutableIntStateOf(0) }
     var sending by remember { mutableStateOf(false) }
+    var showDate by remember { mutableStateOf(false) }
+    var showStartTime by remember { mutableStateOf(false) }
+    var showEndTime by remember { mutableStateOf(false) }
+    var showZone by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val canPreview = title.isNotBlank() && date.isNotBlank() && startTime.isNotBlank()
+    val canSend = title.isNotBlank() && date != null && startTime != null
 
     Column(
         modifier = Modifier
@@ -142,41 +180,40 @@ fun EventCreateChatScreen(
             )
             Spacer(Modifier.height(12.dp))
             FieldLabel("Date *")
-            EventField(
-                value = date,
-                onValueChange = { date = it },
+            PickerField(
+                value = date?.format(DateLabelFmt).orEmpty(),
                 placeholder = "Choose a date",
                 trailing = { Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = AivoraColors.TextSecondary) },
+                onClick = { showDate = true },
             )
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
                     FieldLabel("Start time *")
-                    EventField(
-                        value = startTime,
-                        onValueChange = { startTime = it },
+                    PickerField(
+                        value = startTime?.format(TimeLabelFmt).orEmpty(),
                         placeholder = "Start",
                         trailing = { Icon(Icons.Default.AccessTime, contentDescription = null, tint = AivoraColors.TextSecondary) },
+                        onClick = { showStartTime = true },
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     FieldLabel("End time")
-                    EventField(
-                        value = endTime,
-                        onValueChange = { endTime = it },
+                    PickerField(
+                        value = endTime?.format(TimeLabelFmt).orEmpty(),
                         placeholder = "End",
                         trailing = { Icon(Icons.Default.AccessTime, contentDescription = null, tint = AivoraColors.TextSecondary) },
+                        onClick = { showEndTime = true },
                     )
                 }
             }
             Spacer(Modifier.height(12.dp))
             FieldLabel("Timezone")
-            EventField(
-                value = "Europe/London · BST (UTC+01:00)",
-                onValueChange = { },
-                placeholder = "",
-                readOnly = true,
+            PickerField(
+                value = formatZoneLabel(zoneId),
+                placeholder = "Timezone",
                 trailing = { Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = AivoraColors.TextSecondary) },
+                onClick = { showZone = true },
             )
             Spacer(Modifier.height(16.dp))
             Row(
@@ -204,22 +241,24 @@ fun EventCreateChatScreen(
         PrimaryButton(
             text = "Send event",
             onClick = {
+                val d = date ?: return@PrimaryButton
+                val start = startTime ?: return@PrimaryButton
                 val uid = SessionStore.userId(context)
+                val startsAt = LocalDateTime.of(d, start).atZone(zoneId).toInstant()
+                val endsAt = endTime?.let { end ->
+                    LocalDateTime.of(d, end).atZone(zoneId).toInstant().takeIf { it.isAfter(startsAt) }
+                }
                 if (chatId.isBlank() || SessionStore.accessToken(context).isNullOrBlank() || uid == null) {
                     if (chatId.isNotBlank()) {
                         InMemoryChatStore.sendText(
                             chatId,
-                            "📅 Event: ${title.trim()} · $date $startTime" +
+                            "📅 Event: ${title.trim()} · ${d.format(DateLabelFmt)} ${start.format(TimeLabelFmt)}" +
                                 if (location.isNotBlank()) " · $location" else "",
                         )
                     }
                     onBack?.invoke()
                 } else if (!sending) {
                     sending = true
-                    val startsAt = parseEventInstant(date, startTime)
-                    val endsAt = endTime.takeIf { it.isNotBlank() }
-                        ?.let { parseEventInstantOrNull(date, it) }
-                        ?.takeIf { it.isAfter(startsAt) }
                     scope.launch {
                         runCatching {
                             NetworkModule.api().postConversationsIdMessages(
@@ -233,7 +272,7 @@ fun EventCreateChatScreen(
                                         startsAt = startsAt.toString(),
                                         endsAt = endsAt?.toString(),
                                         withCall = type == 1,
-                                        timezone = ZoneId.systemDefault().id,
+                                        timezone = zoneId.id,
                                     ),
                                 ),
                             )
@@ -247,21 +286,144 @@ fun EventCreateChatScreen(
                     }
                 }
             },
-            enabled = canPreview && !sending,
+            enabled = canSend && !sending,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+        )
+    }
+
+    if (showDate) {
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = (date ?: LocalDate.now())
+                .atStartOfDay(ZoneOffset.UTC)
+                .toInstant()
+                .toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDate = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        state.selectedDateMillis?.let { millis ->
+                            date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                        }
+                        showDate = false
+                    },
+                ) { Text("OK", color = AivoraColors.Primary) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDate = false }) {
+                    Text("Cancel", color = AivoraColors.TextSecondary)
+                }
+            },
+        ) {
+            DatePicker(state = state)
+        }
+    }
+
+    if (showStartTime) {
+        EventTimePickerDialog(
+            initial = startTime ?: LocalTime.now().withSecond(0).withNano(0),
+            onDismiss = { showStartTime = false },
+            onConfirm = {
+                startTime = it
+                showStartTime = false
+            },
+        )
+    }
+    if (showEndTime) {
+        EventTimePickerDialog(
+            initial = endTime ?: (startTime?.plusHours(1) ?: LocalTime.now().plusHours(1).withSecond(0).withNano(0)),
+            onDismiss = { showEndTime = false },
+            onConfirm = {
+                endTime = it
+                showEndTime = false
+            },
+        )
+    }
+    if (showZone) {
+        TimezonePickerDialog(
+            selected = zoneId,
+            onDismiss = { showZone = false },
+            onSelect = {
+                zoneId = it
+                showZone = false
+            },
         )
     }
 }
 
-/** `YYYY-MM-DD` + `HH:mm` in the device zone; falls back to now + 1 day when unparseable. */
-private fun parseEventInstantOrNull(date: String, time: String): Instant? = runCatching {
-    LocalDateTime.of(LocalDate.parse(date.trim()), LocalTime.parse(time.trim()))
-        .atZone(ZoneId.systemDefault())
-        .toInstant()
-}.getOrNull()
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EventTimePickerDialog(
+    initial: LocalTime,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalTime) -> Unit,
+) {
+    val state = rememberTimePickerState(
+        initialHour = initial.hour,
+        initialMinute = initial.minute,
+        is24Hour = false,
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(LocalTime.of(state.hour, state.minute)) },
+            ) { Text("OK", color = AivoraColors.Primary) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = AivoraColors.TextSecondary)
+            }
+        },
+        text = { TimePicker(state = state) },
+    )
+}
 
-private fun parseEventInstant(date: String, time: String): Instant =
-    parseEventInstantOrNull(date, time) ?: Instant.now().plus(1, ChronoUnit.DAYS)
+@Composable
+private fun TimezonePickerDialog(
+    selected: ZoneId,
+    onDismiss: () -> Unit,
+    onSelect: (ZoneId) -> Unit,
+) {
+    val zones = remember {
+        val ids = linkedSetOf(ZoneId.systemDefault().id)
+        ids.addAll(CommonZones)
+        ids.map { ZoneId.of(it) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Timezone", fontWeight = FontWeight.SemiBold) },
+        text = {
+            LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                items(zones, key = { it.id }) { z ->
+                    Text(
+                        formatZoneLabel(z),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(z) }
+                            .padding(vertical = 12.dp),
+                        fontWeight = if (z.id == selected.id) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (z.id == selected.id) AivoraColors.Primary else AivoraColors.Ink,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = AivoraColors.TextSecondary)
+            }
+        },
+    )
+}
+
+private fun formatZoneLabel(zone: ZoneId): String {
+    val now = Instant.now()
+    val offset = zone.rules.getOffset(now)
+    val offsetLabel = offset.id.replace("Z", "+00:00")
+    val short = zone.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+    return "${zone.id} · $short ($offsetLabel)"
+}
 
 @Composable
 private fun FieldLabel(text: String) {
@@ -274,13 +436,46 @@ private fun FieldLabel(text: String) {
 }
 
 @Composable
+private fun PickerField(
+    value: String,
+    placeholder: String,
+    trailing: @Composable (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+            .clickable(onClick = onClick),
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            placeholder = { Text(placeholder) },
+            singleLine = true,
+            readOnly = true,
+            enabled = false,
+            trailingIcon = trailing,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(AivoraDimens.RadiusMd),
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledContainerColor = AivoraColors.LightSurface,
+                disabledTextColor = AivoraColors.Ink,
+                disabledBorderColor = AivoraColors.Divider,
+                disabledPlaceholderColor = AivoraColors.TextTertiary,
+                disabledTrailingIconColor = AivoraColors.TextSecondary,
+            ),
+        )
+    }
+}
+
+@Composable
 private fun EventField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
     singleLine: Boolean = true,
     minHeight: Int = 0,
-    readOnly: Boolean = false,
     trailing: @Composable (() -> Unit)? = null,
 ) {
     OutlinedTextField(
@@ -288,7 +483,6 @@ private fun EventField(
         onValueChange = onValueChange,
         placeholder = if (placeholder.isNotEmpty()) ({ Text(placeholder) }) else null,
         singleLine = singleLine,
-        readOnly = readOnly,
         trailingIcon = trailing,
         modifier = Modifier
             .fillMaxWidth()

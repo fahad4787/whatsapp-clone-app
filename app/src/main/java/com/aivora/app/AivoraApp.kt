@@ -7,12 +7,15 @@ import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.request.crossfade
+import com.aivora.app.data.realtime.PresenceLifecycle
 import okio.Path.Companion.toOkioPath
 
 class AivoraApp : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        // App foreground ↔ WS online; background/kill ↔ offline for peers.
+        PresenceLifecycle.install(this)
         // Push registration runs after first Activity frame (see MainActivity) — keeps cold start light.
     }
 

@@ -319,15 +319,25 @@ fun ChatIdScreen(
     }
     val firstName = chat.title.substringBefore(' ').ifBlank { chat.title }
     val hidePresence = chat.blockedByMe || chat.blockedMe
+    val onlineUsers by RealtimeClient.onlineUsers.collectAsState()
     val roomOnlineMap by RealtimeClient.roomOnline.collectAsState()
+    // Snapshot now lists members with the app open (not only this screen open).
     val groupOnlineCount = remember(chatId, roomOnlineMap, myUserId) {
         RealtimeClient.onlineCountInChat(chatId, myUserId)
     }
-    val peerOnline = remember(chatId, chat.peerUserId, roomOnlineMap, hidePresence, chat.peerPresenceVisible) {
+    val peerOnline = remember(chat.peerUserId, onlineUsers, hidePresence, chat.peerPresenceVisible) {
         if (hidePresence || chat.isGroup || !chat.peerPresenceVisible) false
-        else {
-            val peerId = chat.peerUserId
-            !peerId.isNullOrBlank() && (roomOnlineMap[chatId]?.contains(peerId) == true)
+        else RealtimeClient.isUserOnline(chat.peerUserId)
+    }
+    var lastSeenLocal by remember(chatId) { mutableStateOf(chat.peerLastSeenAt) }
+    LaunchedEffect(chat.peerLastSeenAt) { lastSeenLocal = chat.peerLastSeenAt }
+    LaunchedEffect(chatId, useRemote) {
+        if (!useRemote) return@LaunchedEffect
+        RealtimeClient.presence.collect { event ->
+            if (event.userId != chat.peerUserId) return@collect
+            if (!event.online && !event.lastSeenAt.isNullOrBlank()) {
+                lastSeenLocal = event.lastSeenAt
+            }
         }
     }
     val subtitle = when {
@@ -339,7 +349,7 @@ fun ChatIdScreen(
         }
         !chat.peerPresenceVisible -> ""
         peerOnline -> "Online"
-        !chat.peerLastSeenAt.isNullOrBlank() -> formatLastSeen(chat.peerLastSeenAt)
+        !lastSeenLocal.isNullOrBlank() -> formatLastSeen(lastSeenLocal!!)
         else -> ""
     }
 

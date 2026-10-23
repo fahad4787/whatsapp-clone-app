@@ -48,6 +48,8 @@ object RealtimeClient {
     private var reconnectJob: Job? = null
     private var tokenProvider: (() -> String?)? = null
     private var myUserIdProvider: (() -> String?)? = null
+    /** When true, onClosed must not auto-reconnect (app backgrounded). */
+    @Volatile private var suppressReconnect = false
 
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
@@ -75,6 +77,7 @@ object RealtimeClient {
     fun start(tokenProvider: () -> String?, myUserIdProvider: () -> String?) {
         this.tokenProvider = tokenProvider
         this.myUserIdProvider = myUserIdProvider
+        suppressReconnect = false
         connect()
     }
 
@@ -86,11 +89,14 @@ object RealtimeClient {
     }
 
     fun stop() {
+        suppressReconnect = true
         reconnectJob?.cancel()
         reconnectJob = null
         socketRef.getAndSet(null)?.close(1000, "stop")
         _connected.value = false
-        joinedRooms.clear()
+        // Keep joinedRooms so we re-join after returning to foreground.
+        _onlineUsers.value = emptyMap()
+        _roomOnline.value = emptyMap()
     }
 
     fun join(conversationId: String) {
@@ -103,7 +109,7 @@ object RealtimeClient {
         if (conversationId.isBlank()) return
         synchronized(joinedRooms) { joinedRooms.remove(conversationId) }
         send("leave", buildJsonObject { put("conversation_id", conversationId) })
-        // Drop local room presence; peers get offline via server leave broadcast.
+        // Leaving the screen does not clear app-level onlineUsers.
         _roomOnline.value = _roomOnline.value.toMutableMap().also { it.remove(conversationId) }
     }
 
@@ -153,12 +159,12 @@ object RealtimeClient {
 
                     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                         _connected.value = false
-                        scheduleReconnect()
+                        if (!suppressReconnect) scheduleReconnect()
                     }
 
                     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                         _connected.value = false
-                        scheduleReconnect()
+                        if (!suppressReconnect) scheduleReconnect()
                     }
                 },
             ),
@@ -166,10 +172,11 @@ object RealtimeClient {
     }
 
     private fun scheduleReconnect() {
+        if (suppressReconnect) return
         if (reconnectJob?.isActive == true) return
         reconnectJob = scope.launch {
             delay(2_000)
-            if (isActive && tokenProvider?.invoke()?.isNotBlank() == true) {
+            if (isActive && !suppressReconnect && tokenProvider?.invoke()?.isNotBlank() == true) {
                 connect()
             }
         }
@@ -265,8 +272,10 @@ object RealtimeClient {
                     ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
                     ?.toSet()
                     .orEmpty()
+                // Snapshot is app-level online members of this chat (not "viewing this screen").
                 _roomOnline.value = _roomOnline.value.toMutableMap().also { it[conversationId] = ids }
                 _onlineUsers.value = _onlineUsers.value.toMutableMap().also { map ->
+                    // Mark listed users online; do not wipe others (other chats may still track them).
                     ids.forEach { map[it] = true }
                 }
             }

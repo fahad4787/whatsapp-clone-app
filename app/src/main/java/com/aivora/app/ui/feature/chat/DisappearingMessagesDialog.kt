@@ -12,8 +12,11 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,6 +29,7 @@ import com.aivora.app.data.model.DisappearingBody
 import com.aivora.app.data.toLocalChat
 import com.aivora.app.ui.theme.AivoraColors
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 
 private val DisappearingOptions = listOf(
     0 to "Off",
@@ -55,27 +59,44 @@ fun DisappearingMessagesDialog(
     val scope = rememberCoroutineScope()
     val api = remember { ChatRepository.api() }
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
+    var saving by remember { mutableStateOf(false) }
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!saving) onDismiss() },
         title = { Text("Disappearing messages", fontWeight = FontWeight.Bold) },
         text = {
             Column {
+                Text(
+                    "New messages in this chat disappear after the timer. Already-sent messages stay.",
+                    color = AivoraColors.TextSecondary,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
                 DisappearingOptions.forEach { (seconds, label) ->
                     val pick = {
-                        onDismiss()
-                        if (seconds != currentSeconds) {
-                            if (!useRemote) {
+                        when {
+                            saving -> Unit
+                            seconds == currentSeconds -> onDismiss()
+                            !useRemote -> {
                                 Toast.makeText(context, "Sign in to change this setting", Toast.LENGTH_SHORT).show()
-                            } else {
+                            }
+                            else -> {
+                                saving = true
                                 scope.launch {
-                                    runCatching { api.putConversationsIdDisappearing(chatId, DisappearingBody(seconds)) }
-                                        .onSuccess {
-                                            InMemoryChatStore.upsertChat(it.toLocalChat())
-                                            onUpdated()
+                                    runCatching {
+                                        api.putConversationsIdDisappearing(chatId, DisappearingBody(seconds = seconds))
+                                    }.onSuccess { dto ->
+                                        InMemoryChatStore.upsertChat(dto.toLocalChat())
+                                        onUpdated()
+                                        onDismiss()
+                                    }.onFailure { err ->
+                                        saving = false
+                                        val code = (err as? HttpException)?.code()
+                                        val msg = when (code) {
+                                            404 -> "Chat not found"
+                                            401, 403 -> "Please sign in again"
+                                            else -> "Could not update timer"
                                         }
-                                        .onFailure {
-                                            Toast.makeText(context, "Could not update timer", Toast.LENGTH_SHORT).show()
-                                        }
+                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
                         }
@@ -83,13 +104,14 @@ fun DisappearingMessagesDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { pick() }
+                            .clickable(enabled = !saving) { pick() }
                             .padding(vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
                             selected = seconds == currentSeconds,
                             onClick = { pick() },
+                            enabled = !saving,
                             colors = RadioButtonDefaults.colors(selectedColor = AivoraColors.Primary),
                         )
                         Text(label)
@@ -98,7 +120,7 @@ fun DisappearingMessagesDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, enabled = !saving) {
                 Text("Cancel", color = AivoraColors.Primary, fontWeight = FontWeight.SemiBold)
             }
         },
