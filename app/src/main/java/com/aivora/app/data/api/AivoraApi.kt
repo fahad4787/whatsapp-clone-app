@@ -151,7 +151,7 @@ interface AivoraApi {
     suspend fun postMessagesIdReactions(
         @Path("id") id: String,
             @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.MessageDto
 
     @GET("api/me/two-step")
     suspend fun getMeTwoStep(): okhttp3.ResponseBody
@@ -489,7 +489,7 @@ interface AivoraApi {
     suspend fun postMessagesIdStar(
         @Path("id") id: String,
             @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.MessageDto
 
     @DELETE("api/me/passkeys/{id}")
     suspend fun deleteMePasskeysId(
@@ -564,7 +564,7 @@ interface AivoraApi {
     suspend fun getMeChatLock(): okhttp3.ResponseBody
 
     @GET("api/me/starred")
-    suspend fun getMeStarred(): okhttp3.ResponseBody
+    suspend fun getMeStarred(): com.aivora.app.data.model.MessageListDto
 
     @GET("api/conversations/{id}/messages")
     suspend fun getConversationsIdMessagesAlt(
@@ -631,7 +631,7 @@ interface AivoraApi {
     suspend fun postMessagesIdForward(
         @Path("id") id: String,
             @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.MessageDto
 
     @POST("api/channels/{slug}/report")
     suspend fun postChannelsSlugReport(

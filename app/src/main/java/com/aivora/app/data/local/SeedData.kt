@@ -20,6 +20,18 @@ enum class MessageDeliveryStatus {
     Read,
 }
 
+data class LocalReplyPreview(
+    val id: String,
+    val body: String,
+    val deleted: Boolean = false,
+)
+
+data class LocalReaction(
+    val emoji: String,
+    val count: Int,
+    val mine: Boolean = false,
+)
+
 data class LocalMessage(
     val id: String,
     val mine: Boolean,
@@ -31,6 +43,11 @@ data class LocalMessage(
     val voiceDurationSec: Int? = null,
     val status: MessageDeliveryStatus = MessageDeliveryStatus.Sent,
     val deletedForEveryone: Boolean = false,
+    val replyTo: LocalReplyPreview? = null,
+    val reactions: List<LocalReaction> = emptyList(),
+    val starred: Boolean = false,
+    val forwarded: Boolean = false,
+    val conversationId: String? = null,
 )
 
 /** Seed data for the in-memory store (no persistence). */

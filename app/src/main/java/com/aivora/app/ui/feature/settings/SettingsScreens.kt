@@ -81,6 +81,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.EmptyState
@@ -585,15 +586,101 @@ fun SettingsStarredScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    AivoraScaffold(title = "Starred messages", onBack = onBack) {
-        EmptyState(
-            title = "No starred messages",
-            body = "Press and hold a message in chat, then choose Star.",
-            icon = Icons.Default.StarBorder,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxSize(),
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val api = remember {
+        com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
         )
+    }
+    val useRemote = !com.aivora.app.data.local.SessionStore.accessToken(context).isNullOrBlank()
+    var starred by remember { mutableStateOf<List<com.aivora.app.data.local.LocalMessage>>(emptyList()) }
+    var loading by remember { mutableStateOf(useRemote) }
+    val myUserId = remember {
+        com.aivora.app.data.local.SessionStore.userId(context).orEmpty()
+    }
+
+    androidx.compose.runtime.LaunchedEffect(useRemote) {
+        if (!useRemote) {
+            loading = false
+            return@LaunchedEffect
+        }
+        loading = true
+        runCatching { api.getMeStarred() }
+            .onSuccess { list ->
+                val uid = myUserId.ifBlank {
+                    runCatching { api.getMe().id }.getOrNull().orEmpty()
+                }
+                starred = list.items.map { it.toLocalMessage(uid) }
+            }
+            .onFailure { starred = emptyList() }
+        loading = false
+    }
+
+    AivoraScaffold(title = "Starred messages", onBack = onBack) {
+        when {
+            loading -> {
+                Text(
+                    "Loading…",
+                    color = AivoraColors.TextSecondary,
+                    modifier = Modifier.padding(24.dp),
+                )
+            }
+            starred.isEmpty() -> {
+                EmptyState(
+                    title = "No starred messages",
+                    body = "Press and hold a message in chat, then choose Star.",
+                    icon = Icons.Default.StarBorder,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize(),
+                )
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                ) {
+                    items(starred, key = { it.id }) { msg ->
+                        val chatId = msg.conversationId
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (!chatId.isNullOrBlank()) {
+                                        onNavigate(Routes.ChatId.replace("{id}", chatId))
+                                    }
+                                }
+                                .padding(horizontal = 20.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = null,
+                                tint = AivoraColors.Primary,
+                                modifier = Modifier.size(22.dp),
+                            )
+                            Spacer(Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    msg.body.ifBlank { "Starred message" },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 2,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    msg.time,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = AivoraColors.TextSecondary,
+                                )
+                            }
+                        }
+                        HorizontalDivider(color = AivoraColors.Divider)
+                    }
+                }
+            }
+        }
     }
 }
 

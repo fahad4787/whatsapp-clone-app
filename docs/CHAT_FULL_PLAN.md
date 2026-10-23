@@ -1,7 +1,7 @@
 # Full chat plan (Wave 9+)
 
 Date: 2026-10-23  
-Status: **Wave 9 in progress / shipping** — MVP Waves 0–8 done. Goal: make **1:1 and group chat** feel complete before status/channels/calls.
+Status: **Wave 10 shipping** — Waves 0–9 done. Goal: make **1:1 and group chat** feel complete before status/channels/calls.
 
 ## Principle
 
@@ -38,12 +38,12 @@ Biggest gaps for “full chat”: message actions, conversation controls, voice/
 ### Wave 10 — Reply, react, star, forward
 **Goal:** core message actions.
 
-| # | Feature | Exit |
-|---|---------|------|
-| 10.1 | Reply / quote (`reply_to`) in schema + composer + bubble | Reply thread visible both sides |
-| 10.2 | Reactions (emoji per user) | Live via WS |
-| 10.3 | Star / unstar + Starred messages screen from API | Stars survive reinstall |
-| 10.4 | Forward message to another chat | Appears in target conversation |
+| # | Feature | Exit | Status |
+|---|---------|------|--------|
+| 10.1 | Reply / quote (`reply_to`) in schema + composer + bubble | Reply thread visible both sides | Done |
+| 10.2 | Reactions (emoji per user) | Live via WS | Done |
+| 10.3 | Star / unstar + Starred messages screen from API | Stars survive reinstall | Done |
+| 10.4 | Forward message to another chat | Appears in target conversation | Done |
 
 ---
 

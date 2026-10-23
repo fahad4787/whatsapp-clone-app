@@ -35,10 +35,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContactPage
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Image
@@ -47,8 +50,11 @@ import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Poll
+import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import android.widget.Toast
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -84,12 +90,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import coil3.compose.AsyncImage
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.LocalMessage
+import com.aivora.app.data.local.LocalReplyPreview
 import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.ReplyPreviewDto
 import com.aivora.app.data.model.SendMessageBody
 import com.aivora.app.data.realtime.RealtimeClient
 import com.aivora.app.data.sendImageMessage
@@ -99,6 +109,7 @@ import com.aivora.app.ui.components.AivoraBottomSheet
 import com.aivora.app.ui.components.AivoraOverflowMenu
 import com.aivora.app.ui.components.AivoraSheetAction
 import com.aivora.app.ui.components.AivoraSheetActionGrid
+import com.aivora.app.ui.components.AivoraSheetActionList
 import com.aivora.app.ui.components.OverflowMenuItem
 import com.aivora.app.ui.components.TypingIndicatorBubble
 import com.aivora.app.ui.icons.AivoraIcons
@@ -113,6 +124,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.random.Random
+
+private val ReactionEmojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -140,10 +153,15 @@ fun ChatIdScreen(
     var showChatMenu by remember { mutableStateOf(false) }
     var showClearChat by remember { mutableStateOf(false) }
     var showReportSent by remember { mutableStateOf(false) }
+    var actionTarget by remember { mutableStateOf<LocalMessage?>(null) }
     var deleteTarget by remember { mutableStateOf<LocalMessage?>(null) }
+    var reactTarget by remember { mutableStateOf<LocalMessage?>(null) }
+    var forwardTarget by remember { mutableStateOf<LocalMessage?>(null) }
+    var replyTo by remember(chatId) { mutableStateOf<LocalMessage?>(null) }
     var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
     var peerOnline by remember { mutableStateOf(true) }
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
+    val allChats by InMemoryChatStore.chats.collectAsState()
     val listState = rememberLazyListState()
     val wallpaper = if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
@@ -367,7 +385,10 @@ fun ChatIdScreen(
                         message = msg,
                         isGroup = chat.isGroup,
                         dark = dark,
-                        onLongPress = { deleteTarget = msg },
+                        onLongPress = {
+                            haptics.tick()
+                            actionTarget = msg
+                        },
                     )
                 }
                 if (peerTyping) {
@@ -387,6 +408,10 @@ fun ChatIdScreen(
             value = text,
             onValueChange = { text = it },
             placeholder = "Message $firstName…",
+            replyPreview = replyTo?.let { r ->
+                if (r.deletedForEveryone) "Original message was deleted" else r.body.ifBlank { "Message" }
+            },
+            onClearReply = { replyTo = null },
             onAttach = {
                 focusManager.clearFocus(force = true)
                 keyboard?.hide()
@@ -397,7 +422,19 @@ fun ChatIdScreen(
                 val body = text.trim()
                 if (body.isNotEmpty()) {
                     haptics.confirm()
+                    val quoting = replyTo
                     text = ""
+                    replyTo = null
+                    val replyDto = quoting?.let {
+                        ReplyPreviewDto(id = it.id, text = it.body.takeIf { t -> t.isNotBlank() })
+                    }
+                    val localReply = quoting?.let {
+                        LocalReplyPreview(
+                            id = it.id,
+                            body = if (it.deletedForEveryone) "Original message was deleted" else it.body,
+                            deleted = it.deletedForEveryone,
+                        )
+                    }
                     if (useRemote) {
                         RealtimeClient.setTyping(chatId, false)
                         scope.launch {
@@ -407,6 +444,7 @@ fun ChatIdScreen(
                                     SendMessageBody(
                                         text = body,
                                         clientId = UUID.randomUUID().toString(),
+                                        replyTo = replyDto,
                                     ),
                                 )
                                 val uid = myUserId ?: SessionStore.userId(context)
@@ -414,11 +452,11 @@ fun ChatIdScreen(
                                     InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
                                 }
                             } catch (_: Exception) {
-                                InMemoryChatStore.sendText(chatId, body)
+                                InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
                             }
                         }
                     } else {
-                        InMemoryChatStore.sendText(chatId, body)
+                        InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
                         peerTyping = true
                     }
                 } else {
@@ -503,6 +541,179 @@ fun ChatIdScreen(
             },
             onDismiss = { showClearChat = false },
         )
+    }
+
+    actionTarget?.let { target ->
+        AivoraBottomSheet(
+            onDismiss = { actionTarget = null },
+            title = "Message",
+        ) {
+            AivoraSheetActionList(
+                actions = buildList {
+                    if (!target.deletedForEveryone) {
+                        add(
+                            AivoraSheetAction("Reply", Icons.Default.Reply) {
+                                replyTo = target
+                                actionTarget = null
+                            },
+                        )
+                        add(
+                            AivoraSheetAction("React", Icons.Default.EmojiEmotions) {
+                                reactTarget = target
+                                actionTarget = null
+                            },
+                        )
+                        add(
+                            AivoraSheetAction(
+                                if (target.starred) "Unstar" else "Star",
+                                if (target.starred) Icons.Default.Star else Icons.Default.StarBorder,
+                            ) {
+                                actionTarget = null
+                                if (useRemote) {
+                                    scope.launch {
+                                        try {
+                                            val uid = myUserId ?: SessionStore.userId(context)
+                                            val updated = if (target.starred) {
+                                                api.deleteMessagesIdStar(target.id)
+                                                target.copy(starred = false)
+                                            } else {
+                                                val dto = api.postMessagesIdStar(target.id, emptyMap())
+                                                if (uid != null) dto.toLocalMessage(uid)
+                                                else target.copy(starred = true)
+                                            }
+                                            InMemoryChatStore.upsertMessage(chatId, updated)
+                                        } catch (_: Exception) {
+                                            Toast.makeText(context, "Could not update star", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                } else {
+                                    InMemoryChatStore.upsertMessage(
+                                        chatId,
+                                        target.copy(starred = !target.starred),
+                                    )
+                                }
+                            },
+                        )
+                        add(
+                            AivoraSheetAction("Forward", Icons.AutoMirrored.Filled.Forward) {
+                                forwardTarget = target
+                                actionTarget = null
+                            },
+                        )
+                    }
+                    add(
+                        AivoraSheetAction("Delete", Icons.Default.Delete, danger = true) {
+                            deleteTarget = target
+                            actionTarget = null
+                        },
+                    )
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+
+    reactTarget?.let { target ->
+        AivoraBottomSheet(
+            onDismiss = { reactTarget = null },
+            title = "React",
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ReactionEmojis.forEach { emoji ->
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(AivoraColors.SurfaceMuted)
+                            .clickable {
+                                reactTarget = null
+                                if (useRemote) {
+                                    scope.launch {
+                                        runCatching {
+                                            api.postMessagesIdReactions(
+                                                target.id,
+                                                mapOf("emoji" to emoji),
+                                            )
+                                        }.onSuccess { dto ->
+                                            val uid = myUserId ?: SessionStore.userId(context)
+                                            if (uid != null) {
+                                                InMemoryChatStore.upsertMessage(
+                                                    chatId,
+                                                    dto.toLocalMessage(uid),
+                                                )
+                                            }
+                                        }.onFailure {
+                                            Toast.makeText(context, "Could not react", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(emoji, fontSize = 22.sp)
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+
+    forwardTarget?.let { target ->
+        val destinations = allChats.filter { it.id != chatId }
+        AivoraBottomSheet(
+            onDismiss = { forwardTarget = null },
+            title = "Forward to…",
+        ) {
+            if (destinations.isEmpty()) {
+                Text(
+                    "No other chats yet",
+                    color = AivoraColors.TextSecondary,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                )
+            } else {
+                AivoraSheetActionList(
+                    actions = destinations.map { dest ->
+                        AivoraSheetAction(dest.title, Icons.Default.Person) {
+                            forwardTarget = null
+                            if (useRemote) {
+                                scope.launch {
+                                    runCatching {
+                                        api.postMessagesIdForward(
+                                            target.id,
+                                            mapOf("conversation_id" to dest.id),
+                                        )
+                                    }.onSuccess { dto ->
+                                        val uid = myUserId ?: SessionStore.userId(context)
+                                        if (uid != null) {
+                                            InMemoryChatStore.upsertMessage(
+                                                dest.id,
+                                                dto.toLocalMessage(uid),
+                                            )
+                                        }
+                                        Toast.makeText(context, "Forwarded", Toast.LENGTH_SHORT).show()
+                                    }.onFailure {
+                                        Toast.makeText(context, "Could not forward", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            } else {
+                                InMemoryChatStore.sendText(
+                                    dest.id,
+                                    target.body.ifBlank { "Forwarded message" },
+                                )
+                                Toast.makeText(context, "Forwarded", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
     }
 
     deleteTarget?.let { target ->
@@ -815,6 +1026,41 @@ private fun MessageRow(
                     modifier = Modifier.padding(bottom = 4.dp),
                 )
             }
+            if (message.forwarded) {
+                Text(
+                    "Forwarded",
+                    color = AivoraColors.TextSecondary,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+            message.replyTo?.let { quote ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(AivoraColors.Primary.copy(alpha = 0.12f))
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(3.dp)
+                            .height(28.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(AivoraColors.Primary),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        quote.body,
+                        color = AivoraColors.TextSecondary,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             if (voiceSecs != null) {
                 VoiceNoteContent(
                     durationSec = voiceSecs,
@@ -870,12 +1116,41 @@ private fun MessageRow(
                     )
                 }
             }
+            if (message.reactions.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    message.reactions.forEach { reaction ->
+                        Text(
+                            "${reaction.emoji} ${reaction.count}".trim(),
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (reaction.mine) AivoraColors.Primary.copy(alpha = 0.18f)
+                                    else AivoraColors.SurfaceMuted,
+                                )
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+            }
             Row(
                 modifier = Modifier
                     .align(Alignment.End)
                     .padding(top = 4.dp, start = if (message.mediaUri != null) 4.dp else 0.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (message.starred) {
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = "Starred",
+                        tint = AivoraColors.Primary,
+                        modifier = Modifier.size(12.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
                 if (voiceSecs != null && mine) {
                     Icon(
                         painter = painterResource(AivoraIcons.Mic),
@@ -978,6 +1253,8 @@ private fun ChatComposer(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
+    replyPreview: String? = null,
+    onClearReply: () -> Unit = {},
     onAttach: () -> Unit,
     onCamera: () -> Unit,
     onSendOrMic: () -> Unit,
@@ -990,6 +1267,44 @@ private fun ChatComposer(
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
     ) {
         HorizontalDivider(color = AivoraColors.ChatDivider, thickness = 1.dp)
+        if (replyPreview != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AivoraColors.SurfaceMuted)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(3.dp)
+                        .height(28.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(AivoraColors.Primary),
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Replying",
+                        color = AivoraColors.Primary,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        replyPreview,
+                        color = AivoraColors.TextSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                IconButton(onClick = onClearReply, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Cancel reply", tint = AivoraColors.TextSecondary)
+                }
+            }
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()

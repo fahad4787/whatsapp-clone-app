@@ -67,7 +67,12 @@ object InMemoryChatStore {
             ?: if (usingRemote) LocalChat(chatId, "Chat", "Say hello", "Now")
             else SeedData.chat(chatId)
 
-    fun sendText(chatId: String, body: String, mine: Boolean = true) {
+    fun sendText(
+        chatId: String,
+        body: String,
+        mine: Boolean = true,
+        replyTo: LocalReplyPreview? = null,
+    ) {
         val trimmed = body.trim()
         if (trimmed.isEmpty()) return
         append(
@@ -77,6 +82,7 @@ object InMemoryChatStore {
                 mine = mine,
                 body = trimmed,
                 time = "Now",
+                replyTo = replyTo,
             ),
             preview = trimmed,
         )
