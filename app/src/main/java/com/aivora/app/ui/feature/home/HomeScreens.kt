@@ -176,9 +176,10 @@ fun HomeScreen(
         } catch (_: Exception) {
             /* keep cache / last remote list; do not flash seed while logged in */
         }
-        // Keep unread badges in sync with the server (reuse one client).
+        // Backup poll only when WS is down (live updates come from RealtimeClient).
         while (true) {
-            kotlinx.coroutines.delay(12_000)
+            kotlinx.coroutines.delay(20_000)
+            if (com.aivora.app.data.realtime.RealtimeClient.connected.value) continue
             try {
                 val remote = api.getConversations().items.map { it.toLocalChat() }
                 InMemoryChatStore.replaceFromRemote(remote)

@@ -81,11 +81,21 @@ Goal: **WhatsApp-class feel on low-RAM phones** — cold start, chat open, scrol
 **Exit:** one place to change mute/pin/archive/block UI + behavior.
 
 ### F5 — Memory & polling
-1. Cap in-memory messages per chat; page older history  
-2. Slow home poll when app backgrounded; WS is source of truth when connected  
+1. Cap in-memory messages per chat; page older history — **Started** (60-msg window)  
+2. Slow home poll when app backgrounded; WS is source of truth when connected — **Started** (skip HTTP poll while WS up)  
 3. Coil memory/disk cache tuned; recycle bitmaps  
 
 **Exit:** stable on 2–3GB devices with 50+ chats.
+
+### Free-tier backend vs smoothness
+
+| What paid/always-on hosting fixes | What it does **not** fix |
+|----------------------------------|---------------------------|
+| Cold-start delays (Render free sleep) | Chat **scroll** jank (Compose / RAM) |
+| Slow first API after idle | Heavy bubbles / too many list items |
+| Occasional 10–30s wake latency | Disk writes on main/WS thread |
+
+WhatsApp feel needs **client** work (cache, caps, WS-first, light UI) **plus** a warm API. Paid plan helps send/open latency; conversation scroll is mostly device-side.
 
 ---
 

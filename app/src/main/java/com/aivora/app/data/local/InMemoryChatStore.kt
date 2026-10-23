@@ -1,10 +1,16 @@
 package com.aivora.app.data.local
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -14,6 +20,12 @@ import java.util.concurrent.atomic.AtomicInteger
  * Disk snapshots via [ChatListCache] / [MessageCache] for instant reopen.
  */
 object InMemoryChatStore {
+    /** Keep memory lean for Mate-class devices (WhatsApp pages older history). */
+    private const val MAX_IN_MEMORY_MESSAGES = 60
+
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val persistJobs = ConcurrentHashMap<String, Job>()
+
     /** Empty until remote load or [useOfflineSeed] — avoids flashing SeedData after login. */
     private val _chats = MutableStateFlow<List<LocalChat>>(emptyList())
     val chats: StateFlow<List<LocalChat>> = _chats.asStateFlow()
@@ -73,8 +85,14 @@ object InMemoryChatStore {
     }
 
     fun persistMessages(context: Context, chatId: String) {
-        val msgs = messageFlows[chatId]?.value ?: return
-        MessageCache.save(context, chatId, msgs)
+        val app = context.applicationContext
+        persistJobs[chatId]?.cancel()
+        persistJobs[chatId] = ioScope.launch {
+            delay(350) // coalesce rapid WS upserts
+            val msgs = messageFlows[chatId]?.value ?: return@launch
+            MessageCache.save(app, chatId, msgs)
+            ChatListCache.save(app, _chats.value)
+        }
     }
 
     fun upsertChat(chat: LocalChat) {
@@ -251,9 +269,14 @@ object InMemoryChatStore {
         if (expectedEpoch != null && expectedEpoch != messageEpoch(chatId)) return
         val flow = messageFlow(chatId)
         // Skip identical snapshots — avoids janky full recomposition while scrolling.
-        if (sameMessageSnapshot(flow.value, messages)) return
-        flow.value = messages
-        val last = messages.lastOrNull()
+        val capped = if (messages.size > MAX_IN_MEMORY_MESSAGES) {
+            messages.takeLast(MAX_IN_MEMORY_MESSAGES)
+        } else {
+            messages
+        }
+        if (sameMessageSnapshot(flow.value, capped)) return
+        flow.value = capped
+        val last = capped.lastOrNull()
         if (last != null) {
             _chats.update { list ->
                 val current = list.find { it.id == chatId }
@@ -301,7 +324,8 @@ object InMemoryChatStore {
             } else {
                 message
             }
-            list.filterNot { it.id == message.id } + merged
+            val next = list.filterNot { it.id == message.id } + merged
+            if (next.size > MAX_IN_MEMORY_MESSAGES) next.takeLast(MAX_IN_MEMORY_MESSAGES) else next
         }
         _chats.update { list ->
             val current = list.find { it.id == chatId }

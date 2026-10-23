@@ -333,16 +333,22 @@ fun ChatIdScreen(
     }
     LaunchedEffect(chatId, myUserId, useRemote) {
         if (!useRemote || myUserId == null) return@LaunchedEffect
-        while (true) {
+        // One fetch on open; while WebSocket is up, skip HTTP polls (WhatsApp-style).
+        suspend fun pullOnce() {
             val epoch = InMemoryChatStore.messageEpoch(chatId)
             try {
                 val items = api.getConversationsIdMessages(chatId).items
                     .map { it.toLocalMessage(myUserId!!) }
                 InMemoryChatStore.replaceMessages(chatId, items, expectedEpoch = epoch)
-                MessageCache.save(context, chatId, items)
+                InMemoryChatStore.persistMessages(context, chatId)
                 runCatching { api.postConversationsIdRead(chatId) }
-            } catch (_: Exception) { /* keep cache / last list */ }
-            delay(20_000)
+            } catch (_: Exception) { /* keep cache */ }
+        }
+        pullOnce()
+        while (true) {
+            delay(25_000)
+            if (RealtimeClient.connected.value) continue
+            pullOnce()
         }
     }
 
