@@ -95,7 +95,10 @@ private fun InCallContent(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val session by ActiveCallSession.session.collectAsState()
-    val connected by LiveKitCallController.connected.collectAsState()
+    val answered by ActiveCallSession.answered.collectAsState()
+    val endedReason by ActiveCallSession.endedReason.collectAsState()
+    val roomConnected by LiveKitCallController.roomConnected.collectAsState()
+    val remoteJoined by LiveKitCallController.remoteJoined.collectAsState()
     val muted by LiveKitCallController.muted.collectAsState()
     val speakerOn by LiveKitCallController.speakerOn.collectAsState()
     val cameraOff by LiveKitCallController.cameraOff.collectAsState()
@@ -103,6 +106,7 @@ private fun InCallContent(
     val localVideo by LiveKitCallController.localVideo.collectAsState()
     val peerName = session?.peerName?.ifBlank { name } ?: name
     val enableVideo = videoMode || session?.media == "video"
+    val isLive = answered && remoteJoined
 
     var elapsedSec by remember { mutableLongStateOf(0L) }
     var statusText by remember { mutableStateOf("Connecting…") }
@@ -134,22 +138,39 @@ private fun InCallContent(
     LaunchedEffect(session?.callId, permissionReady) {
         val s = session
         if (!permissionReady || s == null) return@LaunchedEffect
-        statusText = if (s.asCaller) "Calling…" else "Connecting…"
+        statusText = if (s.asCaller) "Ringing…" else "Connecting…"
         runCatching {
             LiveKitCallController.connect(
                 context = context,
                 url = s.livekitUrl,
                 token = s.token,
                 enableVideo = s.media == "video",
+                waitForPeer = s.asCaller,
             )
-            statusText = "Connected"
+            if (!s.asCaller) {
+                statusText = "Connected"
+            }
         }.onFailure {
             statusText = "Failed to connect"
         }
     }
 
-    LaunchedEffect(connected) {
-        if (!connected) return@LaunchedEffect
+    LaunchedEffect(answered, remoteJoined, roomConnected, session?.asCaller) {
+        val s = session ?: return@LaunchedEffect
+        statusText = when {
+            !roomConnected -> "Connecting…"
+            s.asCaller && !answered && !remoteJoined -> "Ringing…"
+            s.asCaller && answered && !remoteJoined -> "Connecting…"
+            isLive -> "Connected"
+            else -> "Connecting…"
+        }
+        if (answered && s.asCaller && remoteJoined) {
+            LiveKitCallController.enableMedia(s.media == "video")
+        }
+    }
+
+    LaunchedEffect(isLive) {
+        if (!isLive) return@LaunchedEffect
         elapsedSec = 0
         while (true) {
             delay(1000)
@@ -157,10 +178,17 @@ private fun InCallContent(
         }
     }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            // Keep room if minimizing later; for now hangup is explicit.
+    LaunchedEffect(endedReason) {
+        val reason = endedReason ?: return@LaunchedEffect
+        LiveKitCallController.disconnect()
+        ActiveCallSession.consumeEndedReason()
+        statusText = when (reason) {
+            "rejected" -> "Call declined"
+            "timeout", "missed" -> "No answer"
+            else -> "Call ended"
         }
+        delay(900)
+        onEnd()
     }
 
     fun hangUp() {
@@ -177,10 +205,12 @@ private fun InCallContent(
         }
     }
 
+    val displayStatus = if (isLive) "Connected · ${formatElapsed(elapsedSec)}" else statusText
+
     if (enableVideo) {
         VideoCallLayout(
             name = peerName,
-            statusText = if (connected) "Connected · ${formatElapsed(elapsedSec)}" else statusText,
+            statusText = displayStatus,
             muted = muted,
             cameraOff = cameraOff,
             remoteVideo = remoteVideo,
@@ -192,8 +222,8 @@ private fun InCallContent(
     } else {
         AudioCallLayout(
             name = peerName,
-            statusText = if (connected) "Connected" else statusText,
-            elapsed = formatElapsed(elapsedSec),
+            statusText = displayStatus,
+            elapsed = if (isLive) formatElapsed(elapsedSec) else "—",
             muted = muted,
             speakerOn = speakerOn,
             onMute = { LiveKitCallController.setMuted(!muted) },

@@ -24,8 +24,12 @@ object LiveKitCallController {
     private var room: Room? = null
     private var eventsJob: Job? = null
 
-    private val _connected = MutableStateFlow(false)
-    val connected: StateFlow<Boolean> = _connected.asStateFlow()
+    private val _roomConnected = MutableStateFlow(false)
+    val roomConnected: StateFlow<Boolean> = _roomConnected.asStateFlow()
+
+    /** True when at least one remote participant is in the LiveKit room. */
+    private val _remoteJoined = MutableStateFlow(false)
+    val remoteJoined: StateFlow<Boolean> = _remoteJoined.asStateFlow()
 
     private val _remoteVideo = MutableStateFlow<VideoTrack?>(null)
     val remoteVideo: StateFlow<VideoTrack?> = _remoteVideo.asStateFlow()
@@ -42,11 +46,15 @@ object LiveKitCallController {
     private val _speakerOn = MutableStateFlow(true)
     val speakerOn: StateFlow<Boolean> = _speakerOn.asStateFlow()
 
+    /**
+     * @param waitForPeer when true (caller), keep mic/camera off until [enableMedia] / remote joins.
+     */
     suspend fun connect(
         context: Context,
         url: String,
         token: String,
         enableVideo: Boolean,
+        waitForPeer: Boolean,
     ) {
         disconnect()
         val appCtx = context.applicationContext
@@ -55,9 +63,19 @@ object LiveKitCallController {
         eventsJob = scope.launch {
             created.events.collect { event ->
                 when (event) {
+                    is RoomEvent.ParticipantConnected -> {
+                        refreshRemoteJoined(created)
+                        if (_remoteJoined.value) {
+                            ActiveCallSession.markAnswered()
+                            enableMedia(enableVideo)
+                        }
+                    }
+                    is RoomEvent.ParticipantDisconnected -> {
+                        refreshRemoteJoined(created)
+                    }
                     is RoomEvent.TrackSubscribed -> {
                         val track = event.track
-                        if (track is VideoTrack) {
+                        if (track is VideoTrack && event.participant != created.localParticipant) {
                             _remoteVideo.value = track
                         }
                     }
@@ -67,25 +85,44 @@ object LiveKitCallController {
                         }
                     }
                     is RoomEvent.Disconnected -> {
-                        _connected.value = false
+                        _roomConnected.value = false
+                        _remoteJoined.value = false
                     }
                     else -> Unit
                 }
             }
         }
         created.connect(url, token)
-        created.localParticipant.setMicrophoneEnabled(true)
-        if (enableVideo) {
-            created.localParticipant.setCameraEnabled(true)
-            refreshLocalVideo()
-            _cameraOff.value = false
-        } else {
+        _roomConnected.value = true
+        refreshRemoteJoined(created)
+
+        if (waitForPeer && !_remoteJoined.value) {
+            // Ringing: join room for fast connect, but do not publish audio/video yet.
+            created.localParticipant.setMicrophoneEnabled(false)
             created.localParticipant.setCameraEnabled(false)
+            _muted.value = true
             _cameraOff.value = true
+        } else {
+            enableMedia(enableVideo)
         }
-        _muted.value = false
-        _connected.value = true
-        setSpeaker(appCtx, true)
+        setSpeaker(appCtx, enableVideo || !waitForPeer)
+    }
+
+    /** Unmute / publish after callee accepts (or remote appears). */
+    fun enableMedia(enableVideo: Boolean) {
+        scope.launch {
+            val lp = room?.localParticipant ?: return@launch
+            lp.setMicrophoneEnabled(true)
+            _muted.value = false
+            if (enableVideo) {
+                lp.setCameraEnabled(true)
+                refreshLocalVideo()
+                _cameraOff.value = false
+            } else {
+                lp.setCameraEnabled(false)
+                _cameraOff.value = true
+            }
+        }
     }
 
     fun setMuted(muted: Boolean) {
@@ -106,6 +143,7 @@ object LiveKitCallController {
     fun setSpeaker(context: Context, on: Boolean) {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         am.mode = AudioManager.MODE_IN_COMMUNICATION
+        @Suppress("DEPRECATION")
         am.isSpeakerphoneOn = on
         _speakerOn.value = on
     }
@@ -126,11 +164,16 @@ object LiveKitCallController {
         room?.disconnect()
         room?.release()
         room = null
-        _connected.value = false
+        _roomConnected.value = false
+        _remoteJoined.value = false
         _remoteVideo.value = null
         _localVideo.value = null
         _muted.value = false
         _cameraOff.value = false
+    }
+
+    private fun refreshRemoteJoined(room: Room) {
+        _remoteJoined.value = room.remoteParticipants.isNotEmpty()
     }
 
     private fun refreshLocalVideo() {

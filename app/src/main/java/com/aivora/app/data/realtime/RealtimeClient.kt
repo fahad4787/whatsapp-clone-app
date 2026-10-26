@@ -287,10 +287,20 @@ object RealtimeClient {
                 val call = runCatching {
                     NetworkModule.json.decodeFromJsonElement(CallDto.serializer(), data)
                 }.getOrNull() ?: return
+                // Never auto-join — only show Accept / Decline.
                 ActiveCallSession.setIncoming(call)
             }
             "call.answered" -> {
-                // Caller stays on in-call screen; status flips to Connected via LiveKit.
+                val data = frame.data ?: return
+                val call = runCatching {
+                    NetworkModule.json.decodeFromJsonElement(CallDto.serializer(), data)
+                }.getOrNull()
+                val activeId = ActiveCallSession.session.value?.callId
+                if (call?.id != null && call.id == activeId) {
+                    ActiveCallSession.markAnswered()
+                    val media = ActiveCallSession.session.value?.media == "video"
+                    LiveKitCallController.enableMedia(media)
+                }
             }
             "call.rejected", "call.ended" -> {
                 val data = frame.data
@@ -299,13 +309,20 @@ object RealtimeClient {
                         NetworkModule.json.decodeFromJsonElement(CallDto.serializer(), it)
                     }.getOrNull()
                 }
+                val reason = when {
+                    frame.type == "call.rejected" -> "rejected"
+                    call?.endReason.equals("timeout", true) -> "timeout"
+                    call?.status.equals("missed", true) -> "missed"
+                    else -> "ended"
+                }
                 val activeId = ActiveCallSession.session.value?.callId
-                if (call?.id != null && call.id == ActiveCallSession.incoming.value?.id) {
+                val incomingId = ActiveCallSession.incoming.value?.id
+                if (call?.id != null && call.id == incomingId) {
                     ActiveCallSession.clearIncoming()
                 }
                 if (call?.id != null && call.id == activeId) {
                     LiveKitCallController.disconnect()
-                    ActiveCallSession.clear()
+                    ActiveCallSession.markEnded(reason)
                 }
             }
         }
