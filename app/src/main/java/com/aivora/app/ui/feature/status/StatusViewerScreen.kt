@@ -1,15 +1,23 @@
 package com.aivora.app.ui.feature.status
 
 import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -22,13 +30,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -39,10 +50,13 @@ import coil3.compose.AsyncImage
 import com.aivora.app.data.StatusRepository
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryStatusStore
+import com.aivora.app.data.local.LocalStatus
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.StatusViewerDto
 import com.aivora.app.ui.theme.AivoraColors
 import kotlinx.coroutines.launch
+
+private const val STATUS_DURATION_MS = 5_000
 
 @Composable
 fun StatusViewerScreen(
@@ -51,40 +65,80 @@ fun StatusViewerScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val status = remember(statusId) { InMemoryStatusStore.get(statusId) }
+    val seed = remember(statusId) { InMemoryStatusStore.get(statusId) }
+    val queue = remember(statusId, seed?.authorId, seed?.mine) {
+        if (seed == null) emptyList()
+        else InMemoryStatusStore.statusesForAuthor(seed.authorId, seed.mine)
+    }
+    val startIndex = remember(statusId, queue) {
+        queue.indexOfFirst { it.id == statusId }.coerceAtLeast(0)
+    }
+    var index by remember(statusId) { mutableIntStateOf(startIndex) }
+    var paused by remember { mutableStateOf(false) }
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
     val api = remember {
         NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
     }
     var showViewers by remember { mutableStateOf(false) }
     var viewers by remember { mutableStateOf<List<StatusViewerDto>>(emptyList()) }
+    val progress = remember { Animatable(0f) }
 
-    LaunchedEffect(statusId) {
-        if (status != null && !status.mine && useRemote) {
-            StatusRepository.markViewed(api, statusId)
-        } else if (status != null && !status.mine) {
-            InMemoryStatusStore.markViewed(statusId)
+    val current: LocalStatus? = queue.getOrNull(index)
+
+    fun goNext() {
+        if (index < queue.lastIndex) index += 1
+        else onBack?.invoke()
+    }
+
+    fun goPrev() {
+        if (index > 0) index -= 1
+        else onBack?.invoke()
+    }
+
+    LaunchedEffect(current?.id) {
+        val item = current ?: return@LaunchedEffect
+        if (!item.mine && useRemote) {
+            StatusRepository.markViewed(api, item.id)
+        } else if (!item.mine) {
+            InMemoryStatusStore.markViewed(item.id)
         }
     }
 
-    val bg = remember(status?.background) {
-        parseStatusColor(status?.background) ?: AivoraColors.Primary
+    LaunchedEffect(current?.id, paused) {
+        if (current == null) return@LaunchedEffect
+        if (paused) {
+            progress.stop()
+            return@LaunchedEffect
+        }
+        val from = progress.value
+        if (from >= 0.999f) progress.snapTo(0f)
+        val start = if (from in 0.01f..0.99f) from else 0f
+        if (start == 0f) progress.snapTo(0f)
+        val remaining = ((1f - start) * STATUS_DURATION_MS).toInt().coerceAtLeast(50)
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = remaining, easing = LinearEasing),
+        )
+        goNext()
+    }
+
+    val bg = remember(current?.background) {
+        parseStatusColor(current?.background) ?: AivoraColors.Primary
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (status?.mediaUri == null) bg else Color.Black)
-            .clickable { onBack?.invoke() },
+            .background(if (current?.mediaUri == null) bg else Color.Black),
     ) {
-        if (status == null) {
+        if (current == null || queue.isEmpty()) {
             Text(
                 "Status unavailable",
                 color = Color.White,
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
-            status.mediaUri?.let { uri ->
+            current.mediaUri?.let { uri ->
                 AsyncImage(
                     model = uri,
                     contentDescription = "Status photo",
@@ -92,6 +146,109 @@ fun StatusViewerScreen(
                     contentScale = ContentScale.Fit,
                 )
             }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(index) {
+                        detectTapGestures(
+                            onPress = {
+                                paused = true
+                                tryAwaitRelease()
+                                paused = false
+                            },
+                            onTap = { offset ->
+                                if (offset.x < size.width * 0.35f) goPrev() else goNext()
+                            },
+                        )
+                    },
+            ) {
+                Spacer(Modifier.weight(0.35f).fillMaxHeight())
+                Spacer(Modifier.weight(0.65f).fillMaxHeight())
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    queue.forEachIndexed { i, _ ->
+                        val fraction = when {
+                            i < index -> 1f
+                            i == index -> progress.value
+                            else -> 0f
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(2.5.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(Color.White.copy(alpha = 0.35f)),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                                    .background(Color.White),
+                            )
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = { onBack?.invoke() }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White,
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            current.authorName,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            current.timeLabel,
+                            color = Color.White.copy(alpha = 0.85f),
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                    if (current.mine && useRemote) {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    val ok = StatusRepository.delete(context, api, current.id)
+                                    if (!ok) {
+                                        Toast.makeText(context, "Could not delete", Toast.LENGTH_SHORT).show()
+                                        return@launch
+                                    }
+                                    val remaining = InMemoryStatusStore.statusesForAuthor(
+                                        current.authorId,
+                                        mine = true,
+                                    )
+                                    if (remaining.isEmpty()) onBack?.invoke()
+                                    else index = index.coerceAtMost(remaining.lastIndex)
+                                }
+                            },
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
+                        }
+                    }
+                }
+            }
+
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -99,9 +256,9 @@ fun StatusViewerScreen(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (status.mediaUri == null) {
+                if (current.mediaUri == null) {
                     Text(
-                        status.text,
+                        current.text,
                         color = Color.White,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -110,62 +267,46 @@ fun StatusViewerScreen(
                             .fillMaxWidth()
                             .padding(24.dp),
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                } else if (status.text.isNotBlank() && status.text != "Photo") {
+                    Spacer(modifier = Modifier.height(12.dp))
+                } else if (
+                    current.text.isNotBlank() &&
+                    current.text != "Photo" &&
+                    current.text != "Video"
+                ) {
                     Text(
-                        status.text,
+                        current.text,
                         color = Color.White,
                         style = MaterialTheme.typography.titleMedium,
                         textAlign = TextAlign.Center,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
-                Text(
-                    buildString {
-                        append(status.authorName)
-                        append(" · ")
-                        append(status.timeLabel)
-                        if (status.mine) append(" · ${status.viewCount} views")
-                    },
-                    color = Color.White.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.clickable(enabled = status.mine && useRemote) {
-                        scope.launch {
-                            runCatching { api.getStatusIdViewers(statusId).items }
-                                .onSuccess {
-                                    viewers = it
-                                    showViewers = true
+                if (current.mine) {
+                    Text(
+                        "${current.viewCount} views · tap to see",
+                        color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.pointerInput(current.id) {
+                            detectTapGestures {
+                                if (!useRemote) return@detectTapGestures
+                                scope.launch {
+                                    runCatching { api.getStatusIdViewers(current.id).items }
+                                        .onSuccess {
+                                            viewers = it
+                                            showViewers = true
+                                        }
+                                        .onFailure {
+                                            Toast.makeText(
+                                                context,
+                                                "Could not load viewers",
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        }
                                 }
-                                .onFailure {
-                                    Toast.makeText(context, "Could not load viewers", Toast.LENGTH_SHORT).show()
-                                }
-                        }
-                    },
-                )
-            }
-        }
-        IconButton(
-            onClick = { onBack?.invoke() },
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(8.dp),
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-        }
-        if (status?.mine == true && useRemote) {
-            IconButton(
-                onClick = {
-                    scope.launch {
-                        val ok = StatusRepository.delete(context, api, statusId)
-                        if (ok) onBack?.invoke()
-                        else Toast.makeText(context, "Could not delete", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp),
-            ) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
+                            }
+                        },
+                    )
+                }
             }
         }
     }

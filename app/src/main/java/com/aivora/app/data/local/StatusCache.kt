@@ -26,6 +26,7 @@ object StatusCache {
         val mine: Boolean = false,
         val viewed: Boolean = false,
         val viewCount: Int = 0,
+        val createdAtMs: Long = 0L,
     )
 
     fun load(context: Context): List<LocalStatus> {
@@ -44,6 +45,7 @@ object StatusCache {
                     mine = it.mine,
                     viewed = it.viewed,
                     viewCount = it.viewCount,
+                    createdAtMs = it.createdAtMs,
                 )
             }
         }.getOrDefault(emptyList())
@@ -62,6 +64,7 @@ object StatusCache {
                 mine = it.mine,
                 viewed = it.viewed,
                 viewCount = it.viewCount,
+                createdAtMs = it.createdAtMs,
             )
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -69,6 +69,7 @@ object StatusRepository {
                 mine = true,
                 viewed = true,
                 viewCount = created.viewCount,
+                createdAtMs = System.currentTimeMillis(),
             ),
         )
         StatusCache.save(context, InMemoryStatusStore.statuses.value)

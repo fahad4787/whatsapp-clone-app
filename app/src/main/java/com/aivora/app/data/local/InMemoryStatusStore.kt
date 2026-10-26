@@ -20,6 +20,8 @@ data class LocalStatus(
     val mine: Boolean = false,
     val viewed: Boolean = false,
     val viewCount: Int = 0,
+    /** Epoch millis for chronological viewing (oldest → newest like WhatsApp). */
+    val createdAtMs: Long = 0L,
 )
 
 /**
@@ -43,6 +45,12 @@ object InMemoryStatusStore {
 
     fun get(id: String): LocalStatus? =
         _statuses.value.find { it.id == id }
+
+    /** All statuses for one author, oldest first (WhatsApp playback order). */
+    fun statusesForAuthor(authorId: String, mine: Boolean): List<LocalStatus> =
+        _statuses.value
+            .filter { it.authorId == authorId && it.mine == mine }
+            .sortedBy { it.createdAtMs }
 
     fun replaceAll(list: List<LocalStatus>) {
         usingRemote = true
@@ -94,6 +102,7 @@ object InMemoryStatusStore {
                 mine = mine,
                 viewed = item.seen || mine,
                 viewCount = item.viewCount,
+                createdAtMs = parseCreatedAtMs(item.createdAt),
             )
         }
         if (incoming.isEmpty()) return
@@ -131,12 +140,16 @@ object InMemoryStatusStore {
                         mine = mine,
                         viewed = item.seen || mine,
                         viewCount = item.viewCount,
+                        createdAtMs = parseCreatedAtMs(item.createdAt),
                     ),
                 )
             }
         }
         return out
     }
+
+    private fun parseCreatedAtMs(iso: String?): Long =
+        runCatching { Instant.parse(iso).toEpochMilli() }.getOrDefault(0L)
 
     private fun formatStatusTime(iso: String?): String {
         if (iso.isNullOrBlank()) return "Just now"

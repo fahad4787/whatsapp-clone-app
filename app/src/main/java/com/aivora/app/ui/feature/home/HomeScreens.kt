@@ -349,9 +349,9 @@ fun HomeScreen(
                     haptics.tick()
                     onNavigate(Routes.NewChat)
                 }
-                1 -> HomeFab(Icons.Default.CameraAlt, "New status") {
+                1 -> HomeFab(Icons.Default.CameraAlt, "Camera status") {
                     haptics.tick()
-                    onNavigate(Routes.NewStatus)
+                    onNavigate(Routes.camera("status"))
                 }
                 2 -> HomeFab(Icons.Default.Call, "New call") {
                     haptics.tick()
@@ -770,6 +770,10 @@ private fun StatusTab(
     val api = remember {
         NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
     }
+    val gallery = com.aivora.app.ui.media.rememberMediaActions(context) { uri ->
+        com.aivora.app.data.local.PendingMedia.set(uri.toString())
+        onNavigate(Routes.NewStatus)
+    }
     LaunchedEffect(useRemote) {
         StatusRepository.hydrateFromDisk(context)
         if (useRemote) StatusRepository.refresh(context, api)
@@ -803,14 +807,19 @@ private fun StatusTab(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        val first = mine.firstOrNull()
-                        if (first != null) onNavigate(Routes.status(first.id))
+                        val oldest = mine.minByOrNull { it.createdAtMs }
+                        if (oldest != null) onNavigate(Routes.status(oldest.id))
                         else onNavigate(Routes.NewStatus)
                     }
                     .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                StatusRingAvatar(myName, hasUnseen = mine.isNotEmpty(), size = 52.dp)
+                StatusRingAvatar(
+                    name = myName,
+                    hasUnseen = mine.isNotEmpty(),
+                    segmentCount = mine.size.coerceAtLeast(1),
+                    size = 52.dp,
+                )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -825,6 +834,15 @@ private fun StatusTab(
                         color = AivoraColors.TextSecondary,
                     )
                 }
+                if (mine.isNotEmpty()) {
+                    IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
+                        Icon(
+                            Icons.Default.CameraAlt,
+                            contentDescription = "Add status",
+                            tint = AivoraColors.Primary,
+                        )
+                    }
+                }
             }
             Row(
                 modifier = Modifier
@@ -836,7 +854,7 @@ private fun StatusTab(
                     icon = Icons.Default.PhotoLibrary,
                     label = "Gallery",
                     modifier = Modifier.weight(1f),
-                    onClick = { onNavigate(Routes.camera("status")) },
+                    onClick = { gallery.pickGallery() },
                 )
                 StatusActionPill(
                     iconRes = AivoraIcons.Edit,
@@ -865,15 +883,21 @@ private fun StatusTab(
             }
         }
         items(recent, key = { it.authorId }) { status ->
-            val count = statuses.count { it.authorId == status.authorId && !it.mine && !it.viewed }
+            val authorItems = InMemoryStatusStore.statusesForAuthor(status.authorId, mine = false)
+            val unseenCount = authorItems.count { !it.viewed }
+            val openId = authorItems.firstOrNull { !it.viewed }?.id
+                ?: authorItems.firstOrNull()?.id
+                ?: status.id
             StatusRow(
                 name = status.authorName,
-                time = if (count > 1) "$count updates · ${status.timeLabel}" else status.timeLabel,
-                unseen = true,
+                time = if (authorItems.size > 1) {
+                    "${authorItems.size} updates · ${status.timeLabel}"
+                } else {
+                    status.timeLabel
+                },
+                unseen = unseenCount > 0,
+                segmentCount = authorItems.size,
             ) {
-                val openId = statuses
-                    .filter { it.authorId == status.authorId && !it.mine && !it.viewed }
-                    .firstOrNull()?.id ?: status.id
                 onNavigate(Routes.status(openId))
             }
         }
@@ -891,8 +915,14 @@ private fun StatusTab(
                 )
             }
             items(viewed, key = { "v-${it.authorId}" }) { status ->
-                StatusRow(status.authorName, status.timeLabel, unseen = false) {
-                    onNavigate(Routes.status(status.id))
+                val authorItems = InMemoryStatusStore.statusesForAuthor(status.authorId, mine = false)
+                StatusRow(
+                    name = status.authorName,
+                    time = status.timeLabel,
+                    unseen = false,
+                    segmentCount = authorItems.size,
+                ) {
+                    onNavigate(Routes.status(authorItems.firstOrNull()?.id ?: status.id))
                 }
             }
         }
@@ -938,7 +968,13 @@ private fun StatusActionPill(
 }
 
 @Composable
-private fun StatusRow(name: String, time: String, unseen: Boolean, onClick: () -> Unit) {
+private fun StatusRow(
+    name: String,
+    time: String,
+    unseen: Boolean,
+    segmentCount: Int = 1,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -946,7 +982,12 @@ private fun StatusRow(name: String, time: String, unseen: Boolean, onClick: () -
             .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StatusRingAvatar(name, hasUnseen = unseen, size = 52.dp)
+        StatusRingAvatar(
+            name = name,
+            hasUnseen = unseen,
+            segmentCount = segmentCount,
+            size = 52.dp,
+        )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
