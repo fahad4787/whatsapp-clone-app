@@ -41,9 +41,11 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.aivora.app.data.StatusRepository
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.PendingMedia
@@ -144,50 +146,55 @@ fun NewStatusScreen(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp)
-                .padding(top = 100.dp, bottom = 140.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (mediaUri != null) {
-                Text(
-                    "Photo attached",
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
-                )
-                Spacer(Modifier.height(12.dp))
-            }
-            BasicTextField(
-                value = text,
-                onValueChange = { if (it.length <= 700) text = it },
-                textStyle = TextStyle(
-                    color = Color.White,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
-                ),
-                cursorBrush = SolidColor(Color.White),
-                decorationBox = { inner ->
-                    Box(contentAlignment = Alignment.Center) {
-                        if (text.isEmpty() && mediaUri == null) {
-                            Text(
-                                "Type a status",
-                                color = Color.White.copy(alpha = 0.55f),
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                        inner()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
+        if (mediaUri != null) {
+            AsyncImage(
+                model = mediaUri,
+                contentDescription = "Status photo",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.25f)),
             )
         }
+
+        BasicTextField(
+            value = text,
+            onValueChange = { if (it.length <= 700) text = it },
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp)
+                .padding(bottom = 48.dp),
+            textStyle = TextStyle(
+                color = Color.White,
+                fontSize = if (mediaUri != null) 22.sp else 28.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            ),
+            cursorBrush = SolidColor(Color.White),
+            decorationBox = { inner ->
+                Box(contentAlignment = Alignment.Center) {
+                    if (text.isEmpty() && mediaUri == null) {
+                        Text(
+                            "Type a status",
+                            color = Color.White.copy(alpha = 0.55f),
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    } else if (text.isEmpty() && mediaUri != null) {
+                        Text(
+                            "Add a caption…",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 18.sp,
+                        )
+                    }
+                    inner()
+                }
+            },
+        )
 
         Column(
             modifier = Modifier

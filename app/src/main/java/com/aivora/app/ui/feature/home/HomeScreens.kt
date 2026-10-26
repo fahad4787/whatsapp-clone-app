@@ -776,21 +776,29 @@ private fun StatusTab(
     }
     val statuses by InMemoryStatusStore.statuses.collectAsState()
     val mine = remember(statuses) { InMemoryStatusStore.myStatuses() }
+    // One row per author (WhatsApp-style), not one row per status item.
     val recent = remember(statuses, query) {
-        InMemoryStatusStore.recent().filter {
-            query.isBlank() || it.authorName.contains(query, ignoreCase = true)
-        }
+        InMemoryStatusStore.recent()
+            .filter { query.isBlank() || it.authorName.contains(query, ignoreCase = true) }
+            .groupBy { it.authorId }
+            .map { (_, items) -> items.first() }
     }
     val viewed = remember(statuses, query) {
-        InMemoryStatusStore.viewed().filter {
-            query.isBlank() || it.authorName.contains(query, ignoreCase = true)
-        }
+        InMemoryStatusStore.viewed()
+            .filter { query.isBlank() || it.authorName.contains(query, ignoreCase = true) }
+            .groupBy { it.authorId }
+            .map { (_, items) -> items.first() }
+            .filter { author -> recent.none { it.authorId == author.authorId } }
     }
+    val myName = "You"
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
-            val subtitle = mine.firstOrNull()?.let { "Just posted · ${it.timeLabel}" }
-                ?: "Share a moment with your contacts"
+            val subtitle = when {
+                mine.isEmpty() -> "Tap to add a status update"
+                mine.size == 1 -> mine.first().timeLabel
+                else -> "${mine.size} updates · ${mine.first().timeLabel}"
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -802,7 +810,7 @@ private fun StatusTab(
                     .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                StatusRingAvatar("Me", hasUnseen = mine.isNotEmpty(), size = 52.dp)
+                StatusRingAvatar(myName, hasUnseen = mine.isNotEmpty(), size = 52.dp)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -856,37 +864,33 @@ private fun StatusTab(
                 )
             }
         }
-        items(recent, key = { it.id }) { status ->
-            StatusRow(status.authorName, status.timeLabel, unseen = true) {
-                onNavigate(Routes.status(status.id))
+        items(recent, key = { it.authorId }) { status ->
+            val count = statuses.count { it.authorId == status.authorId && !it.mine && !it.viewed }
+            StatusRow(
+                name = status.authorName,
+                time = if (count > 1) "$count updates · ${status.timeLabel}" else status.timeLabel,
+                unseen = true,
+            ) {
+                val openId = statuses
+                    .filter { it.authorId == status.authorId && !it.mine && !it.viewed }
+                    .firstOrNull()?.id ?: status.id
+                onNavigate(Routes.status(openId))
             }
         }
         if (viewed.isNotEmpty()) {
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = AivoraDimens.ScreenHorizontal,
-                            vertical = AivoraDimens.Space2,
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "Viewed",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = AivoraColors.Ink,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        "${viewed.size}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = AivoraColors.TextSecondary,
-                    )
-                }
+                Text(
+                    "Viewed",
+                    modifier = Modifier.padding(
+                        horizontal = AivoraDimens.ScreenHorizontal,
+                        vertical = AivoraDimens.Space2,
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AivoraColors.Ink,
+                )
             }
-            items(viewed, key = { it.id }) { status ->
+            items(viewed, key = { "v-${it.authorId}" }) { status ->
                 StatusRow(status.authorName, status.timeLabel, unseen = false) {
                     onNavigate(Routes.status(status.id))
                 }
@@ -953,12 +957,6 @@ private fun StatusRow(name: String, time: String, unseen: Boolean, onClick: () -
             )
             Text(time, style = MaterialTheme.typography.bodyMedium, color = AivoraColors.TextSecondary)
         }
-        Icon(
-            painter = painterResource(AivoraIcons.ChevronRight),
-            contentDescription = null,
-            tint = AivoraColors.IconSecondary,
-            modifier = Modifier.size(20.dp),
-        )
     }
 }
 
