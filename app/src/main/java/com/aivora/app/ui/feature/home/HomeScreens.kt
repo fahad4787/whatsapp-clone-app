@@ -955,25 +955,79 @@ private fun CallsTab(
     callLogCleared: Boolean = false,
     onCreateCallLink: () -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val api = remember { ChatRepository.api() }
+    var items by remember { mutableStateOf<List<com.aivora.app.data.model.CallHistoryItemDto>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
+
+    LaunchedEffect(useRemote, callLogCleared) {
+        if (!useRemote || callLogCleared) {
+            items = emptyList()
+            loading = false
+            return@LaunchedEffect
+        }
+        loading = true
+        items = runCatching { api.getCallsHistory().items }.getOrDefault(emptyList())
+        loading = false
+    }
+
     data class CallRow(
+        val id: String,
         val name: String,
         val detail: String,
         val missed: Boolean,
         val video: Boolean,
         val time: String,
+        val conversationId: String?,
     )
-    val calls = remember {
-        listOf(
-            CallRow("mubasir", "Missed voice call", true, false, "10:49 pm"),
-            CallRow("B Chaudhry", "Outgoing video", false, true, "Yesterday"),
-            CallRow("Hamza (You)", "Missed video call", true, true, "Yesterday"),
-            CallRow("Ahmad Khan", "Outgoing", false, false, "Monday"),
-            CallRow("Fatima Ali", "Incoming", false, false, "Sunday"),
-        )
+
+    fun formatCallTime(iso: String?): String {
+        if (iso.isNullOrBlank()) return ""
+        return runCatching {
+            val instant = java.time.Instant.parse(iso)
+            val z = java.time.ZonedDateTime.ofInstant(instant, java.time.ZoneId.systemDefault())
+            val today = java.time.LocalDate.now()
+            when (z.toLocalDate()) {
+                today -> z.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+                today.minusDays(1) -> "Yesterday"
+                else -> z.format(java.time.format.DateTimeFormatter.ofPattern("EEE"))
+            }
+        }.getOrDefault(iso.take(16))
     }
-    val filtered = remember(calls, query, filter, callLogCleared) {
+
+    val rows = remember(items) {
+        items.map { h ->
+            val detail = when {
+                h.missed && h.video -> "Missed video call"
+                h.missed -> "Missed voice call"
+                h.direction == "outgoing" && h.video -> "Outgoing video"
+                h.direction == "outgoing" -> "Outgoing"
+                h.video -> "Incoming video"
+                else -> "Incoming"
+            }.let { base ->
+                if (h.durationSeconds > 0) {
+                    val m = h.durationSeconds / 60
+                    val s = h.durationSeconds % 60
+                    "$base · ${m}:${s.toString().padStart(2, '0')}"
+                } else base
+            }
+            CallRow(
+                id = h.id.orEmpty(),
+                name = h.peerName ?: "Unknown",
+                detail = detail,
+                missed = h.missed,
+                video = h.video,
+                time = formatCallTime(h.startedAt),
+                conversationId = h.conversationId,
+            )
+        }
+    }
+
+    val filtered = remember(rows, query, filter, callLogCleared) {
         if (callLogCleared) emptyList()
-        else calls.filter { row ->
+        else rows.filter { row ->
             val matchesQuery = query.isBlank() ||
                 row.name.contains(query, ignoreCase = true) ||
                 row.detail.contains(query, ignoreCase = true)
@@ -984,6 +1038,43 @@ private fun CallsTab(
                 CallFilter.Video -> row.video
             }
             matchesQuery && matchesFilter
+        }
+    }
+
+    fun redial(row: CallRow) {
+        val chatId = row.conversationId
+        if (chatId.isNullOrBlank() || !useRemote) {
+            onNavigate(if (row.video) Routes.videoCall(row.name) else Routes.audioCall(row.name))
+            return
+        }
+        scope.launch {
+            Toast.makeText(context, "Calling…", Toast.LENGTH_SHORT).show()
+            val result = runCatching {
+                api.postCalls(
+                    com.aivora.app.data.model.CallStartBody(
+                        conversationId = chatId,
+                        media = if (row.video) "video" else "audio",
+                    ),
+                )
+            }.onFailure {
+                Toast.makeText(context, "Call failed: ${it.message ?: "error"}", Toast.LENGTH_LONG).show()
+            }.getOrNull() ?: return@launch
+            val token = result.token
+            val url = result.livekitUrl
+            val callId = result.call?.id
+            if (token.isNullOrBlank() || url.isNullOrBlank() || callId.isNullOrBlank()) {
+                Toast.makeText(context, "Call failed: bad response", Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            com.aivora.app.data.call.ActiveCallSession.setActive(
+                callId = callId,
+                token = token,
+                livekitUrl = url,
+                media = if (row.video) "video" else "audio",
+                peerName = row.name,
+                asCaller = true,
+            )
+            onNavigate(if (row.video) Routes.videoCall(row.name) else Routes.audioCall(row.name))
         }
     }
 
@@ -1012,15 +1103,28 @@ private fun CallsTab(
         )
         Spacer(Modifier.height(4.dp))
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(filtered, key = { it.name + it.time }) { row ->
+            if (loading) {
+                item {
+                    Text(
+                        "Loading…",
+                        modifier = Modifier.padding(AivoraDimens.ScreenHorizontal, 24.dp),
+                        color = AivoraColors.TextSecondary,
+                    )
+                }
+            } else if (filtered.isEmpty()) {
+                item {
+                    Text(
+                        "No calls yet",
+                        modifier = Modifier.padding(AivoraDimens.ScreenHorizontal, 24.dp),
+                        color = AivoraColors.TextSecondary,
+                    )
+                }
+            }
+            items(filtered, key = { it.id.ifBlank { it.name + it.time } }) { row ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable {
-                            onNavigate(
-                                if (row.video) Routes.videoCall(row.name) else Routes.audioCall(row.name),
-                            )
-                        }
+                        .clickable { redial(row) }
                         .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

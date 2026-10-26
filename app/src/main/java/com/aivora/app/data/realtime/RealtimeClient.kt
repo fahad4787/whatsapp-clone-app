@@ -311,18 +311,25 @@ object RealtimeClient {
                 }
                 val reason = when {
                     frame.type == "call.rejected" -> "rejected"
+                    call?.endReason.equals("rejected", true) -> "rejected"
+                    call?.endReason.equals("cancelled", true) -> "cancelled"
                     call?.endReason.equals("timeout", true) -> "timeout"
                     call?.status.equals("missed", true) -> "missed"
                     else -> "ended"
                 }
                 val activeId = ActiveCallSession.session.value?.callId
                 val incomingId = ActiveCallSession.incoming.value?.id
-                if (call?.id != null && call.id == incomingId) {
+                val matchesIncoming = incomingId != null && (call?.id == null || call.id == incomingId)
+                val matchesActive = activeId != null && (call?.id == null || call.id == activeId)
+                // Always tear down local UI so one side never stays on the call screen alone.
+                if (matchesIncoming) {
                     ActiveCallSession.clearIncoming()
                 }
-                if (call?.id != null && call.id == activeId) {
+                if (matchesActive) {
                     LiveKitCallController.disconnect()
                     ActiveCallSession.markEnded(reason)
+                } else if (matchesIncoming && frame.type == "call.ended") {
+                    // Incoming dismissed (peer cancelled / timeout) — no in-call session.
                 }
             }
         }

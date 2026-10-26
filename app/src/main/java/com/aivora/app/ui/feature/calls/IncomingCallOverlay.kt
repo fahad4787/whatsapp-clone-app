@@ -97,8 +97,8 @@ fun IncomingCallOverlay(
     fun decline() {
         scope.launch {
             val id = call.id ?: return@launch
-            runCatching { NetworkModule.api().postCallsIdAction(id, "reject") }
             ActiveCallSession.clearIncoming()
+            runCatching { NetworkModule.api().postCallsIdAction(id, "reject") }
         }
     }
 

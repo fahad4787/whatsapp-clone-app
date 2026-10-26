@@ -474,7 +474,7 @@ interface AivoraApi {
     ): com.aivora.app.data.model.ConversationSettingsResult
 
     @GET("api/calls/history")
-    suspend fun getCallsHistory(): okhttp3.ResponseBody
+    suspend fun getCallsHistory(): com.aivora.app.data.model.CallHistoryListDto
 
     @POST("api/scheduled-calls/{id}/respond")
     suspend fun postScheduledCallsIdRespond(

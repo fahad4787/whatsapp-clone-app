@@ -23,18 +23,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.Dialpad
-import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -62,13 +58,16 @@ import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.call.ActiveCallSession
 import com.aivora.app.data.call.LiveKitCallController
 import com.aivora.app.ui.components.Avatar
-import com.aivora.app.ui.theme.AivoraColors
-import com.aivora.app.ui.theme.AivoraDimens
 import io.livekit.android.renderer.TextureViewRenderer
 import io.livekit.android.room.track.VideoTrack
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import livekit.org.webrtc.EglBase
+
+private val CallBg = Color(0xFF0B141A)
+private val CallPanel = Color(0xFF1C252C)
+private val CallGreen = Color(0xFF25D366)
+private val CallRed = Color(0xFFE74C3C)
 
 @Composable
 fun AudioCallScreen(
@@ -109,8 +108,9 @@ private fun InCallContent(
     val isLive = answered && remoteJoined
 
     var elapsedSec by remember { mutableLongStateOf(0L) }
-    var statusText by remember { mutableStateOf("Connecting…") }
     var permissionReady by remember { mutableStateOf(false) }
+    var leaving by remember { mutableStateOf(false) }
+    var leaveLabel by remember { mutableStateOf<String?>(null) }
 
     val permissions = remember(enableVideo) {
         buildList {
@@ -128,17 +128,13 @@ private fun InCallContent(
         val missing = permissions.filter {
             ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
         }
-        if (missing.isEmpty()) {
-            permissionReady = true
-        } else {
-            permissionLauncher.launch(permissions)
-        }
+        if (missing.isEmpty()) permissionReady = true
+        else permissionLauncher.launch(permissions)
     }
 
     LaunchedEffect(session?.callId, permissionReady) {
         val s = session
         if (!permissionReady || s == null) return@LaunchedEffect
-        statusText = if (s.asCaller) "Ringing…" else "Connecting…"
         runCatching {
             LiveKitCallController.connect(
                 context = context,
@@ -147,30 +143,21 @@ private fun InCallContent(
                 enableVideo = s.media == "video",
                 waitForPeer = s.asCaller,
             )
-            if (!s.asCaller) {
-                statusText = "Connected"
-            }
-        }.onFailure {
-            statusText = "Failed to connect"
         }
     }
 
-    LaunchedEffect(answered, remoteJoined, roomConnected, session?.asCaller) {
+    LaunchedEffect(answered, remoteJoined, session?.asCaller) {
         val s = session ?: return@LaunchedEffect
-        statusText = when {
-            !roomConnected -> "Connecting…"
-            s.asCaller && !answered && !remoteJoined -> "Ringing…"
-            s.asCaller && answered && !remoteJoined -> "Connecting…"
-            isLive -> "Connected"
-            else -> "Connecting…"
-        }
         if (answered && s.asCaller && remoteJoined) {
             LiveKitCallController.enableMedia(s.media == "video")
         }
     }
 
     LaunchedEffect(isLive) {
-        if (!isLive) return@LaunchedEffect
+        if (!isLive) {
+            elapsedSec = 0
+            return@LaunchedEffect
+        }
         elapsedSec = 0
         while (true) {
             delay(1000)
@@ -178,188 +165,90 @@ private fun InCallContent(
         }
     }
 
+    // Peer cancelled / declined / timeout — leave this screen.
     LaunchedEffect(endedReason) {
         val reason = endedReason ?: return@LaunchedEffect
-        LiveKitCallController.disconnect()
-        ActiveCallSession.consumeEndedReason()
-        statusText = when (reason) {
-            "rejected" -> "Call declined"
+        if (leaving) return@LaunchedEffect
+        leaving = true
+        leaveLabel = when (reason) {
+            "rejected" -> "Declined"
             "timeout", "missed" -> "No answer"
+            "cancelled" -> "Cancelled"
             else -> "Call ended"
         }
-        delay(900)
+        LiveKitCallController.disconnect()
+        ActiveCallSession.consumeEndedReason()
+        delay(800)
         onEnd()
     }
 
     fun hangUp() {
+        if (leaving) return
+        leaving = true
         scope.launch {
             val callId = session?.callId
             LiveKitCallController.disconnect()
             if (!callId.isNullOrBlank()) {
-                runCatching {
-                    NetworkModule.api().postCallsIdAction(callId, "end")
-                }
+                runCatching { NetworkModule.api().postCallsIdAction(callId, "end") }
             }
             ActiveCallSession.clear()
             onEnd()
         }
     }
 
-    val displayStatus = if (isLive) "Connected · ${formatElapsed(elapsedSec)}" else statusText
-
-    if (enableVideo) {
-        VideoCallLayout(
-            name = peerName,
-            statusText = displayStatus,
-            muted = muted,
-            cameraOff = cameraOff,
-            remoteVideo = remoteVideo,
-            localVideo = localVideo,
-            onMute = { LiveKitCallController.setMuted(!muted) },
-            onCamera = { LiveKitCallController.setCameraOff(!cameraOff) },
-            onEnd = { hangUp() },
-        )
-    } else {
-        AudioCallLayout(
-            name = peerName,
-            statusText = displayStatus,
-            elapsed = if (isLive) formatElapsed(elapsedSec) else "—",
-            muted = muted,
-            speakerOn = speakerOn,
-            onMute = { LiveKitCallController.setMuted(!muted) },
-            onSpeaker = { LiveKitCallController.setSpeaker(context, !speakerOn) },
-            onEnd = { hangUp() },
-        )
+    val statusLine = when {
+        leaveLabel != null -> leaveLabel!!
+        !roomConnected -> "Connecting…"
+        session?.asCaller == true && !isLive -> "Ringing…"
+        isLive -> formatElapsed(elapsedSec)
+        else -> "Connecting…"
     }
+
+    WhatsAppCallLayout(
+        name = peerName,
+        statusLine = statusLine,
+        videoMode = enableVideo,
+        muted = muted,
+        speakerOn = speakerOn,
+        cameraOff = cameraOff,
+        remoteVideo = remoteVideo,
+        localVideo = localVideo,
+        onMute = { LiveKitCallController.setMuted(!muted) },
+        onSpeaker = { LiveKitCallController.setSpeaker(context, !speakerOn) },
+        onCamera = { LiveKitCallController.setCameraOff(!cameraOff) },
+        onFlip = { LiveKitCallController.flipCamera() },
+        onEnd = { hangUp() },
+    )
 }
 
 @Composable
-private fun AudioCallLayout(
+private fun WhatsAppCallLayout(
     name: String,
-    statusText: String,
-    elapsed: String,
+    statusLine: String,
+    videoMode: Boolean,
     muted: Boolean,
     speakerOn: Boolean,
-    onMute: () -> Unit,
-    onSpeaker: () -> Unit,
-    onEnd: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AivoraColors.ChatWallpaperLight)
-            .statusBarsPadding(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space3),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(
-                onClick = onEnd,
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color.White),
-            ) {
-                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Minimize", tint = AivoraColors.Ink)
-            }
-            Spacer(Modifier.width(12.dp))
-            Text(
-                "Audio call",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = AivoraColors.InkMuted,
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(top = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(224.dp)) {
-                Box(
-                    modifier = Modifier
-                        .size(224.dp)
-                        .clip(CircleShape)
-                        .background(AivoraColors.Primary.copy(alpha = 0.08f)),
-                )
-                Box(
-                    modifier = Modifier
-                        .size(192.dp)
-                        .clip(CircleShape)
-                        .background(AivoraColors.Primary.copy(alpha = 0.12f)),
-                )
-                Avatar(name, size = 160)
-            }
-            Spacer(Modifier.height(28.dp))
-            Text(
-                name,
-                style = MaterialTheme.typography.headlineLarge.copy(fontSize = 32.sp),
-                fontWeight = FontWeight.SemiBold,
-                color = AivoraColors.InkMuted,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(AivoraColors.Primary),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(statusText, color = AivoraColors.Online, style = MaterialTheme.typography.bodyMedium)
-                Text("  ·  ", color = AivoraColors.IconSecondary)
-                Text(elapsed, color = AivoraColors.InkMuted, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-
-        CallControlsPanel(
-            muted = muted,
-            speakerOn = speakerOn,
-            onMute = onMute,
-            onSpeaker = onSpeaker,
-            onEnd = onEnd,
-            videoMode = false,
-        )
-    }
-}
-
-@Composable
-private fun VideoCallLayout(
-    name: String,
-    statusText: String,
-    muted: Boolean,
     cameraOff: Boolean,
     remoteVideo: VideoTrack?,
     localVideo: VideoTrack?,
     onMute: () -> Unit,
+    onSpeaker: () -> Unit,
     onCamera: () -> Unit,
+    onFlip: () -> Unit,
     onEnd: () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0B141A)),
+            .background(CallBg),
     ) {
-        if (remoteVideo != null) {
-            VideoTrackAndroidView(
-                track = remoteVideo,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
+        if (videoMode && remoteVideo != null && !cameraOff) {
+            VideoTrackAndroidView(track = remoteVideo, modifier = Modifier.fillMaxSize())
+        } else if (videoMode) {
             Box(
-                modifier = Modifier
+                Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color(0xFF1A242C), Color(0xFF0B141A)),
-                        ),
-                    ),
+                    .background(Brush.verticalGradient(listOf(Color(0xFF1A242C), CallBg))),
                 contentAlignment = Alignment.Center,
             ) {
                 Avatar(name, size = 120)
@@ -371,65 +260,121 @@ private fun VideoCallLayout(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding(),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space3),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(
-                    onClick = onEnd,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.15f)),
-                ) {
-                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Minimize", tint = Color.White)
-                }
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
-                    Text(statusText, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
-                }
+            Spacer(Modifier.height(48.dp))
+            if (!videoMode || remoteVideo == null) {
+                Avatar(name, size = 112)
+                Spacer(Modifier.height(20.dp))
             }
+            Text(
+                name,
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 24.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            // Single status / timer line (WhatsApp-style).
+            Text(
+                statusLine,
+                color = Color.White.copy(alpha = 0.75f),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+            )
 
             Spacer(Modifier.weight(1f))
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.End)
-                    .padding(end = 24.dp, bottom = 16.dp)
-                    .size(width = 110.dp, height = 150.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF243038))
-                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                when {
-                    cameraOff || localVideo == null -> {
-                        Icon(Icons.Default.VideocamOff, null, tint = Color.White.copy(alpha = 0.7f))
-                    }
-                    else -> {
-                        VideoTrackAndroidView(
-                            track = localVideo,
-                            modifier = Modifier.fillMaxSize(),
-                            mirror = true,
-                        )
-                    }
+            if (videoMode && localVideo != null && !cameraOff) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(end = 20.dp, bottom = 16.dp)
+                        .size(width = 96.dp, height = 132.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
+                ) {
+                    VideoTrackAndroidView(
+                        track = localVideo,
+                        modifier = Modifier.fillMaxSize(),
+                        mirror = true,
+                    )
                 }
             }
 
-            CallControlsPanel(
-                muted = muted,
-                speakerOn = true,
-                onMute = onMute,
-                onSpeaker = onCamera,
-                onEnd = onEnd,
-                videoMode = true,
-                cameraOff = cameraOff,
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(CallPanel)
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconOnlyControl(
+                    icon = if (muted) Icons.Default.MicOff else Icons.Default.Mic,
+                    active = muted,
+                    onClick = onMute,
+                )
+                if (videoMode) {
+                    IconOnlyControl(
+                        icon = if (cameraOff) Icons.Default.VideocamOff else Icons.Default.Videocam,
+                        active = !cameraOff,
+                        onClick = onCamera,
+                    )
+                    IconOnlyControl(
+                        icon = Icons.Default.Cameraswitch,
+                        active = false,
+                        onClick = onFlip,
+                    )
+                } else {
+                    IconOnlyControl(
+                        icon = Icons.AutoMirrored.Filled.VolumeUp,
+                        active = speakerOn,
+                        onClick = onSpeaker,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(CallRed)
+                        .clickable(onClick = onEnd),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.CallEnd,
+                        contentDescription = "End",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(20.dp))
         }
+    }
+}
+
+@Composable
+private fun IconOnlyControl(
+    icon: ImageVector,
+    active: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(if (active) CallGreen else Color.White.copy(alpha = 0.12f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (active) Color.White else Color.White.copy(alpha = 0.9f),
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 
@@ -449,9 +394,7 @@ private fun VideoTrackAndroidView(
                 track.addRenderer(renderer)
             }
         },
-        update = { renderer ->
-            // Track already attached in factory for this renderer instance.
-        },
+        update = { },
         onRelease = { renderer ->
             track.removeRenderer(renderer)
             renderer.release()
@@ -466,141 +409,4 @@ private fun formatElapsed(sec: Long): String {
     val m = sec / 60
     val s = sec % 60
     return "%d:%02d".format(m, s)
-}
-
-@Composable
-private fun CallControlsPanel(
-    muted: Boolean,
-    speakerOn: Boolean,
-    onMute: () -> Unit,
-    onSpeaker: () -> Unit,
-    onEnd: () -> Unit,
-    videoMode: Boolean,
-    cameraOff: Boolean = false,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-            .background(if (videoMode) Color(0xFF1A242C) else Color.White)
-            .border(
-                width = if (videoMode) 0.dp else 1.dp,
-                color = AivoraColors.ChatDivider,
-                shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-            )
-            .padding(top = 32.dp, start = 24.dp, end = 24.dp, bottom = 16.dp)
-            .navigationBarsPadding(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            CallControl(
-                icon = if (muted) Icons.Default.MicOff else Icons.Default.Mic,
-                label = "Mute",
-                active = muted,
-                onDark = videoMode,
-                onClick = onMute,
-            )
-            CallControl(
-                icon = if (videoMode) {
-                    if (cameraOff) Icons.Default.VideocamOff else Icons.Default.Videocam
-                } else {
-                    Icons.Default.VolumeUp
-                },
-                label = if (videoMode) "Camera" else "Speaker",
-                active = if (videoMode) !cameraOff else speakerOn,
-                onDark = videoMode,
-                onClick = onSpeaker,
-            )
-            CallControl(
-                icon = Icons.Default.Dialpad,
-                label = "Keypad",
-                active = false,
-                onDark = videoMode,
-                onClick = { },
-            )
-            CallControl(
-                icon = Icons.Default.PersonAdd,
-                label = "Add person",
-                active = false,
-                onDark = videoMode,
-                onClick = { },
-            )
-        }
-        Spacer(Modifier.height(32.dp))
-        Row(
-            modifier = Modifier
-                .width(216.dp)
-                .height(64.dp)
-                .clip(RoundedCornerShape(100.dp))
-                .background(Color(0xFFE64C53))
-                .clickable(onClick = onEnd),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Icon(Icons.Default.CallEnd, contentDescription = null, tint = Color.White, modifier = Modifier.size(30.dp))
-            Spacer(Modifier.width(12.dp))
-            Text("End call", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-        }
-    }
-}
-
-@Composable
-private fun CallControl(
-    icon: ImageVector,
-    label: String,
-    active: Boolean,
-    onDark: Boolean,
-    onClick: () -> Unit,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(84.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(
-                    when {
-                        active -> AivoraColors.Primary
-                        onDark -> Color.White.copy(alpha = 0.12f)
-                        else -> AivoraColors.ChatWallpaperLight
-                    },
-                )
-                .then(
-                    if (!active && !onDark) {
-                        Modifier.border(1.dp, AivoraColors.ChatDivider, CircleShape)
-                    } else {
-                        Modifier
-                    },
-                )
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                icon,
-                contentDescription = label,
-                tint = when {
-                    active -> AivoraColors.OnPrimary
-                    onDark -> Color.White
-                    else -> AivoraColors.InkMuted
-                },
-                modifier = Modifier.size(28.dp),
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            label,
-            fontSize = 13.sp,
-            fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
-            color = when {
-                active && !onDark -> AivoraColors.Online
-                onDark -> Color.White.copy(alpha = 0.85f)
-                else -> AivoraColors.InkMuted
-            },
-        )
-    }
 }
