@@ -9,11 +9,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
@@ -76,16 +74,9 @@ fun AivoraAppRoot(startDestination: String = Routes.Login) {
                     navController = navController,
                     startDestination = startDestination,
                 )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding(),
-                    contentAlignment = Alignment.TopCenter,
-                ) {
-                    IncomingCallOverlay(
-                        onNavigate = { route -> navController.navigate(route) },
-                    )
-                }
+                IncomingCallOverlay(
+                    onNavigate = { route -> navController.navigate(route) },
+                )
             }
         }
     }

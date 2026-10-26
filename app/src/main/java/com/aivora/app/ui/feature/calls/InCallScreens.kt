@@ -113,6 +113,8 @@ private fun InCallContent(
     val enableVideo = videoMode || session?.media == "video"
     val isLive = answered && remoteJoined
 
+    CallSystemBars()
+
     var elapsedSec by remember { mutableLongStateOf(0L) }
     var permissionReady by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }

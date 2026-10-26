@@ -64,6 +64,8 @@ fun IncomingCallOverlay(
     val name = call.caller?.name?.ifBlank { null } ?: "Incoming call"
     val isVideo = call.media.equals("video", ignoreCase = true)
 
+    CallSystemBars()
+
     val ringtone = remember {
         runCatching {
             RingtoneManager.getRingtone(

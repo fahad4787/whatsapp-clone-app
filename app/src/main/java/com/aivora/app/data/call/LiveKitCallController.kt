@@ -23,6 +23,7 @@ object LiveKitCallController {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var room: Room? = null
     private var eventsJob: Job? = null
+    private var appContext: Context? = null
 
     private val _roomConnected = MutableStateFlow(false)
     val roomConnected: StateFlow<Boolean> = _roomConnected.asStateFlow()
@@ -43,7 +44,8 @@ object LiveKitCallController {
     private val _cameraOff = MutableStateFlow(false)
     val cameraOff: StateFlow<Boolean> = _cameraOff.asStateFlow()
 
-    private val _speakerOn = MutableStateFlow(true)
+    /** Voice = earpiece (false); video = speaker. Never auto-flip on accept. */
+    private val _speakerOn = MutableStateFlow(false)
     val speakerOn: StateFlow<Boolean> = _speakerOn.asStateFlow()
 
     /**
@@ -58,6 +60,7 @@ object LiveKitCallController {
     ) {
         disconnect()
         val appCtx = context.applicationContext
+        appContext = appCtx
         val created = LiveKit.create(appCtx)
         room = created
         eventsJob = scope.launch {
@@ -97,15 +100,17 @@ object LiveKitCallController {
         refreshRemoteJoined(created)
 
         if (waitForPeer && !_remoteJoined.value) {
-            // Ringing: join room for fast connect, but do not publish audio/video yet.
+            // Ringing: join room for fast connect, but do not publish yet.
+            // Keep Mute UI off (WhatsApp-like) — mic is just unpublished.
             created.localParticipant.setMicrophoneEnabled(false)
             created.localParticipant.setCameraEnabled(false)
-            _muted.value = true
-            _cameraOff.value = true
+            _muted.value = false
+            _cameraOff.value = !enableVideo
         } else {
             enableMedia(enableVideo)
         }
-        setSpeaker(appCtx, enableVideo || !waitForPeer)
+        // Voice → earpiece; video → speaker. Same for caller and callee.
+        setSpeaker(appCtx, enableVideo)
     }
 
     /** Unmute / publish after callee accepts (or remote appears). */
@@ -164,12 +169,20 @@ object LiveKitCallController {
         room?.disconnect()
         room?.release()
         room = null
+        appContext?.let { ctx ->
+            val am = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            @Suppress("DEPRECATION")
+            am.isSpeakerphoneOn = false
+            am.mode = AudioManager.MODE_NORMAL
+        }
+        appContext = null
         _roomConnected.value = false
         _remoteJoined.value = false
         _remoteVideo.value = null
         _localVideo.value = null
         _muted.value = false
         _cameraOff.value = false
+        _speakerOn.value = false
     }
 
     private fun refreshRemoteJoined(room: Room) {
