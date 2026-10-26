@@ -2,9 +2,12 @@ package com.aivora.app.data.realtime
 
 import com.aivora.app.BuildConfig
 import com.aivora.app.data.api.NetworkModule
+import com.aivora.app.data.call.ActiveCallSession
+import com.aivora.app.data.call.LiveKitCallController
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.CallDto
 import com.aivora.app.data.model.MessageDto
 import com.aivora.app.data.toLocalMessage
 import kotlinx.coroutines.CoroutineScope
@@ -277,6 +280,32 @@ object RealtimeClient {
                 _onlineUsers.value = _onlineUsers.value.toMutableMap().also { map ->
                     // Mark listed users online; do not wipe others (other chats may still track them).
                     ids.forEach { map[it] = true }
+                }
+            }
+            "call.incoming" -> {
+                val data = frame.data ?: return
+                val call = runCatching {
+                    NetworkModule.json.decodeFromJsonElement(CallDto.serializer(), data)
+                }.getOrNull() ?: return
+                ActiveCallSession.setIncoming(call)
+            }
+            "call.answered" -> {
+                // Caller stays on in-call screen; status flips to Connected via LiveKit.
+            }
+            "call.rejected", "call.ended" -> {
+                val data = frame.data
+                val call = data?.let {
+                    runCatching {
+                        NetworkModule.json.decodeFromJsonElement(CallDto.serializer(), it)
+                    }.getOrNull()
+                }
+                val activeId = ActiveCallSession.session.value?.callId
+                if (call?.id != null && call.id == ActiveCallSession.incoming.value?.id) {
+                    ActiveCallSession.clearIncoming()
+                }
+                if (call?.id != null && call.id == activeId) {
+                    LiveKitCallController.disconnect()
+                    ActiveCallSession.clear()
                 }
             }
         }

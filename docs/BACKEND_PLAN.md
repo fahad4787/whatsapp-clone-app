@@ -10,7 +10,7 @@ Status: **MVP Waves 0–8 done.** Next: full chat — see `CHAT_FULL_PLAN.md` (W
 | Stack | Fastify + Prisma + Postgres + Redis + object storage |
 | Hosting (now) | **Render free / trial** (staging) |
 | OTP | **Dev OTP** — code in admin panel + server logs (real SMS later) |
-| Calls / LiveKit | **Deferred** |
+| Calls / LiveKit | **Wave 16.1** — Cloud free tier (set `LIVEKIT_*` env) |
 | Also deferred | Communities, passkeys, backup/transfer, stickers, live location |
 | Quality bar | Senior practice: tests + Semgrep CI + verify before next feature |
 

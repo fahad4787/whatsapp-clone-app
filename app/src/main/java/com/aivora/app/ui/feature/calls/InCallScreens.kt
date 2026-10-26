@@ -1,5 +1,9 @@
 package com.aivora.app.ui.feature.calls
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,9 +37,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,21 +52,168 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import com.aivora.app.data.api.NetworkModule
+import com.aivora.app.data.call.ActiveCallSession
+import com.aivora.app.data.call.LiveKitCallController
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
+import io.livekit.android.renderer.TextureViewRenderer
+import io.livekit.android.room.track.VideoTrack
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import livekit.org.webrtc.EglBase
 
 @Composable
 fun AudioCallScreen(
-    name: String = "George Alan",
+    name: String = "Contact",
     onEnd: () -> Unit = {},
 ) {
-    var muted by remember { mutableStateOf(false) }
-    var speaker by remember { mutableStateOf(true) }
+    InCallContent(name = name, videoMode = false, onEnd = onEnd)
+}
 
+@Composable
+fun VideoCallScreen(
+    name: String = "Contact",
+    onEnd: () -> Unit = {},
+) {
+    InCallContent(name = name, videoMode = true, onEnd = onEnd)
+}
+
+@Composable
+private fun InCallContent(
+    name: String,
+    videoMode: Boolean,
+    onEnd: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val session by ActiveCallSession.session.collectAsState()
+    val connected by LiveKitCallController.connected.collectAsState()
+    val muted by LiveKitCallController.muted.collectAsState()
+    val speakerOn by LiveKitCallController.speakerOn.collectAsState()
+    val cameraOff by LiveKitCallController.cameraOff.collectAsState()
+    val remoteVideo by LiveKitCallController.remoteVideo.collectAsState()
+    val localVideo by LiveKitCallController.localVideo.collectAsState()
+    val peerName = session?.peerName?.ifBlank { name } ?: name
+    val enableVideo = videoMode || session?.media == "video"
+
+    var elapsedSec by remember { mutableLongStateOf(0L) }
+    var statusText by remember { mutableStateOf("Connecting…") }
+    var permissionReady by remember { mutableStateOf(false) }
+
+    val permissions = remember(enableVideo) {
+        buildList {
+            add(Manifest.permission.RECORD_AUDIO)
+            if (enableVideo) add(Manifest.permission.CAMERA)
+        }.toTypedArray()
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        permissionReady = grants.values.all { it }
+    }
+
+    LaunchedEffect(Unit) {
+        val missing = permissions.filter {
+            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) {
+            permissionReady = true
+        } else {
+            permissionLauncher.launch(permissions)
+        }
+    }
+
+    LaunchedEffect(session?.callId, permissionReady) {
+        val s = session
+        if (!permissionReady || s == null) return@LaunchedEffect
+        statusText = if (s.asCaller) "Calling…" else "Connecting…"
+        runCatching {
+            LiveKitCallController.connect(
+                context = context,
+                url = s.livekitUrl,
+                token = s.token,
+                enableVideo = s.media == "video",
+            )
+            statusText = "Connected"
+        }.onFailure {
+            statusText = "Failed to connect"
+        }
+    }
+
+    LaunchedEffect(connected) {
+        if (!connected) return@LaunchedEffect
+        elapsedSec = 0
+        while (true) {
+            delay(1000)
+            elapsedSec += 1
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            // Keep room if minimizing later; for now hangup is explicit.
+        }
+    }
+
+    fun hangUp() {
+        scope.launch {
+            val callId = session?.callId
+            LiveKitCallController.disconnect()
+            if (!callId.isNullOrBlank()) {
+                runCatching {
+                    NetworkModule.api().postCallsIdAction(callId, "end", emptyMap())
+                }
+            }
+            ActiveCallSession.clear()
+            onEnd()
+        }
+    }
+
+    if (enableVideo) {
+        VideoCallLayout(
+            name = peerName,
+            statusText = if (connected) "Connected · ${formatElapsed(elapsedSec)}" else statusText,
+            muted = muted,
+            cameraOff = cameraOff,
+            remoteVideo = remoteVideo,
+            localVideo = localVideo,
+            onMute = { LiveKitCallController.setMuted(!muted) },
+            onCamera = { LiveKitCallController.setCameraOff(!cameraOff) },
+            onEnd = { hangUp() },
+        )
+    } else {
+        AudioCallLayout(
+            name = peerName,
+            statusText = if (connected) "Connected" else statusText,
+            elapsed = formatElapsed(elapsedSec),
+            muted = muted,
+            speakerOn = speakerOn,
+            onMute = { LiveKitCallController.setMuted(!muted) },
+            onSpeaker = { LiveKitCallController.setSpeaker(context, !speakerOn) },
+            onEnd = { hangUp() },
+        )
+    }
+}
+
+@Composable
+private fun AudioCallLayout(
+    name: String,
+    statusText: String,
+    elapsed: String,
+    muted: Boolean,
+    speakerOn: Boolean,
+    onMute: () -> Unit,
+    onSpeaker: () -> Unit,
+    onEnd: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -126,25 +282,17 @@ fun AudioCallScreen(
                         .background(AivoraColors.Primary),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text("Connected", color = AivoraColors.Online, style = MaterialTheme.typography.bodyMedium)
+                Text(statusText, color = AivoraColors.Online, style = MaterialTheme.typography.bodyMedium)
                 Text("  ·  ", color = AivoraColors.IconSecondary)
-                Text("02:34", color = AivoraColors.InkMuted, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
+                Text(elapsed, color = AivoraColors.InkMuted, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
             }
-            Spacer(Modifier.height(18.dp))
-            VoiceActivityBars()
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "${name.substringBefore(' ')} is speaking",
-                color = AivoraColors.TextSecondary,
-                style = MaterialTheme.typography.labelMedium,
-            )
         }
 
         CallControlsPanel(
             muted = muted,
-            speakerOn = speaker,
-            onMute = { muted = !muted },
-            onSpeaker = { speaker = !speaker },
+            speakerOn = speakerOn,
+            onMute = onMute,
+            onSpeaker = onSpeaker,
             onEnd = onEnd,
             videoMode = false,
         )
@@ -152,30 +300,38 @@ fun AudioCallScreen(
 }
 
 @Composable
-fun VideoCallScreen(
-    name: String = "George Alan",
-    onEnd: () -> Unit = {},
+private fun VideoCallLayout(
+    name: String,
+    statusText: String,
+    muted: Boolean,
+    cameraOff: Boolean,
+    remoteVideo: VideoTrack?,
+    localVideo: VideoTrack?,
+    onMute: () -> Unit,
+    onCamera: () -> Unit,
+    onEnd: () -> Unit,
 ) {
-    var muted by remember { mutableStateOf(false) }
-    var cameraOff by remember { mutableStateOf(false) }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0B141A)),
     ) {
-        // Mock remote video plane
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xFF1A242C), Color(0xFF0B141A)),
+        if (remoteVideo != null) {
+            VideoTrackAndroidView(
+                track = remoteVideo,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color(0xFF1A242C), Color(0xFF0B141A)),
+                        ),
                     ),
-                ),
-        )
-        if (cameraOff) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                contentAlignment = Alignment.Center,
+            ) {
                 Avatar(name, size = 120)
             }
         }
@@ -204,22 +360,12 @@ fun VideoCallScreen(
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(AivoraColors.Primary),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text("Connected · 02:34", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
-                    }
+                    Text(statusText, color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
                 }
             }
 
             Spacer(Modifier.weight(1f))
 
-            // Local preview stub
             Box(
                 modifier = Modifier
                     .align(Alignment.End)
@@ -230,18 +376,25 @@ fun VideoCallScreen(
                     .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                if (cameraOff) {
-                    Icon(Icons.Default.VideocamOff, null, tint = Color.White.copy(alpha = 0.7f))
-                } else {
-                    Avatar("You", size = 48)
+                when {
+                    cameraOff || localVideo == null -> {
+                        Icon(Icons.Default.VideocamOff, null, tint = Color.White.copy(alpha = 0.7f))
+                    }
+                    else -> {
+                        VideoTrackAndroidView(
+                            track = localVideo,
+                            modifier = Modifier.fillMaxSize(),
+                            mirror = true,
+                        )
+                    }
                 }
             }
 
             CallControlsPanel(
                 muted = muted,
                 speakerOn = true,
-                onMute = { muted = !muted },
-                onSpeaker = { cameraOff = !cameraOff },
+                onMute = onMute,
+                onSpeaker = onCamera,
                 onEnd = onEnd,
                 videoMode = true,
                 cameraOff = cameraOff,
@@ -251,23 +404,38 @@ fun VideoCallScreen(
 }
 
 @Composable
-private fun VoiceActivityBars() {
-    val heights = listOf(8, 13, 21, 15, 24, 11, 18, 8, 15)
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.height(24.dp),
-    ) {
-        heights.forEach { h ->
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .height(h.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(AivoraColors.Primary),
-            )
-        }
+private fun VideoTrackAndroidView(
+    track: VideoTrack,
+    modifier: Modifier = Modifier,
+    mirror: Boolean = false,
+) {
+    val eglBase = remember { EglBase.create() }
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            TextureViewRenderer(ctx).also { renderer ->
+                renderer.init(eglBase.eglBaseContext, null)
+                renderer.setMirror(mirror)
+                track.addRenderer(renderer)
+            }
+        },
+        update = { renderer ->
+            // Track already attached in factory for this renderer instance.
+        },
+        onRelease = { renderer ->
+            track.removeRenderer(renderer)
+            renderer.release()
+        },
+    )
+    DisposableEffect(Unit) {
+        onDispose { eglBase.release() }
     }
+}
+
+private fun formatElapsed(sec: Long): String {
+    val m = sec / 60
+    val s = sec % 60
+    return "%d:%02d".format(m, s)
 }
 
 @Composable

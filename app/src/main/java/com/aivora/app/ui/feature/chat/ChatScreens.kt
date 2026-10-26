@@ -540,8 +540,68 @@ fun ChatIdScreen(
                 haptics.tick()
                 onBack?.invoke()
             },
-            onCall = { onNavigate(Routes.audioCall(chat.title)) },
-            onVideo = { onNavigate(Routes.videoCall(chat.title)) },
+            onCall = {
+                if (!useRemote) {
+                    onNavigate(Routes.audioCall(chat.title))
+                } else {
+                    scope.launch {
+                        runCatching {
+                            val result = api.postCalls(
+                                mapOf(
+                                    "conversation_id" to chatId,
+                                    "media" to "audio",
+                                ),
+                            )
+                            val token = result.token
+                            val url = result.livekitUrl
+                            val callId = result.call?.id
+                            if (token.isNullOrBlank() || url.isNullOrBlank() || callId.isNullOrBlank()) {
+                                return@runCatching
+                            }
+                            com.aivora.app.data.call.ActiveCallSession.setActive(
+                                callId = callId,
+                                token = token,
+                                livekitUrl = url,
+                                media = "audio",
+                                peerName = chat.title,
+                                asCaller = true,
+                            )
+                            onNavigate(Routes.audioCall(chat.title))
+                        }
+                    }
+                }
+            },
+            onVideo = {
+                if (!useRemote) {
+                    onNavigate(Routes.videoCall(chat.title))
+                } else {
+                    scope.launch {
+                        runCatching {
+                            val result = api.postCalls(
+                                mapOf(
+                                    "conversation_id" to chatId,
+                                    "media" to "video",
+                                ),
+                            )
+                            val token = result.token
+                            val url = result.livekitUrl
+                            val callId = result.call?.id
+                            if (token.isNullOrBlank() || url.isNullOrBlank() || callId.isNullOrBlank()) {
+                                return@runCatching
+                            }
+                            com.aivora.app.data.call.ActiveCallSession.setActive(
+                                callId = callId,
+                                token = token,
+                                livekitUrl = url,
+                                media = "video",
+                                peerName = chat.title,
+                                asCaller = true,
+                            )
+                            onNavigate(Routes.videoCall(chat.title))
+                        }
+                    }
+                }
+            },
             onOpenProfile = { onNavigate(Routes.ProfileId.replace("{id}", chatId)) },
             menuItems = ChatControls.overflowMenuItems(
                 chat = chat,

@@ -315,7 +315,7 @@ interface AivoraApi {
     @POST("api/calls")
     suspend fun postCalls(
         @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.CallTokenResult
 
     @PATCH("api/me/username")
     suspend fun patchMeUsername(
@@ -727,7 +727,7 @@ interface AivoraApi {
     suspend fun postCallsIdAction(
         @Path("id") id: String,
         @Path("action") action: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: Map<String, @JvmSuppressWildcards Any?> = emptyMap(),
+    ): com.aivora.app.data.model.CallTokenResult
 
 }

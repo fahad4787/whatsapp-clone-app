@@ -7,10 +7,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
@@ -18,6 +21,7 @@ import com.aivora.app.data.SessionRestorer
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.push.MessageNotifier
 import com.aivora.app.data.push.PushRegistrar
+import com.aivora.app.ui.feature.calls.IncomingCallOverlay
 import com.aivora.app.ui.motion.MotionPrefs
 import com.aivora.app.ui.navigation.AivoraNavHost
 import com.aivora.app.ui.navigation.Routes
@@ -67,10 +71,22 @@ fun AivoraAppRoot(startDestination: String = Routes.Login) {
     AivoraTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             val navController = rememberNavController()
-            AivoraNavHost(
-                navController = navController,
-                startDestination = startDestination,
-            )
+            Box(Modifier.fillMaxSize()) {
+                AivoraNavHost(
+                    navController = navController,
+                    startDestination = startDestination,
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding(),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    IncomingCallOverlay(
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
+            }
         }
     }
 }

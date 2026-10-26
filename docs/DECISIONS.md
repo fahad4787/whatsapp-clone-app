@@ -10,7 +10,7 @@ Source: Backend Scope Discussion plan (recommended defaults).
 | Hosting (now) | **Render free/trial** (staging); upgrade later for prod |
 | OTP | **Dev OTP** — show code in admin + logs; real SMS later |
 | MVP cut | Feature waves 0–8 in `BACKEND_PLAN.md` (foundation → admin) |
-| Calls (LiveKit) | **Deferred** past MVP |
+| Calls (LiveKit) | **LiveKit Cloud Build (free)** — Wave 16; self-host later if needed |
 | Also deferred | Communities, passkeys, backup/transfer, stickers, live location, real SMS |
 | Quality | Feature-by-feature; tests + Semgrep CI; no next wave until gate passes |
 

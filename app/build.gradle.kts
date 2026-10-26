@@ -77,5 +77,8 @@ dependencies {
     // BoM 33+ folds KTX into the main artifact
     implementation("com.google.firebase:firebase-messaging")
 
+    // Wave 16 — LiveKit Cloud calls
+    implementation("io.livekit:livekit-android:2.29.1")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
