@@ -45,6 +45,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContactPage
 import androidx.compose.material.icons.filled.Delete
@@ -108,6 +110,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -128,6 +131,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
 import com.aivora.app.data.ChatRepository
+import com.aivora.app.ui.media.rememberBubbleImageModel
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.LocalMediaKind
 import com.aivora.app.data.local.LocalMessage
@@ -189,23 +193,31 @@ fun ChatIdScreen(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val haptics = rememberAivoraHaptics()
-    val chats by InMemoryChatStore.chats.collectAsState()
-    val chat = remember(chatId, chats) { InMemoryChatStore.chat(chatId) }
+    val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
+    // Sync disk hydrate BEFORE collect — first frame already has latest cached thread.
+    if (useRemote) {
+        remember(chatId) {
+            ChatRepository.hydrateMessagesFromDisk(context, chatId)
+            true
+        }
+    }
+    val chat by InMemoryChatStore.chatFlow(chatId).collectAsState(
+        initial = InMemoryChatStore.chat(chatId),
+    )
     val messages by InMemoryChatStore.messages(chatId).collectAsState()
-    // reuse `chats` for forward sheet — avoid a second collectAsState on the same flow
-    var text by remember(chatId) { mutableStateOf("") }
     var searchQuery by remember(chatId) { mutableStateOf("") }
     var showSearch by remember(chatId) { mutableStateOf(false) }
     var peerTyping by remember(chatId) { mutableStateOf(false) }
-    var typingSent by remember(chatId) { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
     var showChatMenu by remember { mutableStateOf(false) }
     var showClearChat by remember { mutableStateOf(false) }
     var showReportSent by remember { mutableStateOf(false) }
     var showBlockConfirm by remember { mutableStateOf(false) }
     val visibleMessages = remember(messages, searchQuery, showSearch) {
-        if (!showSearch || searchQuery.isBlank()) messages
+        val base = if (!showSearch || searchQuery.isBlank()) messages
         else messages.filter { it.body.contains(searchQuery, ignoreCase = true) }
+        // Guard: duplicate ids crash LazyColumn (Vivo chat-open FATAL).
+        base.distinctBy { it.id }
     }
     var actionTarget by remember { mutableStateOf<LocalMessage?>(null) }
     var deleteTarget by remember { mutableStateOf<LocalMessage?>(null) }
@@ -218,9 +230,9 @@ fun ChatIdScreen(
     var viewOnceShown by remember { mutableStateOf<Pair<LocalMessage, String>?>(null) }
     var replyTo by remember(chatId) { mutableStateOf<LocalMessage?>(null) }
     var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
-    val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
     // Per-chat list state so reopen doesn't flash a previous scroll offset.
     val listState = remember(chatId) { androidx.compose.foundation.lazy.LazyListState() }
+    var listReady by remember(chatId) { mutableStateOf(false) }
     val wallpaper = chatWallpaperColor(chat.wallpaper, dark)
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
     fun uploadPickedUri(uri: Uri, viewOnce: Boolean = false) {
@@ -271,26 +283,8 @@ fun ChatIdScreen(
     ) { uri -> if (uri != null) uploadPickedUri(uri, viewOnce = true) }
     val voiceRecorder = remember { VoiceRecorder(context) }
     var recordingVoice by remember { mutableStateOf(false) }
-    var recordingSecs by remember { mutableStateOf(0) }
-    var liveLevels by remember { mutableStateOf(FloatArray(28) { 0.2f }) }
     DisposableEffect(Unit) {
         onDispose { voiceRecorder.cancel() }
-    }
-    LaunchedEffect(recordingVoice) {
-        if (!recordingVoice) {
-            recordingSecs = 0
-            return@LaunchedEffect
-        }
-        while (true) {
-            recordingSecs = voiceRecorder.elapsedSec()
-            val amp = voiceRecorder.amplitude()
-            val prev = liveLevels
-            liveLevels = FloatArray(prev.size) { i ->
-                val target = if (i == prev.lastIndex) amp else prev.getOrElse(i + 1) { amp }
-                prev[i] * 0.35f + target * 0.65f
-            }
-            delay(50)
-        }
     }
     val requestMic = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -335,16 +329,11 @@ fun ChatIdScreen(
     }
     val firstName = chat.title.substringBefore(' ').ifBlank { chat.title }
     val hidePresence = chat.blockedByMe || chat.blockedMe
-    val onlineUsers by RealtimeClient.onlineUsers.collectAsState()
-    val roomOnlineMap by RealtimeClient.roomOnline.collectAsState()
-    // Snapshot now lists members with the app open (not only this screen open).
-    val groupOnlineCount = remember(chatId, roomOnlineMap, myUserId) {
-        RealtimeClient.onlineCountInChat(chatId, myUserId)
-    }
-    val peerOnline = remember(chat.peerUserId, onlineUsers, hidePresence, chat.peerPresenceVisible) {
-        if (hidePresence || chat.isGroup || !chat.peerPresenceVisible) false
-        else RealtimeClient.isUserOnline(chat.peerUserId)
-    }
+    val peerOnlineRaw by RealtimeClient.observeUserOnline(chat.peerUserId)
+        .collectAsState(initial = RealtimeClient.isUserOnline(chat.peerUserId))
+    val groupOnlineCount by RealtimeClient.observeRoomOnlineCount(chatId, myUserId)
+        .collectAsState(initial = RealtimeClient.onlineCountInChat(chatId, myUserId))
+    val peerOnline = !hidePresence && !chat.isGroup && chat.peerPresenceVisible && peerOnlineRaw
     var lastSeenLocal by remember(chatId) { mutableStateOf(chat.peerLastSeenAt) }
     LaunchedEffect(chat.peerLastSeenAt) { lastSeenLocal = chat.peerLastSeenAt }
     LaunchedEffect(chatId, useRemote) {
@@ -417,11 +406,11 @@ fun ChatIdScreen(
         }
     }
 
-    // Disk → paint, then network refresh (websocket is primary)
+    // Disk → paint first; defer network so open-chat first frames stay light (PERF F8).
     LaunchedEffect(chatId, useRemote) {
         if (!useRemote) return@LaunchedEffect
         ChatRepository.hydrateMessagesFromDisk(context, chatId)
-        // Refresh group role / privacy flags for composer gate.
+        delay(80)
         runCatching {
             val remote = api.getConversationsId(chatId)
             InMemoryChatStore.upsertChat(remote.toLocalChat())
@@ -430,6 +419,7 @@ fun ChatIdScreen(
     LaunchedEffect(chatId, myUserId, useRemote) {
         if (!useRemote || myUserId == null) return@LaunchedEffect
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            delay(80)
             ChatRepository.refreshMessages(context, chatId, myUserId!!)
             while (true) {
                 delay(25_000)
@@ -464,44 +454,29 @@ fun ChatIdScreen(
             }
     }
 
-    // Typing only when the composer has real text — focus / keyboard alone must not notify peers.
-    LaunchedEffect(text, useRemote, chatId) {
-        if (!useRemote) return@LaunchedEffect
-        val hasText = text.trim().isNotEmpty()
-        if (!hasText) {
-            if (typingSent) {
-                RealtimeClient.setTyping(chatId, false)
-                typingSent = false
-            }
-            return@LaunchedEffect
-        }
-        delay(300)
-        if (text.trim().isEmpty()) return@LaunchedEffect
-        RealtimeClient.setTyping(chatId, true)
-        typingSent = true
-        delay(1_500)
-        RealtimeClient.setTyping(chatId, false)
-        typingSent = false
-    }
-
     // Open pinned to latest; follow new messages only (react/star must not jump scroll).
     var didInitialScroll by remember(chatId) { mutableStateOf(false) }
     var prevMsgCount by remember(chatId) { mutableStateOf(-1) }
     LaunchedEffect(chatId) {
         didInitialScroll = false
         prevMsgCount = -1
+        listReady = false
     }
-    LaunchedEffect(messages.size, messages.lastOrNull()?.id, peerTyping, imeVisible) {
-        if (messages.isEmpty()) return@LaunchedEffect
-        val index = (messages.lastIndex + if (peerTyping) 1 else 0).coerceAtLeast(0)
-        val grew = prevMsgCount >= 0 && messages.size > prevMsgCount
-        prevMsgCount = messages.size
+    LaunchedEffect(visibleMessages.size, visibleMessages.lastOrNull()?.id, peerTyping, imeVisible) {
+        if (visibleMessages.isEmpty()) {
+            listReady = true
+            return@LaunchedEffect
+        }
+        // +1 for date separator item above messages
+        val index = (visibleMessages.lastIndex + 1 + if (peerTyping) 1 else 0).coerceAtLeast(0)
+        val grew = prevMsgCount >= 0 && visibleMessages.size > prevMsgCount
+        prevMsgCount = visibleMessages.size
         if (!didInitialScroll) {
             listState.scrollToItem(index)
-            // Second pass after layout so we don't flash mid-thread then jump.
             delay(16)
             listState.scrollToItem(index)
             didInitialScroll = true
+            listReady = true
             return@LaunchedEffect
         }
         if (listState.isScrollInProgress) return@LaunchedEffect
@@ -707,8 +682,10 @@ fun ChatIdScreen(
     ) {
         LazyColumn(
             state = listState,
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = if (listReady) 1f else 0f },
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 item(key = "date", contentType = "date") {
@@ -857,16 +834,15 @@ fun ChatIdScreen(
             }
         } else {
             ChatComposer(
-                value = text,
-                onValueChange = { text = it },
+                chatId = chatId,
+                useRemote = useRemote,
                 placeholder = "Message $firstName…",
                 replyPreview = replyTo?.let { r ->
                     if (r.deletedForEveryone) "Original message was deleted" else r.body.ifBlank { "Message" }
                 },
                 onClearReply = { replyTo = null },
                 recording = recordingVoice,
-                recordingSecs = recordingSecs,
-                recordingLevels = liveLevels,
+                voiceRecorder = voiceRecorder,
                 onCancelRecording = {
                     voiceRecorder.cancel()
                     recordingVoice = false
@@ -877,60 +853,54 @@ fun ChatIdScreen(
                     showAttach = true
                 },
                 onCamera = { onNavigate(Routes.camera("chat:$chatId")) },
-                onSendOrMic = {
-                    when {
-                        recordingVoice -> finishVoiceSend()
-                        text.trim().isNotEmpty() -> {
-                            haptics.confirm()
-                            val body = text.trim()
-                            val quoting = replyTo
-                            text = ""
-                            replyTo = null
-                            val replyDto = quoting?.let {
-                                ReplyPreviewDto(id = it.id, text = it.body.takeIf { t -> t.isNotBlank() })
-                            }
-                            val localReply = quoting?.let {
-                                LocalReplyPreview(
-                                    id = it.id,
-                                    body = if (it.deletedForEveryone) "Original message was deleted" else it.body,
-                                    deleted = it.deletedForEveryone,
+                onSendText = { body ->
+                    haptics.confirm()
+                    val quoting = replyTo
+                    replyTo = null
+                    val replyDto = quoting?.let {
+                        ReplyPreviewDto(id = it.id, text = it.body.takeIf { t -> t.isNotBlank() })
+                    }
+                    val localReply = quoting?.let {
+                        LocalReplyPreview(
+                            id = it.id,
+                            body = if (it.deletedForEveryone) "Original message was deleted" else it.body,
+                            deleted = it.deletedForEveryone,
+                        )
+                    }
+                    if (useRemote) {
+                        RealtimeClient.setTyping(chatId, false)
+                        scope.launch {
+                            try {
+                                val sent = api.postConversationsIdMessages(
+                                    chatId,
+                                    SendMessageBody(
+                                        text = body,
+                                        clientId = UUID.randomUUID().toString(),
+                                        replyTo = replyDto,
+                                    ),
                                 )
-                            }
-                            if (useRemote) {
-                                RealtimeClient.setTyping(chatId, false)
-                                scope.launch {
-                                    try {
-                                        val sent = api.postConversationsIdMessages(
-                                            chatId,
-                                            SendMessageBody(
-                                                text = body,
-                                                clientId = UUID.randomUUID().toString(),
-                                                replyTo = replyDto,
-                                            ),
-                                        )
-                                        val uid = myUserId ?: SessionStore.userId(context)
-                                        if (uid != null) {
-                                            InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
-                                        }
-                                    } catch (_: Exception) {
-                                        InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
-                                    }
+                                val uid = myUserId ?: SessionStore.userId(context)
+                                if (uid != null) {
+                                    InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
                                 }
-                            } else {
+                            } catch (_: Exception) {
                                 InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
-                                peerTyping = true
                             }
                         }
-                        else -> {
-                            haptics.confirm()
-                            if (context.hasMicPermission()) {
-                                if (voiceRecorder.start()) recordingVoice = true
-                            } else {
-                                requestMic.launch(Manifest.permission.RECORD_AUDIO)
-                            }
-                        }
+                    } else {
+                        InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
+                        peerTyping = true
                     }
                 },
+                onRequestMic = {
+                    haptics.confirm()
+                    if (context.hasMicPermission()) {
+                        if (voiceRecorder.start()) recordingVoice = true
+                    } else {
+                        requestMic.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+                onFinishRecording = { finishVoiceSend() },
             )
         }
     }
@@ -1160,55 +1130,13 @@ fun ChatIdScreen(
     }
 
     forwardTarget?.let { target ->
-        val destinations = chats.filter { it.id != chatId }
-        AivoraBottomSheet(
+        ForwardToSheet(
+            chatId = chatId,
+            target = target,
+            useRemote = useRemote,
+            myUserId = myUserId,
             onDismiss = { forwardTarget = null },
-            title = "Forward to…",
-        ) {
-            if (destinations.isEmpty()) {
-                        Text(
-                    "No other chats yet",
-                    color = AivoraColors.TextSecondary,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                )
-            } else {
-                AivoraSheetActionList(
-                    actions = destinations.map { dest ->
-                        AivoraSheetAction(dest.title, Icons.Default.Person) {
-                            forwardTarget = null
-                            if (useRemote) {
-                                scope.launch {
-                                    runCatching {
-                                        api.postMessagesIdForward(
-                                            target.id,
-                                            ForwardMessageBody(conversationId = dest.id),
-                                        )
-                                    }.onSuccess { dto ->
-                                        val uid = myUserId ?: SessionStore.userId(context)
-                                        if (uid != null) {
-                                            InMemoryChatStore.upsertMessage(
-                                                dest.id,
-                                                dto.toLocalMessage(uid),
-                                            )
-                                        }
-                                        Toast.makeText(context, "Forwarded", Toast.LENGTH_SHORT).show()
-                                    }.onFailure {
-                                        Toast.makeText(context, "Could not forward", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            } else {
-                                InMemoryChatStore.sendText(
-                                    dest.id,
-                                    target.body.ifBlank { "Forwarded message" },
-                                )
-                                Toast.makeText(context, "Forwarded", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-        }
+        )
     }
 
     deleteTarget?.let { target ->
@@ -1363,7 +1291,7 @@ fun ChatIdScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 AsyncImage(
-                    model = url,
+                    model = rememberBubbleImageModel(url, width = 720.dp, height = 1280.dp),
                     contentDescription = "View once photo",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,
@@ -1589,23 +1517,44 @@ private fun DateSeparator(label: String) {
     }
 }
 
-/** WhatsApp-style centered info strip (disappearing messages, etc.). */
+/** WhatsApp/Bolta-style centered info strip (disappearing, call notices, etc.). */
 @Composable
 private fun SystemNotice(body: String) {
+    val isCall = body.contains("call", ignoreCase = true)
     Box(
         modifier = Modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            body,
+        Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
-                .background(AivoraColors.SoftMint)
+                .background(
+                    if (isCall) AivoraColors.SurfaceMuted
+                    else AivoraColors.SoftMint,
+                )
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = AivoraColors.InfoGreen,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (isCall) {
+                Icon(
+                    imageVector = if (body.contains("video", ignoreCase = true)) {
+                        Icons.Default.Videocam
+                    } else {
+                        Icons.Default.Call
+                    },
+                    contentDescription = null,
+                    tint = AivoraColors.TextSecondary,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+            Text(
+                body,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (isCall) AivoraColors.TextSecondary else AivoraColors.InfoGreen,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+        }
     }
 }
 
@@ -1762,11 +1711,10 @@ private fun MessageRow(
                             contentAlignment = Alignment.Center,
                         ) {
                             AsyncImage(
-                                model = uri,
+                                model = rememberBubbleImageModel(uri),
                                 contentDescription = "Video",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop,
-                                // Prefer decode size over full bitmap while scrolling.
                             )
                             Box(
                                 modifier = Modifier
@@ -1810,7 +1758,7 @@ private fun MessageRow(
                                 style = MaterialTheme.typography.labelMedium,
                             )
                             AsyncImage(
-                                model = uri,
+                                model = rememberBubbleImageModel(uri),
                                 contentDescription = "Photo",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop,
@@ -2038,7 +1986,7 @@ private fun LinkPreviewCard(card: com.aivora.app.data.local.LocalLinkPreview) {
     ) {
         card.imageUrl?.takeIf { it.isNotBlank() }?.let { img ->
             AsyncImage(
-                model = img,
+                model = rememberBubbleImageModel(img, width = 320.dp, height = 120.dp),
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2109,53 +2057,20 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
     var ready by remember(mediaUrl) { mutableStateOf(false) }
     var progress by remember(mediaUrl) { mutableStateOf(0f) }
     var positionSec by remember(mediaUrl) { mutableStateOf(0) }
-    var playWhenReady by remember(mediaUrl) { mutableStateOf(false) }
+    var loading by remember(mediaUrl) { mutableStateOf(false) }
     val playerHolder = remember(mediaUrl) { arrayOf<MediaPlayer?>(null) }
 
+    // Create MediaPlayer only on first play — scrolling past voice rows must stay cheap.
     DisposableEffect(mediaUrl) {
-        val url = mediaUrl
-        if (url.isNullOrBlank()) {
-            onDispose { }
-        } else {
-            ready = false
+        onDispose {
             playing = false
-            progress = 0f
-            positionSec = 0
-            playWhenReady = false
-            val mp = MediaPlayer()
-            playerHolder[0] = mp
-            try {
-                mp.setDataSource(context, Uri.parse(url))
-                mp.setOnPreparedListener {
-                    ready = true
-                    if (playWhenReady) {
-                        playWhenReady = false
-                        runCatching { mp.start() }
-                        playing = true
-                    }
-                }
-                mp.setOnCompletionListener {
-                    playing = false
-                    progress = 0f
-                    positionSec = 0
-                    runCatching { mp.seekTo(0) }
-                }
-                // Non-blocking — play/pause stays instant after this.
-                mp.prepareAsync()
-            } catch (_: Exception) {
-                ready = false
-                playerHolder[0] = null
-                runCatching { mp.release() }
-            }
-            onDispose {
-                playWhenReady = false
-                playing = false
-                ready = false
-                playerHolder[0] = null
-                runCatching {
-                    mp.reset()
-                    mp.release()
-                }
+            ready = false
+            loading = false
+            val mp = playerHolder[0]
+            playerHolder[0] = null
+            runCatching {
+                mp?.reset()
+                mp?.release()
             }
         }
     }
@@ -2167,13 +2082,55 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
             val pos = runCatching { mp.currentPosition }.getOrDefault(0)
             progress = pos.toFloat() / dur.toFloat()
             positionSec = (pos / 1000).coerceAtLeast(0)
-            delay(50)
+            delay(200)
         }
     }
 
     val bars = remember(seed) {
         val rnd = Random(seed)
-        FloatArray(28) { 0.22f + rnd.nextFloat() * 0.78f }
+        FloatArray(20) { 0.22f + rnd.nextFloat() * 0.78f }
+    }
+
+    fun ensurePlayerAndPlay() {
+        val url = mediaUrl ?: return
+        if (url.isBlank()) return
+        val existing = playerHolder[0]
+        if (existing != null && ready) {
+            runCatching { existing.start() }
+            playing = true
+            return
+        }
+        if (loading) return
+        loading = true
+        val mp = MediaPlayer()
+        playerHolder[0] = mp
+        try {
+            mp.setDataSource(context, Uri.parse(url))
+            mp.setOnPreparedListener {
+                ready = true
+                loading = false
+                runCatching { mp.start() }
+                playing = true
+            }
+            mp.setOnCompletionListener {
+                playing = false
+                progress = 0f
+                positionSec = 0
+                runCatching { mp.seekTo(0) }
+            }
+            mp.setOnErrorListener { _, _, _ ->
+                loading = false
+                ready = false
+                playing = false
+                true
+            }
+            mp.prepareAsync()
+        } catch (_: Exception) {
+            loading = false
+            ready = false
+            playerHolder[0] = null
+            runCatching { mp.release() }
+        }
     }
 
     fun togglePlay() {
@@ -2184,12 +2141,7 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
             playing = false
             return
         }
-        if (ready && mp != null) {
-            runCatching { mp.start() }
-            playing = true
-        } else {
-            playWhenReady = true
-        }
+        ensurePlayerAndPlay()
     }
 
     Row(
@@ -2208,7 +2160,7 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
             Text(
                 when {
                     playing -> "❚❚"
-                    playWhenReady && !ready -> "…"
+                    loading -> "…"
                     else -> "▶"
                 },
                 color = Color.White,
@@ -2243,21 +2195,70 @@ private fun formatVoiceDuration(sec: Int): String {
 }
 
 @Composable
-private fun ChatComposer(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    replyPreview: String? = null,
-    onClearReply: () -> Unit = {},
-    recording: Boolean = false,
-    recordingSecs: Int = 0,
-    recordingLevels: FloatArray = FloatArray(0),
-    onCancelRecording: () -> Unit = {},
-    onAttach: () -> Unit,
-    onCamera: () -> Unit,
-    onSendOrMic: () -> Unit,
+private fun ForwardToSheet(
+    chatId: String,
+    target: LocalMessage,
+    useRemote: Boolean,
+    myUserId: String?,
+    onDismiss: () -> Unit,
 ) {
-    val canSend = value.isNotBlank() || recording
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val api = remember { ChatRepository.api() }
+    val chats by InMemoryChatStore.chats.collectAsState()
+    val destinations = remember(chats, chatId) { chats.filter { it.id != chatId } }
+    AivoraBottomSheet(
+        onDismiss = onDismiss,
+        title = "Forward to…",
+    ) {
+        if (destinations.isEmpty()) {
+            Text(
+                "No other chats yet",
+                color = AivoraColors.TextSecondary,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+            )
+        } else {
+            AivoraSheetActionList(
+                actions = destinations.map { dest ->
+                    AivoraSheetAction(dest.title, Icons.Default.Person) {
+                        onDismiss()
+                        if (useRemote) {
+                            scope.launch {
+                                runCatching {
+                                    api.postMessagesIdForward(
+                                        target.id,
+                                        ForwardMessageBody(conversationId = dest.id),
+                                    )
+                                }.onSuccess { dto ->
+                                    val uid = myUserId ?: SessionStore.userId(context)
+                                    if (uid != null) {
+                                        InMemoryChatStore.upsertMessage(
+                                            dest.id,
+                                            dto.toLocalMessage(uid),
+                                        )
+                                    }
+                                    Toast.makeText(context, "Forwarded", Toast.LENGTH_SHORT).show()
+                                }.onFailure {
+                                    Toast.makeText(context, "Could not forward", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } else {
+                            InMemoryChatStore.sendText(
+                                dest.id,
+                                target.body.ifBlank { "Forwarded message" },
+                            )
+                            Toast.makeText(context, "Forwarded", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun RecordingPulseDot() {
     val pulse = rememberInfiniteTransition(label = "recPulse")
     val pulseAlpha by pulse.animateFloat(
         initialValue = 1f,
@@ -2268,6 +2269,70 @@ private fun ChatComposer(
         ),
         label = "recAlpha",
     )
+    Box(
+        modifier = Modifier
+            .size(10.dp)
+            .clip(CircleShape)
+            .background(AivoraColors.Danger.copy(alpha = pulseAlpha)),
+    )
+}
+
+@Composable
+private fun ChatComposer(
+    chatId: String,
+    useRemote: Boolean,
+    placeholder: String,
+    replyPreview: String? = null,
+    onClearReply: () -> Unit = {},
+    recording: Boolean = false,
+    voiceRecorder: VoiceRecorder? = null,
+    onCancelRecording: () -> Unit = {},
+    onAttach: () -> Unit,
+    onCamera: () -> Unit,
+    onSendText: (String) -> Unit,
+    onRequestMic: () -> Unit,
+    onFinishRecording: () -> Unit,
+) {
+    // Draft lives here so keystrokes do not recompose the message LazyColumn (PERF F7).
+    var draft by remember(chatId) { mutableStateOf("") }
+    var typingSent by remember(chatId) { mutableStateOf(false) }
+    val canSend = draft.isNotBlank() || recording
+    var recordingSecs by remember { mutableStateOf(0) }
+    var liveLevels by remember { mutableStateOf(FloatArray(28) { 0.2f }) }
+    LaunchedEffect(draft, useRemote, chatId) {
+        if (!useRemote) return@LaunchedEffect
+        val hasText = draft.trim().isNotEmpty()
+        if (!hasText) {
+            if (typingSent) {
+                RealtimeClient.setTyping(chatId, false)
+                typingSent = false
+            }
+            return@LaunchedEffect
+        }
+        delay(300)
+        if (draft.trim().isEmpty()) return@LaunchedEffect
+        RealtimeClient.setTyping(chatId, true)
+        typingSent = true
+        delay(1_500)
+        RealtimeClient.setTyping(chatId, false)
+        typingSent = false
+    }
+    LaunchedEffect(recording, voiceRecorder) {
+        if (!recording || voiceRecorder == null) {
+            recordingSecs = 0
+            return@LaunchedEffect
+        }
+        while (true) {
+            recordingSecs = voiceRecorder.elapsedSec()
+            val amp = voiceRecorder.amplitude()
+            val prev = liveLevels
+            liveLevels = FloatArray(prev.size) { i ->
+                val target = if (i == prev.lastIndex) amp else prev.getOrElse(i + 1) { amp }
+                prev[i] * 0.35f + target * 0.65f
+            }
+            delay(80)
+        }
+    }
     Column(
         modifier = Modifier
             .background(MaterialTheme.colorScheme.surface)
@@ -2337,12 +2402,7 @@ private fun ChatComposer(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(AivoraColors.Danger.copy(alpha = pulseAlpha)),
-                    )
+                    RecordingPulseDot()
                     Text(
                         formatVoiceDuration(recordingSecs),
                         color = AivoraColors.Ink,
@@ -2351,11 +2411,7 @@ private fun ChatComposer(
                         modifier = Modifier.defaultMinSize(minWidth = 40.dp),
                     )
                     VoiceWaveform(
-                        levels = if (recordingLevels.isNotEmpty()) {
-                            recordingLevels
-                        } else {
-                            FloatArray(28) { 0.2f }
-                        },
+                        levels = liveLevels,
                         progress = 1f,
                         modifier = Modifier.weight(1f),
                         activeColor = AivoraColors.Danger,
@@ -2380,15 +2436,15 @@ private fun ChatComposer(
                         )
                     }
                     BasicTextField(
-                        value = value,
-                        onValueChange = onValueChange,
+                        value = draft,
+                        onValueChange = { draft = it },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyMedium.copy(color = AivoraColors.Ink),
                         cursorBrush = SolidColor(AivoraColors.Primary),
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
-                                if (value.isEmpty()) {
+                                if (draft.isEmpty()) {
                                     Text(
                                         placeholder,
                                         style = MaterialTheme.typography.bodyMedium,
@@ -2417,11 +2473,25 @@ private fun ChatComposer(
                             listOf(AivoraColors.Primary, AivoraColors.PrimaryDark),
                         ),
                     )
-                    .clickable(onClick = onSendOrMic),
+                    .clickable {
+                        when {
+                            recording -> onFinishRecording()
+                            draft.trim().isNotEmpty() -> {
+                                val body = draft.trim()
+                                draft = ""
+                                if (typingSent) {
+                                    RealtimeClient.setTyping(chatId, false)
+                                    typingSent = false
+                                }
+                                onSendText(body)
+                            }
+                            else -> onRequestMic()
+                        }
+                    },
                 contentAlignment = Alignment.Center,
             ) {
                 when {
-                    canSend && (recording || value.isNotBlank()) -> Icon(
+                    canSend && (recording || draft.isNotBlank()) -> Icon(
                         Icons.Default.Send,
                         contentDescription = "Send",
                         tint = AivoraColors.OnPrimary,
