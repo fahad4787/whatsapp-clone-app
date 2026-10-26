@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,18 +36,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.call.ActiveCallSession
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.navigation.Routes
-import com.aivora.app.ui.theme.AivoraColors
 import kotlinx.coroutines.launch
+
+private val WaBg = Color(0xFF0B141A)
+private val WaGreen = Color(0xFF00A884)
+private val WaRed = Color(0xFFF15C6D)
+private val WaMuted = Color(0xFF8696A0)
 
 @Composable
 fun IncomingCallOverlay(
@@ -122,88 +127,97 @@ fun IncomingCallOverlay(
                 peerName = name,
                 asCaller = false,
             )
-            onNavigate(
-                if (isVideo) Routes.videoCall(name) else Routes.audioCall(name),
-            )
+            onNavigate(if (isVideo) Routes.videoCall(name) else Routes.audioCall(name))
         }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF0B141A), Color(0xFF1A242C), Color(0xFF0B141A)),
-                ),
-            )
+            .background(WaBg)
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 32.dp),
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                if (isVideo) "Incoming video call" else "Incoming voice call",
-                color = Color.White.copy(alpha = 0.75f),
-                fontSize = 15.sp,
-            )
-            Spacer(Modifier.height(40.dp))
-            Avatar(name, size = 140)
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Lock, null, tint = WaMuted, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.size(6.dp))
+                Text("End-to-end encrypted", color = WaMuted, fontSize = 13.sp)
+            }
+            Spacer(Modifier.height(48.dp))
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(200.dp)) {
+                Box(
+                    Modifier
+                        .size(200.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.04f)),
+                )
+                Box(
+                    Modifier
+                        .size(168.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.06f)),
+                )
+                Avatar(name, size = 136)
+            }
+            Spacer(Modifier.height(28.dp))
             Text(
                 name,
                 color = Color.White,
-                fontWeight = FontWeight.SemiBold,
                 fontSize = 28.sp,
+                fontWeight = FontWeight.Normal,
+                textAlign = TextAlign.Center,
             )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                if (isVideo) "Incoming video call" else "Incoming voice call",
+                color = WaMuted,
+                fontSize = 15.sp,
+            )
+
             Spacer(Modifier.weight(1f))
+
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 40.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
-                            .size(72.dp)
+                            .size(64.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFE64C53))
+                            .background(WaRed)
                             .clickable { decline() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            Icons.Default.CallEnd,
-                            contentDescription = "Decline",
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp),
-                        )
+                        Icon(Icons.Default.CallEnd, "Decline", tint = Color.White, modifier = Modifier.size(30.dp))
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text("Decline", color = Color.White.copy(alpha = 0.85f))
+                    Text("Decline", color = WaMuted, fontSize = 13.sp)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
-                            .size(72.dp)
+                            .size(64.dp)
                             .clip(CircleShape)
-                            .background(AivoraColors.Primary)
+                            .background(WaGreen)
                             .clickable { accept() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            Icons.Default.Call,
-                            contentDescription = "Accept",
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp),
-                        )
+                        Icon(Icons.Default.Call, "Accept", tint = Color.White, modifier = Modifier.size(30.dp))
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text("Accept", color = Color.White.copy(alpha = 0.85f))
+                    Text("Accept", color = WaMuted, fontSize = 13.sp)
                 }
             }
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
