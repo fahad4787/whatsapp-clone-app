@@ -74,6 +74,34 @@ suspend fun AivoraApi.sendAttachmentMessage(
     )
 }
 
+suspend fun AivoraApi.uploadAttachment(
+    context: Context,
+    uri: Uri,
+    defaultName: String = "file.bin",
+    defaultMime: String = "application/octet-stream",
+): AttachmentDto {
+    val bytes = withContext(Dispatchers.IO) {
+        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+    } ?: throw IllegalStateException("Could not read file")
+    val mime = context.contentResolver.getType(uri) ?: defaultMime
+    val name = queryDisplayName(context, uri) ?: defaultName
+    val part = okhttp3.MultipartBody.Part.createFormData(
+        "file",
+        name,
+        bytes.toRequestBody(mime.toMediaTypeOrNull()),
+    )
+    val result = postMediaUpload(part)
+    val url = result.url ?: throw IllegalStateException("Upload missing url")
+    val key = result.key ?: throw IllegalStateException("Upload missing key")
+    return AttachmentDto(
+        key = key,
+        url = url,
+        mime = result.mime ?: mime,
+        size = result.size.takeIf { it > 0 } ?: bytes.size,
+        name = name,
+    )
+}
+
 suspend fun AivoraApi.sendVoiceFile(
     conversationId: String,
     file: File,

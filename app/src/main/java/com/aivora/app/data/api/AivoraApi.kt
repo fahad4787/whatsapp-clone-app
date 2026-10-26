@@ -296,7 +296,7 @@ interface AivoraApi {
     @GET("api/status/{id}/viewers")
     suspend fun getStatusIdViewers(
         @Path("id") id: String,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.StatusViewerListDto
 
     @POST("api/conversations/{id}/stickers")
     suspend fun postConversationsIdStickers(
@@ -380,7 +380,7 @@ interface AivoraApi {
     @POST("api/status/{id}")
     suspend fun postStatusId(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Body body: Map<String, @JvmSuppressWildcards Any?> = emptyMap(),
     ): okhttp3.ResponseBody
 
     @POST("api/channels/{slug}/posts")
@@ -390,7 +390,7 @@ interface AivoraApi {
     ): okhttp3.ResponseBody
 
     @GET("api/status")
-    suspend fun getStatus(): okhttp3.ResponseBody
+    suspend fun getStatus(): com.aivora.app.data.model.StatusListDto
 
     @DELETE("api/scheduled-calls/{id}")
     suspend fun deleteScheduledCallsId(
@@ -426,7 +426,7 @@ interface AivoraApi {
     @POST("api/status/{id}/reaction")
     suspend fun postStatusIdReaction(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Body body: com.aivora.app.data.model.StatusReactionBody,
     ): okhttp3.ResponseBody
 
     @PATCH("api/me/two-step")
@@ -564,8 +564,8 @@ interface AivoraApi {
 
     @POST("api/status")
     suspend fun postStatus(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.StatusCreateBody,
+    ): com.aivora.app.data.model.StatusItemDto
 
     @GET("api/calls/{id}")
     suspend fun getCallsId(

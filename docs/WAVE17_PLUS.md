@@ -1,7 +1,7 @@
 # Waves 17+ — What’s left after Calls
 
 Date: 2026-10-27  
-Status: Wave **17 done**; 18+ planned
+Status: Waves **17–18 done**; 19+ planned
 
 ## Done so far (short)
 
@@ -12,6 +12,7 @@ Status: Wave **17 done**; 18+ planned
 | Perf foundation | F0–F8 | Done |
 | LiveKit calls | 16.1–16.4 | Done |
 | Export chat | 17 | Done — see [WAVE17_EXPORT.md](WAVE17_EXPORT.md) |
+| Status / Updates | 18 | Done — see [WAVE18_STATUS.md](WAVE18_STATUS.md) |
 
 ## Gaps found in audit (2026-10-27)
 
@@ -48,16 +49,8 @@ See [WAVE17_EXPORT.md](WAVE17_EXPORT.md).
 
 ---
 
-### Wave 18 — Status / Updates *(main tab)*
-**Goal:** Updates tab is server-backed like chats.
-
-| # | Slice | Exit |
-|---|-------|------|
-| 18.1 | Prisma `Status` + viewers; `GET/POST /api/status`, view, delete | CRUD works |
-| 18.2 | Replace `InMemoryStatusStore` with API + cache | Restart keeps my status |
-| 18.3 | Privacy (contacts / contacts-except / only-share) | Respects settings |
-| 18.4 | Viewers list + 24h expiry job | Matches Bolta feel |
-| 18.5 | FCM/WS thin notify for new status (optional) | Peer sees without pull |
+### Wave 18 — Status / Updates *(main tab)* — **DONE**
+See [WAVE18_STATUS.md](WAVE18_STATUS.md).
 
 ---
 
@@ -148,4 +141,4 @@ Stickers store, live location, multi-account, chat backup to cloud, E2EE, full f
 
 ## Kickoff
 
-Say **go Wave 18** (status), **go Wave 19** (call links), or **go Wave 20** (admin ops).
+Say **go Wave 19** (call links), **go Wave 20** (admin ops), or **go Wave 23** (APK size).

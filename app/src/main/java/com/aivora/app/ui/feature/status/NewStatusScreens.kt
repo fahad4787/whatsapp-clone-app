@@ -1,5 +1,6 @@
 package com.aivora.app.ui.feature.status
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -29,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,11 +44,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aivora.app.data.local.InMemoryStatusStore
+import com.aivora.app.data.StatusRepository
+import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.PendingMedia
+import com.aivora.app.data.local.SessionStore
 import com.aivora.app.ui.media.rememberMediaActions
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
+import kotlinx.coroutines.launch
 
 private val StatusColors = listOf(
     Color(0xFF1DAA61),
@@ -58,15 +64,26 @@ private val StatusColors = listOf(
     Color(0xFFE67E22),
 )
 
+private val StatusColorHex = listOf(
+    "#1DAA61", "#0B6B3A", "#1B3A6B", "#4A90D9",
+    "#9B8CDB", "#2C2C2C", "#D64545", "#E67E22",
+)
+
 @Composable
 fun NewStatusScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var text by remember { mutableStateOf("") }
     var colorIndex by remember { mutableIntStateOf(0) }
     var mediaUri by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
+    val api = remember {
+        NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
+    }
 
     LaunchedEffect(Unit) {
         PendingMedia.consume()?.let { mediaUri = it }
@@ -127,56 +144,73 @@ fun NewStatusScreen(
             }
         }
 
-        BasicTextField(
-            value = text,
-            onValueChange = { text = it },
+        Column(
             modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth()
-                .padding(horizontal = 28.dp),
-            textStyle = TextStyle(
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-            ),
-            cursorBrush = SolidColor(Color.White),
-            decorationBox = { inner ->
-                Box(contentAlignment = Alignment.Center) {
-                    if (text.isEmpty()) {
-                        Text(
-                            "Type a status",
-                            color = Color.White.copy(alpha = 0.55f),
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                .fillMaxSize()
+                .padding(horizontal = 24.dp)
+                .padding(top = 100.dp, bottom = 140.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (mediaUri != null) {
+                Text(
+                    "Photo attached",
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+            BasicTextField(
+                value = text,
+                onValueChange = { if (it.length <= 700) text = it },
+                textStyle = TextStyle(
+                    color = Color.White,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                ),
+                cursorBrush = SolidColor(Color.White),
+                decorationBox = { inner ->
+                    Box(contentAlignment = Alignment.Center) {
+                        if (text.isEmpty() && mediaUri == null) {
+                            Text(
+                                "Type a status",
+                                color = Color.White.copy(alpha = 0.55f),
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                        inner()
                     }
-                    inner()
-                }
-            },
-        )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .padding(bottom = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 StatusColors.forEachIndexed { index, color ->
-                    val selected = index == colorIndex
                     Box(
                         modifier = Modifier
                             .size(28.dp)
                             .clip(CircleShape)
                             .background(color)
                             .then(
-                                if (selected) Modifier.border(2.dp, Color.White, CircleShape)
-                                else Modifier,
+                                if (index == colorIndex) {
+                                    Modifier.border(2.dp, Color.White, CircleShape)
+                                } else Modifier,
                             )
                             .clickable { colorIndex = index },
                     )
@@ -197,16 +231,40 @@ fun NewStatusScreen(
                 )
                 IconButton(
                     onClick = {
+                        if (busy) return@IconButton
                         if (text.isBlank() && mediaUri == null) return@IconButton
-                        InMemoryStatusStore.post(text.ifBlank { " " }, mediaUri)
-                        onNavigate(Routes.Home)
+                        if (!useRemote) {
+                            Toast.makeText(context, "Sign in to post a status", Toast.LENGTH_SHORT).show()
+                            return@IconButton
+                        }
+                        busy = true
+                        scope.launch {
+                            val ok = StatusRepository.post(
+                                context = context,
+                                api = api,
+                                text = text,
+                                background = StatusColorHex.getOrNull(colorIndex),
+                                mediaUri = mediaUri,
+                            ) != null
+                            busy = false
+                            if (ok) onNavigate(Routes.Home)
+                            else Toast.makeText(context, "Could not post status", Toast.LENGTH_SHORT).show()
+                        }
                     },
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
                         .background(Color.White),
                 ) {
-                    Icon(Icons.Default.Send, null, tint = AivoraColors.Primary)
+                    if (busy) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            strokeWidth = 2.dp,
+                            color = AivoraColors.Primary,
+                        )
+                    } else {
+                        Icon(Icons.Default.Send, null, tint = AivoraColors.Primary)
+                    }
                 }
             }
         }

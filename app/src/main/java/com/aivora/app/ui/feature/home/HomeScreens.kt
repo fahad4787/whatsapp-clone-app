@@ -31,7 +31,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.GroupAdd
@@ -45,7 +44,6 @@ import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,6 +68,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -83,6 +83,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.aivora.app.data.ChatRepository
+import com.aivora.app.data.StatusRepository
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.InMemoryStatusStore
@@ -109,7 +110,6 @@ import com.aivora.app.ui.motion.rememberAivoraHaptics
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 private enum class ChatFilter(val label: String) {
@@ -138,9 +138,8 @@ fun HomeScreen(
         initialPage = HomeShellState.selectedTab.coerceIn(0, 3),
         pageCount = { 4 },
     )
-    // Chrome reads settled page only — avoids Scaffold recompose every swipe frame.
+    // Chrome reads settled page only — swipe progress stays inside bottomBar (PERF F6).
     val settled = pagerState.settledPage
-    val selectionProgress = pagerState.currentPage + pagerState.currentPageOffsetFraction
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(ChatFilter.All) }
     var callFilter by remember { mutableStateOf(CallFilter.All) }
@@ -150,10 +149,12 @@ fun HomeScreen(
     var callLogCleared by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val allChats by InMemoryChatStore.chats.collectAsState()
-    val unreadTotal = remember(allChats) {
-        allChats.filterNot { it.archived }.sumOf { it.unread }
-    }
+    // Unread badge only — full chat list collected inside ChatsTab (PERF F7).
+    val unreadTotal by remember {
+        InMemoryChatStore.chats
+            .map { list -> list.filterNot { it.archived }.sumOf { it.unread } }
+            .distinctUntilChanged()
+    }.collectAsState(initial = 0)
 
     LaunchedEffect(Unit) {
         val token = SessionStore.accessToken(context)
@@ -165,13 +166,21 @@ fun HomeScreen(
         InMemoryChatStore.hydrateFromCache(
             com.aivora.app.data.local.ChatListCache.load(context),
         )
+        // Warm in-memory threads from disk so reopen is instant (no black wait).
+        ChatRepository.hydrateRecentFromDisk(context)
+        // WS first — calls use toUser over the socket; waiting for HTTP left a miss window.
+        RealtimeClient.startFromSession(context)
+        // Defer HTTP so first home frames are not competing with list fetch (PERF F8).
+        kotlinx.coroutines.delay(100)
         val api = ChatRepository.api()
         try {
             if (SessionStore.userId(context) == null) {
                 runCatching { api.getMe().id?.let { SessionStore.saveUserId(context, it) } }
             }
             ChatRepository.refreshConversations(context)
-            RealtimeClient.startFromSession(context)
+            ChatRepository.hydrateRecentFromDisk(context)
+            // Prefetch uncached top chats in background (first-open black screen).
+            launch { ChatRepository.warmRecentThreads(context) }
         } catch (_: Exception) {
             /* keep cache / last remote list; do not flash seed while logged in */
         }
@@ -197,11 +206,9 @@ fun HomeScreen(
             }
     }
 
+    // Instant tab snap — animated pager fling was a big source of input latency (PERF F8).
     val pageSnap = remember {
-        androidx.compose.animation.core.tween<Float>(
-            durationMillis = 200,
-            easing = com.aivora.app.ui.motion.AivoraEmphasizedDecel,
-        )
+        androidx.compose.animation.core.snap<Float>()
     }
 
     if (showCreateCallLink) {
@@ -317,6 +324,9 @@ fun HomeScreen(
             )
         },
         bottomBar = {
+            // Read offset here only — do not lift into HomeScreen body (list thrash on swipe).
+            val selectionProgress =
+                pagerState.currentPage + pagerState.currentPageOffsetFraction
             AivoraBottomNav(
                 selected = settled,
                 selectionProgress = selectionProgress,
@@ -358,6 +368,7 @@ fun HomeScreen(
                 .consumeWindowInsets(padding)
                 .imePadding(),
             beyondViewportPageCount = 0,
+            userScrollEnabled = true,
             flingBehavior = PagerDefaults.flingBehavior(
                 state = pagerState,
                 snapAnimationSpec = pageSnap,
@@ -366,7 +377,6 @@ fun HomeScreen(
         ) { page ->
             when (page) {
                 0 -> ChatsTab(
-                    allChats = allChats,
                     query = query,
                     onQueryChange = { query = it },
                     filter = filter,
@@ -389,7 +399,6 @@ fun HomeScreen(
                     onFilterChange = { callFilter = it },
                     onNavigate = onNavigate,
                     callLogCleared = callLogCleared,
-                    onCreateCallLink = { showCreateCallLink = true },
                 )
                 else -> ProfileTab(
                     query = query,
@@ -448,7 +457,6 @@ private fun HomeFabRes(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun ChatsTab(
-    allChats: List<LocalChat>,
     query: String,
     onQueryChange: (String) -> Unit,
     filter: ChatFilter,
@@ -464,6 +472,7 @@ private fun ChatsTab(
         NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
     }
     var menuChat by remember { mutableStateOf<LocalChat?>(null) }
+    val allChats by InMemoryChatStore.chats.collectAsState()
 
     val chats = remember(allChats, query, filter) {
         allChats
@@ -530,27 +539,26 @@ private fun ChatsTab(
                 }
             }
             items(chats, key = { it.id }) { chat ->
-                // Live row from store so mute/pin/archive icons update after sheet actions.
-                val row = allChats.find { it.id == chat.id } ?: chat
+                // `chats` is already filtered from allChats — use row directly (no O(n) find).
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .combinedClickable(
-                            onClick = { onOpenChat(row.id) },
+                            onClick = { onOpenChat(chat.id) },
                             onLongClick = {
                                 haptics.tick()
-                                menuChat = row
+                                menuChat = chat
                             },
                         )
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(row.title, size = 52)
+                    Avatar(chat.title, size = 52)
                     Spacer(modifier = Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                row.title,
+                                chat.title,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
@@ -558,7 +566,7 @@ private fun ChatsTab(
                                 color = AivoraColors.Ink,
                                 modifier = Modifier.weight(1f, fill = false),
                             )
-                            if (row.pinned) {
+                            if (chat.pinned) {
                                 Spacer(Modifier.width(6.dp))
                                 Icon(
                                     Icons.Default.PushPin,
@@ -567,7 +575,7 @@ private fun ChatsTab(
                                     modifier = Modifier.size(14.dp),
                                 )
                             }
-                            if (row.isMuted) {
+                            if (chat.isMuted) {
                                 Spacer(Modifier.width(6.dp))
                                 Icon(
                                     Icons.Default.NotificationsOff,
@@ -579,7 +587,7 @@ private fun ChatsTab(
                         }
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            row.preview,
+                            chat.preview,
                             style = MaterialTheme.typography.bodyMedium,
                             color = AivoraColors.TextSecondary,
                             maxLines = 1,
@@ -589,15 +597,15 @@ private fun ChatsTab(
                     Spacer(Modifier.width(10.dp))
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            row.time,
+                            chat.time,
                             style = MaterialTheme.typography.labelMedium,
                             fontSize = 12.sp,
-                            color = if (row.unread > 0) AivoraColors.Primary
+                            color = if (chat.unread > 0) AivoraColors.Primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        if (row.unread > 0) {
+                        if (chat.unread > 0) {
                             Spacer(modifier = Modifier.height(6.dp))
-                            UnreadBadge(row.unread)
+                            UnreadBadge(chat.unread)
                         }
                     }
                 }
@@ -757,6 +765,15 @@ private fun StatusTab(
     onQueryChange: (String) -> Unit,
     onNavigate: (String) -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
+    val api = remember {
+        NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
+    }
+    LaunchedEffect(useRemote) {
+        StatusRepository.hydrateFromDisk(context)
+        if (useRemote) StatusRepository.refresh(context, api)
+    }
     val statuses by InMemoryStatusStore.statuses.collectAsState()
     val mine = remember(statuses) { InMemoryStatusStore.myStatuses() }
     val recent = remember(statuses, query) {
@@ -953,7 +970,6 @@ private fun CallsTab(
     onFilterChange: (CallFilter) -> Unit,
     onNavigate: (String) -> Unit,
     callLogCleared: Boolean = false,
-    onCreateCallLink: () -> Unit = {},
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1090,10 +1106,8 @@ private fun CallsTab(
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            CallQuickAction(Icons.Default.Call, "Call") { onNavigate(Routes.NewCall) }
+            CallQuickAction(Icons.Default.Call, "New call") { onNavigate(Routes.NewCall) }
             CallQuickAction(Icons.Default.Event, "Schedule") { onNavigate(Routes.ScheduledCalls) }
-            CallQuickAction(Icons.Default.Dialpad, "Keypad") { onNavigate(Routes.Keypad) }
-            CallQuickAction(Icons.Default.StarBorder, "Favorites") { onCreateCallLink() }
         }
         Spacer(Modifier.height(6.dp))
         AivoraFilterBar(

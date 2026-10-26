@@ -3,6 +3,7 @@ package com.aivora.app.data.realtime
 import com.aivora.app.BuildConfig
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.call.ActiveCallSession
+import com.aivora.app.data.call.CallLog
 import com.aivora.app.data.call.LiveKitCallController
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.MessageDeliveryStatus
@@ -15,12 +16,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
@@ -53,6 +57,8 @@ object RealtimeClient {
     private var myUserIdProvider: (() -> String?)? = null
     /** When true, onClosed must not auto-reconnect (app backgrounded). */
     @Volatile private var suppressReconnect = false
+    /** Token used for the open (or in-flight) socket — avoid thrashing reconnects on cold start. */
+    @Volatile private var socketToken: String? = null
 
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
@@ -81,13 +87,14 @@ object RealtimeClient {
         this.tokenProvider = tokenProvider
         this.myUserIdProvider = myUserIdProvider
         suppressReconnect = false
-        connect()
+        connectIfNeeded()
     }
 
     fun startFromSession(context: android.content.Context) {
+        val app = context.applicationContext
         start(
-            tokenProvider = { SessionStore.accessToken(context) },
-            myUserIdProvider = { SessionStore.userId(context) },
+            tokenProvider = { SessionStore.accessToken(app) },
+            myUserIdProvider = { SessionStore.userId(app) },
         )
     }
 
@@ -95,6 +102,7 @@ object RealtimeClient {
         suppressReconnect = true
         reconnectJob?.cancel()
         reconnectJob = null
+        socketToken = null
         socketRef.getAndSet(null)?.close(1000, "stop")
         _connected.value = false
         // Keep joinedRooms so we re-join after returning to foreground.
@@ -126,9 +134,22 @@ object RealtimeClient {
         )
     }
 
-    private fun connect() {
+    /**
+     * Idempotent connect: Home + PresenceLifecycle + Chat all call start on cold open.
+     * Previously each call closed the socket mid-handshake → missed call.incoming until chat open.
+     */
+    private fun connectIfNeeded() {
         val token = tokenProvider?.invoke() ?: return
         if (token.isBlank()) return
+        // Same token already connected or still handshaking — keep it.
+        if (socketRef.get() != null && socketToken == token) return
+        // Token refreshed or no socket — (re)connect.
+        connect(token)
+    }
+
+    private fun connect(token: String) {
+        if (token.isBlank()) return
+        socketToken = token
         socketRef.getAndSet(null)?.close(1000, "reconnect")
 
         val base = BuildConfig.API_BASE_URL.trimEnd('/')
@@ -144,6 +165,8 @@ object RealtimeClient {
                 req,
                 object : WebSocketListener() {
                     override fun onOpen(webSocket: WebSocket, response: Response) {
+                        if (socketRef.get() !== webSocket) return
+                        socketToken = token
                         _connected.value = true
                         // Re-join rooms after reconnect
                         val rooms = synchronized(joinedRooms) { joinedRooms.toList() }
@@ -153,6 +176,7 @@ object RealtimeClient {
                     }
 
                     override fun onMessage(webSocket: WebSocket, text: String) {
+                        if (socketRef.get() !== webSocket) return
                         handleFrame(text)
                     }
 
@@ -161,13 +185,19 @@ object RealtimeClient {
                     }
 
                     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                        _connected.value = false
-                        if (!suppressReconnect) scheduleReconnect()
+                        if (socketRef.compareAndSet(webSocket, null)) {
+                            if (socketToken == token) socketToken = null
+                            _connected.value = false
+                            if (!suppressReconnect) scheduleReconnect()
+                        }
                     }
 
                     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                        _connected.value = false
-                        if (!suppressReconnect) scheduleReconnect()
+                        if (socketRef.compareAndSet(webSocket, null)) {
+                            if (socketToken == token) socketToken = null
+                            _connected.value = false
+                            if (!suppressReconnect) scheduleReconnect()
+                        }
                     }
                 },
             ),
@@ -178,9 +208,9 @@ object RealtimeClient {
         if (suppressReconnect) return
         if (reconnectJob?.isActive == true) return
         reconnectJob = scope.launch {
-            delay(2_000)
+            delay(1_000)
             if (isActive && !suppressReconnect && tokenProvider?.invoke()?.isNotBlank() == true) {
-                connect()
+                connectIfNeeded()
             }
         }
     }
@@ -286,7 +316,7 @@ object RealtimeClient {
                 val data = frame.data ?: return
                 val call = runCatching {
                     NetworkModule.json.decodeFromJsonElement(CallDto.serializer(), data)
-                }.getOrNull() ?: return
+                }.onFailure { CallLog.w("decode call.incoming failed", it) }.getOrNull() ?: return
                 // Never auto-join — only show Accept / Decline.
                 ActiveCallSession.setIncoming(call)
             }
@@ -296,6 +326,7 @@ object RealtimeClient {
                     NetworkModule.json.decodeFromJsonElement(CallDto.serializer(), data)
                 }.getOrNull()
                 val activeId = ActiveCallSession.session.value?.callId
+                CallLog.i("ws call.answered id=${call?.id} active=$activeId")
                 if (call?.id != null && call.id == activeId) {
                     ActiveCallSession.markAnswered()
                     val media = ActiveCallSession.session.value?.media == "video"
@@ -321,6 +352,10 @@ object RealtimeClient {
                 val incomingId = ActiveCallSession.incoming.value?.id
                 val matchesIncoming = incomingId != null && (call?.id == null || call.id == incomingId)
                 val matchesActive = activeId != null && (call?.id == null || call.id == activeId)
+                CallLog.i(
+                    "ws ${frame.type} id=${call?.id} reason=$reason " +
+                        "matchIncoming=$matchesIncoming matchActive=$matchesActive",
+                )
                 // Always tear down local UI so one side never stays on the call screen alone.
                 if (matchesIncoming) {
                     ActiveCallSession.clearIncoming()
@@ -330,6 +365,24 @@ object RealtimeClient {
                     ActiveCallSession.markEnded(reason)
                 } else if (matchesIncoming && frame.type == "call.ended") {
                     // Incoming dismissed (peer cancelled / timeout) — no in-call session.
+                }
+            }
+            "status.new" -> {
+                val data = frame.data ?: return
+                val row = runCatching {
+                    NetworkModule.json.decodeFromJsonElement(
+                        com.aivora.app.data.model.StatusRowDto.serializer(),
+                        data,
+                    )
+                }.getOrNull() ?: return
+                val uid = myUserIdProvider?.invoke()
+                com.aivora.app.data.local.InMemoryStatusStore.mergeRow(row, uid)
+                val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
+                if (app != null) {
+                    com.aivora.app.data.local.StatusCache.save(
+                        app,
+                        com.aivora.app.data.local.InMemoryStatusStore.statuses.value,
+                    )
                 }
             }
         }
@@ -342,6 +395,20 @@ object RealtimeClient {
         val set = _roomOnline.value[conversationId].orEmpty()
         return if (excludeUserId.isNullOrBlank()) set.size else set.count { it != excludeUserId }
     }
+
+    /** Presence for one peer — skips recomposition when unrelated users go online. */
+    fun observeUserOnline(userId: String?): Flow<Boolean> =
+        _onlineUsers
+            .map { map -> !userId.isNullOrBlank() && map[userId] == true }
+            .distinctUntilChanged()
+
+    fun observeRoomOnlineCount(conversationId: String, excludeUserId: String?): Flow<Int> =
+        _roomOnline
+            .map { rooms ->
+                val set = rooms[conversationId].orEmpty()
+                if (excludeUserId.isNullOrBlank()) set.size else set.count { it != excludeUserId }
+            }
+            .distinctUntilChanged()
 
     private fun ackDelivered(messageIds: List<String>) {
         if (messageIds.isEmpty()) return

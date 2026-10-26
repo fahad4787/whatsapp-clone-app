@@ -7,4 +7,6 @@ import kotlinx.serialization.Serializable
 data class PrivacySettingsBody(
     @SerialName("last_seen") val lastSeen: String? = null,
     @SerialName("online") val online: String? = null,
+    @SerialName("status") val status: String? = null,
+    @SerialName("status_ids") val statusIds: List<String>? = null,
 )

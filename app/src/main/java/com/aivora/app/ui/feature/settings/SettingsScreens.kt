@@ -67,6 +67,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -485,7 +486,47 @@ fun SettingsPrivacyStatusScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val useRemote = !com.aivora.app.data.local.SessionStore.accessToken(context).isNullOrBlank()
+    val api = remember {
+        com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
+        )
+    }
+    val keys = listOf("everyone", "contacts", "contacts_except", "only_share")
     var selected by remember { mutableIntStateOf(1) }
+    var statusIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var pickMode by remember { mutableStateOf(false) }
+    var people by remember { mutableStateOf<List<com.aivora.app.data.model.UserDto>>(emptyList()) }
+
+    fun save(modeIndex: Int, ids: Set<String> = statusIds) {
+        if (!useRemote) return
+        scope.launch {
+            runCatching {
+                api.putMePrivacy(
+                    com.aivora.app.data.model.PrivacySettingsBody(
+                        status = keys[modeIndex],
+                        statusIds = ids.toList(),
+                    ),
+                )
+            }.onFailure {
+                android.widget.Toast.makeText(context, "Could not save", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    LaunchedEffect(useRemote) {
+        if (!useRemote) return@LaunchedEffect
+        runCatching { api.getMePrivacy() }.onSuccess { dto ->
+            selected = keys.indexOf(dto.status).takeIf { it >= 0 } ?: 1
+            statusIds = dto.statusIds.toSet()
+        }
+        runCatching { api.getPeopleSearch(q = null, limit = 100).items }.onSuccess { people = it }
+    }
+
     AivoraScaffold(title = "Status", onBack = onBack) {
         Spacer(Modifier.height(8.dp))
         SettingsSectionLabel("Who can see my status updates")
@@ -497,9 +538,44 @@ fun SettingsPrivacyStatusScreen(
                 "Only share with…" to null,
             ),
             selected = selected,
-            onSelect = { selected = it },
+            onSelect = { i ->
+                selected = i
+                if (i == 2 || i == 3) {
+                    pickMode = true
+                } else {
+                    pickMode = false
+                    save(i)
+                }
+            },
             navigableIndices = setOf(2, 3),
         )
+        if (pickMode && (selected == 2 || selected == 3)) {
+            Spacer(Modifier.height(12.dp))
+            SettingsSectionLabel(if (selected == 2) "Except" else "Only share with")
+            people.forEach { person ->
+                val id = person.id ?: return@forEach
+                val name = person.displayName?.takeIf { it.isNotBlank() } ?: person.phone ?: id
+                val checked = id in statusIds
+                SettingsRow(
+                    SettingsItem(
+                        name,
+                        subtitle = person.phone,
+                        toggle = checked,
+                        onToggle = { on ->
+                            statusIds = if (on) statusIds + id else statusIds - id
+                        },
+                    ),
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            PrimaryButton(
+                text = "Save",
+                onClick = {
+                    save(selected, statusIds)
+                    pickMode = false
+                },
+            )
+        }
         SettingsFootnote("Changes to your privacy settings won’t affect status updates you’ve already sent.")
     }
 }
