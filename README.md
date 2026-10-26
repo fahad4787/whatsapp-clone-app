@@ -55,6 +55,14 @@ aivora/
 
 Start destination is **Login** → Profile setup → **Home**.
 
+## Install on all connected devices
+
+```bash
+./scripts/install-all.sh
+```
+
+Builds the debug APK and `adb install -r` on every device currently listed by `adb devices`.
+
 ## Frontend coverage
 
 **All 67 NavHost destinations have real Compose screens** (no empty placeholders):
