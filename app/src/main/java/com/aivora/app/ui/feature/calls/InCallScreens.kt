@@ -169,7 +169,7 @@ private fun InCallContent(
             LiveKitCallController.disconnect()
             if (!callId.isNullOrBlank()) {
                 runCatching {
-                    NetworkModule.api().postCallsIdAction(callId, "end", emptyMap())
+                    NetworkModule.api().postCallsIdAction(callId, "end")
                 }
             }
             ActiveCallSession.clear()

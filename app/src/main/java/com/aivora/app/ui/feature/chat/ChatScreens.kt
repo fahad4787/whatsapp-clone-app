@@ -545,29 +545,37 @@ fun ChatIdScreen(
                     onNavigate(Routes.audioCall(chat.title))
                 } else {
                     scope.launch {
-                        runCatching {
-                            val result = api.postCalls(
-                                mapOf(
-                                    "conversation_id" to chatId,
-                                    "media" to "audio",
+                        Toast.makeText(context, "Calling…", Toast.LENGTH_SHORT).show()
+                        val result = runCatching {
+                            api.postCalls(
+                                com.aivora.app.data.model.CallStartBody(
+                                    conversationId = chatId,
+                                    media = "audio",
                                 ),
                             )
-                            val token = result.token
-                            val url = result.livekitUrl
-                            val callId = result.call?.id
-                            if (token.isNullOrBlank() || url.isNullOrBlank() || callId.isNullOrBlank()) {
-                                return@runCatching
-                            }
-                            com.aivora.app.data.call.ActiveCallSession.setActive(
-                                callId = callId,
-                                token = token,
-                                livekitUrl = url,
-                                media = "audio",
-                                peerName = chat.title,
-                                asCaller = true,
-                            )
-                            onNavigate(Routes.audioCall(chat.title))
+                        }.onFailure {
+                            Toast.makeText(
+                                context,
+                                "Call failed: ${it.message ?: "error"}",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }.getOrNull() ?: return@launch
+                        val token = result.token
+                        val url = result.livekitUrl
+                        val callId = result.call?.id
+                        if (token.isNullOrBlank() || url.isNullOrBlank() || callId.isNullOrBlank()) {
+                            Toast.makeText(context, "Call failed: bad response", Toast.LENGTH_LONG).show()
+                            return@launch
                         }
+                        com.aivora.app.data.call.ActiveCallSession.setActive(
+                            callId = callId,
+                            token = token,
+                            livekitUrl = url,
+                            media = "audio",
+                            peerName = chat.title,
+                            asCaller = true,
+                        )
+                        onNavigate(Routes.audioCall(chat.title))
                     }
                 }
             },
@@ -576,29 +584,37 @@ fun ChatIdScreen(
                     onNavigate(Routes.videoCall(chat.title))
                 } else {
                     scope.launch {
-                        runCatching {
-                            val result = api.postCalls(
-                                mapOf(
-                                    "conversation_id" to chatId,
-                                    "media" to "video",
+                        Toast.makeText(context, "Calling…", Toast.LENGTH_SHORT).show()
+                        val result = runCatching {
+                            api.postCalls(
+                                com.aivora.app.data.model.CallStartBody(
+                                    conversationId = chatId,
+                                    media = "video",
                                 ),
                             )
-                            val token = result.token
-                            val url = result.livekitUrl
-                            val callId = result.call?.id
-                            if (token.isNullOrBlank() || url.isNullOrBlank() || callId.isNullOrBlank()) {
-                                return@runCatching
-                            }
-                            com.aivora.app.data.call.ActiveCallSession.setActive(
-                                callId = callId,
-                                token = token,
-                                livekitUrl = url,
-                                media = "video",
-                                peerName = chat.title,
-                                asCaller = true,
-                            )
-                            onNavigate(Routes.videoCall(chat.title))
+                        }.onFailure {
+                            Toast.makeText(
+                                context,
+                                "Call failed: ${it.message ?: "error"}",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }.getOrNull() ?: return@launch
+                        val token = result.token
+                        val url = result.livekitUrl
+                        val callId = result.call?.id
+                        if (token.isNullOrBlank() || url.isNullOrBlank() || callId.isNullOrBlank()) {
+                            Toast.makeText(context, "Call failed: bad response", Toast.LENGTH_LONG).show()
+                            return@launch
                         }
+                        com.aivora.app.data.call.ActiveCallSession.setActive(
+                            callId = callId,
+                            token = token,
+                            livekitUrl = url,
+                            media = "video",
+                            peerName = chat.title,
+                            asCaller = true,
+                        )
+                        onNavigate(Routes.videoCall(chat.title))
                     }
                 }
             },

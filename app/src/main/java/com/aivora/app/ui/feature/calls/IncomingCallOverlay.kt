@@ -75,7 +75,7 @@ fun IncomingCallOverlay(
                     scope.launch {
                         val id = call.id ?: return@launch
                         runCatching {
-                            NetworkModule.api().postCallsIdAction(id, "reject", emptyMap())
+                            NetworkModule.api().postCallsIdAction(id, "reject")
                         }
                         ActiveCallSession.clearIncoming()
                     }
@@ -97,7 +97,7 @@ fun IncomingCallOverlay(
                     scope.launch {
                         val id = call.id ?: return@launch
                         val result = runCatching {
-                            NetworkModule.api().postCallsIdAction(id, "answer", emptyMap())
+                            NetworkModule.api().postCallsIdAction(id, "answer")
                         }.getOrNull()
                         val token = result?.token
                         val url = result?.livekitUrl
