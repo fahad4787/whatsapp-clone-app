@@ -67,6 +67,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -1650,16 +1651,90 @@ fun SettingsChatsExportScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val chats by com.aivora.app.data.local.InMemoryChatStore.chats.collectAsState(
+        initial = emptyList(),
+    )
+    val useRemote = !com.aivora.app.data.local.SessionStore.accessToken(context).isNullOrBlank()
+    val api = remember {
+        com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
+        )
+    }
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val selected = chats.firstOrNull { it.id == selectedId }
+
+    fun runExport(includeMedia: Boolean) {
+        val chat = selected ?: return
+        if (!useRemote || busy) return
+        busy = true
+        scope.launch {
+            val ok = com.aivora.app.data.ChatExport.downloadAndShare(
+                context = context,
+                api = api,
+                conversationId = chat.id,
+                chatTitle = chat.title,
+                includeMedia = includeMedia,
+            )
+            busy = false
+            if (ok) {
+                android.widget.Toast.makeText(context, "Chat exported", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    if (selected == null) {
+        val sections = listOf(
+            null to chats
+                .filter { !it.archived }
+                .map { chat ->
+                    SettingsItem(
+                        chat.title,
+                        subtitle = if (chat.isGroup) "Group" else "Chat",
+                        icon = if (chat.isGroup) Icons.Default.Groups else Icons.Default.Chat,
+                        onClick = { selectedId = chat.id },
+                    )
+                },
+        )
+        AivoraScaffold(title = "Export chat", onBack = onBack) {
+            InfoBanner(
+                if (!useRemote) "Sign in to export chats from the server."
+                else if (chats.isEmpty()) "No chats to export yet."
+                else "Choose a chat to export.",
+            )
+            if (useRemote && chats.isNotEmpty()) {
+                SettingsList(sections)
+            }
+        }
+        return
+    }
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Without media", null, Icons.Default.Chat, onClick = { }),
-            SettingsItem("Include media", null, Icons.Default.Photo, onClick = { }),
+            SettingsItem(
+                "Without media",
+                subtitle = if (busy) "Exporting…" else "Text file (.txt)",
+                icon = Icons.Default.Chat,
+                onClick = { runExport(false) },
+            ),
+            SettingsItem(
+                "Include media",
+                subtitle = if (busy) "Exporting…" else "Zip with attachments",
+                icon = Icons.Default.Photo,
+                onClick = { runExport(true) },
+            ),
         ),
     )
 
-    AivoraScaffold(title = "Export chat", onBack = onBack) {
-        InfoBanner("Export chat without media or with media.")
+    AivoraScaffold(
+        title = selected.title,
+        onBack = { selectedId = null },
+    ) {
+        InfoBanner("Export “${selected.title}” without media or with media.")
         SettingsList(sections)
     }
 }

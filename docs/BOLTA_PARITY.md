@@ -3,29 +3,23 @@
 Reference app on devices: `com.boltapunjab.app` **v1.12.13** (both Mate + Vivo).  
 Aivora is the clone of this product (same shell: Chats / Updates / Calls / My Profile).
 
-## Observed in Bolta (Mate, 2026-10-26)
+## Shipped (through Wave 17)
 
-### Chats (deep)
-- Home row preview shows call outcomes: `Missed video call`, etc.
-- In-thread **system notices** (centered chips):
-  - `Missed voice call` / `Missed video call`
-  - `Voice call cancelled` / `Video call cancelled`
-  - `Video call declined` / voice declined
-  - `Voice call · busy`
-  - `Voice call · 0:00` (duration after connect)
-- Chat header: last seen, Voice + Video call, More actions
-- Chat ⋮: Clear chat, Contact info, Delete chat, Export chat, Mute, Schedule call, Search
-- Voice bubbles: SeekBar + “Play voice message” + duration `0:00 / 0:04`
-- Composer: Attach, Camera, Record voice note
+- Chat Waves 9–15; Perf F0–F8  
+- LiveKit 1:1 / group / scheduled; admin live calls + force-end  
+- Contact info, disappearing, block; voice bubbles; schedule call  
+- Export chat (Settings + ⋮ → share .txt / .zip) — [WAVE17_EXPORT.md](WAVE17_EXPORT.md)  
 
-### Already in Aivora
-- Block / unblock, disappearing API, mute/archive/pin, calls LiveKit, Calls tab history labels
+## Remaining gaps → see [WAVE17_PLUS.md](WAVE17_PLUS.md)
 
-### Gaps to close (priority)
-1. **In-chat call system messages** — ship notices when call ends (backend + UI) ← in progress
-2. Home preview bump from those notices (follows last message)
-3. Contact info: disappearing timer UX polish (API exists)
-4. Perf: Bolta APK ~30MB vs Aivora ~75MB (LiveKit/native); keep list isolation + no duplicate keys
+| Priority | Gap | Wave |
+|----------|-----|------|
+| High | Updates/Status still local-only | **18** |
+| Medium | Call links stub | **19** |
+| Medium | Admin pages still mock | **20** |
+| Medium | APK ~75MB vs Bolta ~30MB | **23** |
+| Lower | Channels / communities | **21** |
+| Later | Real SMS, two-step, passkeys, backup | **22 / 24** |
 
 ## Performance note
-Bolta feels smoother on Mate — smaller APK, mature scroll. Continue PERF F6–F8 discipline; do not re-enable debug R8 minify.
+Continue PERF F6–F8 discipline; do not re-enable debug R8 minify.

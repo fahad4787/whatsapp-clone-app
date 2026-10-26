@@ -12,6 +12,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 import retrofit2.http.Url
 
 /**
@@ -197,7 +198,9 @@ interface AivoraApi {
     ): com.aivora.app.data.model.ConversationDto
 
     @GET("api/scheduled-calls")
-    suspend fun getScheduledCalls(): okhttp3.ResponseBody
+    suspend fun getScheduledCalls(
+        @Query("scope") scope: String? = null,
+    ): okhttp3.ResponseBody
 
     @GET("api/scheduled-calls/{id}")
     suspend fun getScheduledCallsId(
@@ -258,8 +261,8 @@ interface AivoraApi {
 
     @POST("api/scheduled-calls")
     suspend fun postScheduledCalls(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.ScheduledCallCreateBody,
+    ): com.aivora.app.data.model.ScheduledCallDto
 
     @DELETE("api/status/{id}")
     suspend fun deleteStatusId(
@@ -479,8 +482,13 @@ interface AivoraApi {
     @POST("api/scheduled-calls/{id}/respond")
     suspend fun postScheduledCallsIdRespond(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.ScheduledCallRespondBody,
+    ): com.aivora.app.data.model.ScheduledCallDto
+
+    @POST("api/scheduled-calls/{id}/start")
+    suspend fun postScheduledCallsIdStart(
+        @Path("id") id: String,
+    ): com.aivora.app.data.model.CallTokenResult
 
     @GET("api/me/storage")
     suspend fun getMeStorage(): okhttp3.ResponseBody
@@ -619,8 +627,8 @@ interface AivoraApi {
     @PUT("api/scheduled-calls/{id}")
     suspend fun putScheduledCallsId(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.ScheduledCallUpdateBody,
+    ): com.aivora.app.data.model.ScheduledCallDto
 
     @GET("api/me/devices")
     suspend fun getMeDevices(): com.aivora.app.data.model.DeviceListDto
@@ -631,9 +639,11 @@ interface AivoraApi {
     @DELETE("api/calls/history")
     suspend fun deleteCallsHistory(): okhttp3.ResponseBody
 
+    @Streaming
     @GET("api/conversations/{id}/export")
     suspend fun getConversationsIdExport(
         @Path("id") id: String,
+        @Query("media") media: Int = 0,
     ): okhttp3.ResponseBody
 
     @GET("api/contacts")

@@ -104,6 +104,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -111,6 +112,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -173,8 +175,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.util.UUID
-import kotlin.random.Random
-
 private val ReactionEmojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -201,16 +201,18 @@ fun ChatIdScreen(
             true
         }
     }
-    val chat by InMemoryChatStore.chatFlow(chatId).collectAsState(
-        initial = InMemoryChatStore.chat(chatId),
-    )
-    val messages by InMemoryChatStore.messages(chatId).collectAsState()
+    val chatFlow = remember(chatId) { InMemoryChatStore.chatFlow(chatId) }
+    val chat by chatFlow.collectAsState(initial = InMemoryChatStore.chat(chatId))
+    val messageFlow = remember(chatId) { InMemoryChatStore.messages(chatId) }
+    val messages by messageFlow.collectAsState()
     var searchQuery by remember(chatId) { mutableStateOf("") }
     var showSearch by remember(chatId) { mutableStateOf(false) }
     var peerTyping by remember(chatId) { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
     var showChatMenu by remember { mutableStateOf(false) }
     var showClearChat by remember { mutableStateOf(false) }
+    var showExportChat by remember { mutableStateOf(false) }
+    var exportBusy by remember { mutableStateOf(false) }
     var showReportSent by remember { mutableStateOf(false) }
     var showBlockConfirm by remember { mutableStateOf(false) }
     val visibleMessages = remember(messages, searchQuery, showSearch) {
@@ -230,9 +232,8 @@ fun ChatIdScreen(
     var viewOnceShown by remember { mutableStateOf<Pair<LocalMessage, String>?>(null) }
     var replyTo by remember(chatId) { mutableStateOf<LocalMessage?>(null) }
     var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
-    // Per-chat list state so reopen doesn't flash a previous scroll offset.
+    // reverseLayout: index 0 = bottom (latest). First frame already shows latest — no alpha gate.
     val listState = remember(chatId) { androidx.compose.foundation.lazy.LazyListState() }
-    var listReady by remember(chatId) { mutableStateOf(false) }
     val wallpaper = chatWallpaperColor(chat.wallpaper, dark)
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
     fun uploadPickedUri(uri: Uri, viewOnce: Boolean = false) {
@@ -406,20 +407,23 @@ fun ChatIdScreen(
         }
     }
 
-    // Disk → paint first; defer network so open-chat first frames stay light (PERF F8).
+    // Disk already hydrated synchronously above; defer meta HTTP when we already have messages.
     LaunchedEffect(chatId, useRemote) {
         if (!useRemote) return@LaunchedEffect
-        ChatRepository.hydrateMessagesFromDisk(context, chatId)
-        delay(80)
+        val hasLocal = InMemoryChatStore.messages(chatId).value.isNotEmpty()
+        if (hasLocal) delay(200)
         runCatching {
             val remote = api.getConversationsId(chatId)
-            InMemoryChatStore.upsertChat(remote.toLocalChat())
+            // Don't bump this chat to #1 on the home list while opening.
+            InMemoryChatStore.upsertChat(remote.toLocalChat(), promote = false)
         }
     }
     LaunchedEffect(chatId, myUserId, useRemote) {
         if (!useRemote || myUserId == null) return@LaunchedEffect
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            delay(80)
+            val empty = InMemoryChatStore.messages(chatId).value.isEmpty()
+            // First open (no cache): fetch immediately — defer only when list already painted.
+            if (!empty) delay(250)
             ChatRepository.refreshMessages(context, chatId, myUserId!!)
             while (true) {
                 delay(25_000)
@@ -428,66 +432,57 @@ fun ChatIdScreen(
             }
         }
     }
-    // Scroll-up → older history (keep anchor so list doesn't jump)
+    // Newest-first for reverseLayout (index 0 = visual bottom).
+    val listNewestFirst = remember(visibleMessages) { visibleMessages.asReversed() }
+
+    // Scroll toward top (high indices) → older history; keep anchor so list doesn't jump.
     var loadingOlder by remember(chatId) { mutableStateOf(false) }
     var reachedStart by remember(chatId) { mutableStateOf(false) }
     LaunchedEffect(chatId, myUserId, useRemote, listState) {
         if (!useRemote || myUserId == null) return@LaunchedEffect
-        snapshotFlow { listState.firstVisibleItemIndex }
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisible to info.totalItemsCount
+        }
             .distinctUntilChanged()
-            .collect { first ->
-                if (first > 2 || loadingOlder || reachedStart) return@collect
+            .collect { (lastVisible, total) ->
+                if (total == 0 || lastVisible < total - 4 || loadingOlder || reachedStart) return@collect
                 loadingOlder = true
                 val anchorId = messages.firstOrNull()?.id
+                val typingOffset = if (peerTyping) 1 else 0
                 val added = ChatRepository.loadOlderMessages(chatId, myUserId!!)
                 if (added == 0) {
                     reachedStart = true
                 } else if (anchorId != null) {
-                    val newIndex = InMemoryChatStore.messages(chatId).value
-                        .indexOfFirst { it.id == anchorId }
+                    val reversed = InMemoryChatStore.messages(chatId).value.asReversed()
+                    val newIndex = reversed.indexOfFirst { it.id == anchorId }
                     if (newIndex >= 0) {
-                        // +1 for date separator item above messages
-                        listState.scrollToItem(newIndex + 1)
+                        listState.scrollToItem(newIndex + typingOffset)
                     }
                 }
                 loadingOlder = false
             }
     }
 
-    // Open pinned to latest; follow new messages only (react/star must not jump scroll).
-    var didInitialScroll by remember(chatId) { mutableStateOf(false) }
+    // reverseLayout starts at latest; only stick to bottom when user is already there.
     var prevMsgCount by remember(chatId) { mutableStateOf(-1) }
-    LaunchedEffect(chatId) {
-        didInitialScroll = false
-        prevMsgCount = -1
-        listReady = false
-    }
     LaunchedEffect(visibleMessages.size, visibleMessages.lastOrNull()?.id, peerTyping, imeVisible) {
         if (visibleMessages.isEmpty()) {
-            listReady = true
+            prevMsgCount = 0
             return@LaunchedEffect
         }
-        // +1 for date separator item above messages
-        val index = (visibleMessages.lastIndex + 1 + if (peerTyping) 1 else 0).coerceAtLeast(0)
         val grew = prevMsgCount >= 0 && visibleMessages.size > prevMsgCount
         prevMsgCount = visibleMessages.size
-        if (!didInitialScroll) {
-            listState.scrollToItem(index)
-            delay(16)
-            listState.scrollToItem(index)
-            didInitialScroll = true
-            listReady = true
-            return@LaunchedEffect
-        }
         if (listState.isScrollInProgress) return@LaunchedEffect
-        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-        val nearBottom = lastVisible >= index - 3
+        // reverseLayout: near bottom ⇒ small firstVisibleItemIndex
+        val nearBottom = listState.firstVisibleItemIndex <= 2
         if (grew && nearBottom) {
-            listState.scrollToItem(index)
+            listState.scrollToItem(0)
         } else if (imeVisible && nearBottom) {
-            listState.scrollToItem(index)
+            listState.scrollToItem(0)
         } else if (peerTyping && nearBottom) {
-            listState.scrollToItem(index)
+            listState.scrollToItem(0)
         }
     }
 
@@ -610,6 +605,8 @@ fun ChatIdScreen(
                 onViewInfo = { onNavigate(Routes.ProfileId.replace("{id}", chatId)) },
                 onMedia = { onNavigate(Routes.chatMedia(chatId)) },
                 onWallpaper = { showWallpaper = true },
+                onScheduleCall = { onNavigate(Routes.ScheduledCalls) },
+                onExport = if (useRemote) ({ showExportChat = true }) else null,
                 onBlockRequest = { showBlockConfirm = true },
                 onAfterArchive = { archived -> if (archived) onBack?.invoke() },
                 onReport = {
@@ -682,103 +679,103 @@ fun ChatIdScreen(
     ) {
         LazyColumn(
             state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = if (listReady) 1f else 0f },
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            ) {
-                item(key = "date", contentType = "date") {
-                    DateSeparator(label = "Today")
-                }
-                items(
-                    items = visibleMessages,
-                    key = { it.id },
-                    contentType = { msg ->
-                        when {
-                            msg.poll != null -> "poll"
-                            msg.location != null -> "location"
-                            msg.contact != null -> "contact"
-                            msg.event != null -> "event"
-                            msg.voiceDurationSec != null -> "voice"
-                            msg.mediaKind != null -> msg.mediaKind.name
-                            msg.linkPreview != null -> "link"
-                            else -> "text"
-                        }
-                    },
-                ) { msg ->
-                    if (msg.system) {
-                        SystemNotice(msg.body)
-                    } else {
-                        MessageRow(
-                            message = msg,
-                            isGroup = chat.isGroup,
-                            dark = dark,
-                            // WhatsApp: if they blocked you, ticks stay single (never delivered/read).
-                            forceSingleTick = chat.blockedMe,
-                            onLongPress = {
-                                haptics.tick()
-                                actionTarget = msg
-                            },
-                            onOpenViewOnce = {
-                                val url = msg.mediaUri
-                                if (url != null) {
-                                    haptics.tick()
-                                    if (useRemote) {
-                                        scope.launch {
-                                            runCatching { api.postMessagesIdViewOnce(msg.id, EmptyRequestBody()) }
-                                                .onSuccess { dto ->
-                                                    viewOnceShown = msg to (dto.attachment?.url?.takeIf { it.isNotBlank() } ?: url)
-                                                }
-                                                .onFailure {
-                                                    Toast.makeText(context, "Could not open photo", Toast.LENGTH_SHORT).show()
-                                                }
-                                        }
-                                    } else {
-                                        viewOnceShown = msg to url
-                                    }
-                                }
-                            },
-                            onVote = { optionId ->
-                                val uid = myUserId ?: SessionStore.userId(context)
-                                if (useRemote && uid != null) {
-                                    haptics.tick()
-                                    scope.launch {
-                                        runCatching { api.postMessagesIdVote(msg.id, VoteBody(optionId = optionId)) }
-                                            .onSuccess { InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid)) }
-                                            .onFailure {
-                                                Toast.makeText(context, "Could not vote", Toast.LENGTH_SHORT).show()
-                                            }
-                                    }
-                                }
-                            },
-                            onRsvp = { answer ->
-                                val uid = myUserId ?: SessionStore.userId(context)
-                                if (useRemote && uid != null) {
-                                    haptics.tick()
-                                    scope.launch {
-                                        runCatching { api.postMessagesIdRsvp(msg.id, RsvpBody(answer = answer)) }
-                                            .onSuccess { InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid)) }
-                                            .onFailure {
-                                                Toast.makeText(context, "Could not RSVP", Toast.LENGTH_SHORT).show()
-                                            }
-                                    }
-                                }
-                            },
-                        )
-                    }
-                }
-                if (peerTyping) {
-                    item(key = "typing") {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Start,
-                        ) {
-                            TypingIndicatorBubble()
-                        }
+            reverseLayout = true,
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            // reverseLayout: first items sit at the bottom.
+            if (peerTyping) {
+                item(key = "typing", contentType = "typing") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start,
+                    ) {
+                        TypingIndicatorBubble()
                     }
                 }
             }
+            items(
+                items = listNewestFirst,
+                key = { it.id },
+                contentType = { msg ->
+                    when {
+                        msg.poll != null -> "poll"
+                        msg.location != null -> "location"
+                        msg.contact != null -> "contact"
+                        msg.event != null -> "event"
+                        msg.voiceDurationSec != null -> "voice"
+                        msg.mediaKind != null -> msg.mediaKind.name
+                        msg.linkPreview != null -> "link"
+                        else -> "text"
+                    }
+                },
+            ) { msg ->
+                if (msg.system) {
+                    SystemNotice(msg.body)
+                } else {
+                    MessageRow(
+                        message = msg,
+                        isGroup = chat.isGroup,
+                        dark = dark,
+                        // WhatsApp: if they blocked you, ticks stay single (never delivered/read).
+                        forceSingleTick = chat.blockedMe,
+                        onLongPress = {
+                            haptics.tick()
+                            actionTarget = msg
+                        },
+                        onOpenViewOnce = {
+                            val url = msg.mediaUri
+                            if (url != null) {
+                                haptics.tick()
+                                if (useRemote) {
+                                    scope.launch {
+                                        runCatching { api.postMessagesIdViewOnce(msg.id, EmptyRequestBody()) }
+                                            .onSuccess { dto ->
+                                                viewOnceShown = msg to (dto.attachment?.url?.takeIf { it.isNotBlank() } ?: url)
+                                            }
+                                            .onFailure {
+                                                Toast.makeText(context, "Could not open photo", Toast.LENGTH_SHORT).show()
+                                            }
+                                    }
+                                } else {
+                                    viewOnceShown = msg to url
+                                }
+                            }
+                        },
+                        onVote = { optionId ->
+                            val uid = myUserId ?: SessionStore.userId(context)
+                            if (useRemote && uid != null) {
+                                haptics.tick()
+                                scope.launch {
+                                    runCatching { api.postMessagesIdVote(msg.id, VoteBody(optionId = optionId)) }
+                                        .onSuccess { InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid)) }
+                                        .onFailure {
+                                            Toast.makeText(context, "Could not vote", Toast.LENGTH_SHORT).show()
+                                        }
+                                }
+                            }
+                        },
+                        onRsvp = { answer ->
+                            val uid = myUserId ?: SessionStore.userId(context)
+                            if (useRemote && uid != null) {
+                                haptics.tick()
+                                scope.launch {
+                                    runCatching { api.postMessagesIdRsvp(msg.id, RsvpBody(answer = answer)) }
+                                        .onSuccess { InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid)) }
+                                        .onFailure {
+                                            Toast.makeText(context, "Could not RSVP", Toast.LENGTH_SHORT).show()
+                                        }
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+            item(key = "date", contentType = "date") {
+                DateSeparator(label = "Today")
+            }
+        }
         }
 
         if (chat.blockedByMe) {
@@ -988,6 +985,60 @@ fun ChatIdScreen(
                 }
             },
             onDismiss = { showClearChat = false },
+        )
+    }
+
+    if (showExportChat) {
+        AlertDialog(
+            onDismissRequest = { if (!exportBusy) showExportChat = false },
+            title = { Text("Export chat") },
+            text = { Text("Include media in the export? Without media is a text file; with media is a zip.") },
+            confirmButton = {
+                TextButton(
+                    enabled = !exportBusy,
+                    onClick = {
+                        if (exportBusy) return@TextButton
+                        exportBusy = true
+                        scope.launch {
+                            val ok = com.aivora.app.data.ChatExport.downloadAndShare(
+                                context = context,
+                                api = api,
+                                conversationId = chatId,
+                                chatTitle = chat.title,
+                                includeMedia = true,
+                            )
+                            exportBusy = false
+                            showExportChat = false
+                            if (ok) {
+                                Toast.makeText(context, "Chat exported", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                ) { Text(if (exportBusy) "Exporting…" else "Include media") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !exportBusy,
+                    onClick = {
+                        if (exportBusy) return@TextButton
+                        exportBusy = true
+                        scope.launch {
+                            val ok = com.aivora.app.data.ChatExport.downloadAndShare(
+                                context = context,
+                                api = api,
+                                conversationId = chatId,
+                                chatTitle = chat.title,
+                                includeMedia = false,
+                            )
+                            exportBusy = false
+                            showExportChat = false
+                            if (ok) {
+                                Toast.makeText(context, "Chat exported", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                ) { Text("Without media") }
+            },
         )
     }
 
@@ -2086,11 +2137,6 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
         }
     }
 
-    val bars = remember(seed) {
-        val rnd = Random(seed)
-        FloatArray(20) { 0.22f + rnd.nextFloat() * 0.78f }
-    }
-
     fun ensurePlayerAndPlay() {
         val url = mediaUrl ?: return
         if (url.isBlank()) return
@@ -2144,46 +2190,92 @@ private fun VoiceNoteContent(durationSec: Int, seed: Int, mediaUrl: String? = nu
         ensurePlayerAndPlay()
     }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.widthIn(min = 200.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(AivoraColors.Primary)
-                .clickable(enabled = !mediaUrl.isNullOrBlank(), onClick = { togglePlay() }),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                when {
-                    playing -> "❚❚"
-                    loading -> "…"
-                    else -> "▶"
-                },
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-            )
+    fun seekToFraction(fraction: Float) {
+        val next = fraction.coerceIn(0f, 1f)
+        progress = next
+        val mp = playerHolder[0]
+        if (mp != null && ready) {
+            val dur = runCatching { mp.duration }.getOrDefault(0)
+            if (dur > 0) {
+                val ms = (next * dur).toInt().coerceIn(0, dur)
+                runCatching { mp.seekTo(ms) }
+                positionSec = ms / 1000
+                return
+            }
         }
-        Column(modifier = Modifier.weight(1f)) {
+        if (durationSec > 0) {
+            positionSec = (next * durationSec).toInt().coerceIn(0, durationSec)
+        }
+    }
+
+    // Figma voice bubble: play + waveform bars (not Material Slider).
+    val bars = remember(seed) {
+        val rnd = kotlin.random.Random(seed)
+        FloatArray(32) { 0.18f + rnd.nextFloat() * 0.82f }
+    }
+
+    Column(
+        modifier = Modifier.widthIn(min = 220.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(AivoraColors.Primary)
+                    .clickable(enabled = !mediaUrl.isNullOrBlank(), onClick = { togglePlay() }),
+                contentAlignment = Alignment.Center,
+            ) {
+                when {
+                    loading -> Text("…", color = Color.White, fontWeight = FontWeight.Bold)
+                    playing -> Text("❚❚", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    else -> Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            }
             VoiceWaveform(
                 levels = bars,
                 progress = if (playing || progress > 0f) progress else 0f,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(36.dp)
+                    .pointerInput(mediaUrl, ready, durationSec) {
+                        detectTapGestures { offset ->
+                            if (mediaUrl.isNullOrBlank()) return@detectTapGestures
+                            val w = size.width.toFloat().coerceAtLeast(1f)
+                            seekToFraction(offset.x / w)
+                            if (!playing) ensurePlayerAndPlay()
+                        }
+                    },
+                activeColor = AivoraColors.Primary,
+                idleColor = Color(0xFFA6CBB2),
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    "${formatVoiceDuration(positionSec)} / ${formatVoiceDuration(durationSec)}",
-                    fontSize = 11.sp,
-                    color = AivoraColors.TextSecondary,
-                )
-                Text("1x", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = AivoraColors.Ink)
-            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "${formatVoiceDuration(positionSec)} / ${formatVoiceDuration(durationSec)}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = AivoraColors.Online,
+            )
+            Text(
+                "1×",
+                fontSize = 11.sp,
+                color = AivoraColors.TextSecondary,
+            )
         }
     }
 }

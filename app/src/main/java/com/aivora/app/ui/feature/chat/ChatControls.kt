@@ -29,6 +29,7 @@ import com.aivora.app.ui.theme.AivoraColors
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Unarchive
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Wallpaper
 import com.aivora.app.data.api.AivoraApi
 import com.aivora.app.data.local.InMemoryChatStore
@@ -208,16 +210,34 @@ object ChatControls {
         onReport: (() -> Unit)? = null,
         onViewInfo: (() -> Unit)? = null,
         onWallpaper: (() -> Unit)? = null,
+        onScheduleCall: (() -> Unit)? = null,
+        onExport: (() -> Unit)? = null,
         onAfterArchive: ((archived: Boolean) -> Unit)? = null,
     ): List<AivoraSheetAction> = buildList {
         onViewInfo?.let { view ->
             add(
                 AivoraSheetAction(
-                    if (chat.isGroup) "Group info" else "View contact",
+                    if (chat.isGroup) "Group info" else "Contact info",
                     Icons.Default.Person,
                 ) {
                     onDismiss()
                     view()
+                },
+            )
+        }
+        if (onScheduleCall != null && !chat.isGroup) {
+            add(
+                AivoraSheetAction("Schedule call", Icons.Default.Event) {
+                    onDismiss()
+                    onScheduleCall()
+                },
+            )
+        }
+        if (onExport != null) {
+            add(
+                AivoraSheetAction("Export chat", Icons.Default.Upload) {
+                    onDismiss()
+                    onExport()
                 },
             )
         }
@@ -363,6 +383,8 @@ object ChatControls {
         onViewInfo: (() -> Unit)? = null,
         onMedia: (() -> Unit)? = null,
         onWallpaper: (() -> Unit)? = null,
+        onScheduleCall: (() -> Unit)? = null,
+        onExport: (() -> Unit)? = null,
         onBlockRequest: (() -> Unit)? = null,
         onAfterArchive: ((archived: Boolean) -> Unit)? = null,
     ): List<OverflowMenuItem> {
@@ -381,6 +403,8 @@ object ChatControls {
             onReport = onReport,
             onViewInfo = onViewInfo,
             onWallpaper = onWallpaper,
+            onScheduleCall = onScheduleCall,
+            onExport = onExport,
             onAfterArchive = onAfterArchive,
         ).toMutableList()
         if (includeMedia && onMedia != null) {
