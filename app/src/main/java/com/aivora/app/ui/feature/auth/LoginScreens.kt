@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.auth
 
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -32,15 +34,22 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.DialogProperties
+import com.aivora.app.data.model.AppCountryDto
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,6 +93,9 @@ fun LoginScreen(
     var step by remember { mutableIntStateOf(0) }
     var country by remember { mutableStateOf("Pakistan") }
     var dial by remember { mutableStateOf("+92") }
+    var countries by remember { mutableStateOf<List<AppCountryDto>>(emptyList()) }
+    var pickCountry by remember { mutableStateOf(false) }
+    var forceUpdateUrl by remember { mutableStateOf<String?>(null) }
     // Prefill last signed-in number so rebuilds don't force retyping.
     var phone by remember {
         mutableStateOf(
@@ -98,6 +110,53 @@ fun LoginScreen(
     var otp by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        runCatching { api.getAppConfig() }.onSuccess { cfg ->
+            val list = cfg.countries.filter { it.enabled && !it.name.isNullOrBlank() }
+            if (list.isNotEmpty()) {
+                countries = list
+                val match = list.firstOrNull { it.name.equals(country, ignoreCase = true) }
+                    ?: list.firstOrNull { it.iso == "PK" }
+                    ?: list.first()
+                country = match.name ?: country
+                dial = match.dial?.takeIf { it.isNotBlank() } ?: dial
+            }
+            if (BuildConfig.VERSION_CODE < cfg.minAndroidVersionCode) {
+                forceUpdateUrl = cfg.downloadUrl
+            }
+        }
+    }
+
+    if (pickCountry && countries.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { pickCountry = false },
+            properties = DialogProperties(usePlatformDefaultWidth = true),
+            title = { Text("Country") },
+            text = {
+                LazyColumn(modifier = Modifier.height(280.dp)) {
+                    items(countries, key = { it.iso ?: it.dial ?: it.name.orEmpty() }) { row ->
+                        Text(
+                            "${row.name} (${row.dial})",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    country = row.name ?: country
+                                    dial = row.dial?.takeIf { it.isNotBlank() } ?: dial
+                                    pickCountry = false
+                                }
+                                .padding(vertical = 12.dp),
+                            fontSize = 16.sp,
+                            color = AivoraColors.Ink,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { pickCountry = false }) { Text("Close") }
+            },
+        )
+    }
 
     suspend fun completeVerify(targetPhone: String, code: String): String? {
         val tokens = api.postAuthOtpVerify(
@@ -222,8 +281,21 @@ fun LoginScreen(
                         )
                         Spacer(Modifier.height(20.dp))
 
+                        if (forceUpdateUrl != null) {
+                            Text(
+                                "Update required to continue. Ask admin for the latest APK.",
+                                color = AivoraColors.Danger,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(bottom = 12.dp),
+                            )
+                        }
                         AuthFieldLabel("Country")
-                        CountryField(value = country, onClick = { /* local mock */ })
+                        CountryField(
+                            value = country,
+                            onClick = {
+                                if (countries.isNotEmpty()) pickCountry = true
+                            },
+                        )
                         Spacer(Modifier.height(14.dp))
 
                         AuthFieldLabel("Phone")
@@ -433,7 +505,7 @@ private fun CountryField(value: String, onClick: () -> Unit) {
             color = AivoraColors.InkMuted,
         )
         Icon(
-            Icons.Default.KeyboardArrowDown,
+            AppIcons.KeyboardArrowDown,
             contentDescription = null,
             tint = AivoraColors.TextSecondary,
         )

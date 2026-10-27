@@ -242,7 +242,7 @@ interface AivoraApi {
     ): com.aivora.app.data.model.PrivacySettingsDto
 
     @GET("api/app/config")
-    suspend fun getAppConfig(): okhttp3.ResponseBody
+    suspend fun getAppConfig(): com.aivora.app.data.model.AppConfigDto
 
     @POST("api/messages/delivered")
     suspend fun postMessagesDelivered(

@@ -67,16 +67,17 @@ See [WAVE18_STATUS.md](WAVE18_STATUS.md).
 
 ---
 
-### Wave 20 — Admin ops *(mock → live)*
-**Goal:** Remaining admin sidebar pages talk to the API.
+### Wave 20 — Admin ops *(mock → live)* ✅
+**Goal:** Remaining admin sidebar pages talk to the API.  
+**Doc:** [WAVE20_ADMIN_OPS.md](WAVE20_ADMIN_OPS.md)
 
 | # | Slice | Exit |
 |---|-------|------|
-| 20.1 | App config / Android version gates (`/api/app/config`) | Android page live |
-| 20.2 | Countries allowlist | Signup respects enabled list |
-| 20.3 | Settings map (limits, ring timeout, group caps) | Persist + app reads |
-| 20.4 | Admins + audit log | Invite / role / trail |
-| 20.5 | Channels/stickers admin **only if** Wave 21 ships those features | Skip otherwise |
+| 20.1 | App config / Android version gates (`/api/app/config`) | Android page live ✅ |
+| 20.2 | Countries allowlist | Signup respects enabled list ✅ |
+| 20.3 | Settings map (limits, ring timeout, group caps) | Persist + app reads ✅ |
+| 20.4 | Admins + audit log | Invite / role / trail ✅ |
+| 20.5 | Channels/stickers admin **only if** Wave 21 ships those features | Skip |
 
 Auto-update pattern: reuse SSE/poll where it matters (already on calls).
 
