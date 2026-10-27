@@ -126,8 +126,13 @@ interface AivoraApi {
     @POST("api/call-links/{code}")
     suspend fun postCallLinksCode(
         @Path("code") code: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.EmptyRequestBody = com.aivora.app.data.model.EmptyRequestBody(),
+    ): com.aivora.app.data.model.CallLinkJoinDto
+
+    @GET("api/call-links/{code}")
+    suspend fun getCallLinksCode(
+        @Path("code") code: String,
+    ): com.aivora.app.data.model.CallLinkDto
 
     @GET("api/conversations/{id}/pins")
     suspend fun getConversationsIdPins(
@@ -241,7 +246,7 @@ interface AivoraApi {
 
     @POST("api/messages/delivered")
     suspend fun postMessagesDelivered(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Body body: com.aivora.app.data.model.DeliveredBody,
     ): okhttp3.ResponseBody
 
     @POST("api/auth/passkey")
@@ -267,7 +272,7 @@ interface AivoraApi {
     @DELETE("api/status/{id}")
     suspend fun deleteStatusId(
         @Path("id") id: String,
-    ): okhttp3.ResponseBody
+    ): retrofit2.Response<okhttp3.ResponseBody>
 
     @DELETE("api/messages/{id}")
     suspend fun deleteMessagesId(
@@ -380,7 +385,7 @@ interface AivoraApi {
     @POST("api/status/{id}")
     suspend fun postStatusId(
         @Path("id") id: String,
-        @Body body: Map<String, @JvmSuppressWildcards Any?> = emptyMap(),
+        @Body body: com.aivora.app.data.model.EmptyRequestBody = com.aivora.app.data.model.EmptyRequestBody(),
     ): okhttp3.ResponseBody
 
     @POST("api/channels/{slug}/posts")
@@ -543,8 +548,8 @@ interface AivoraApi {
 
     @POST("api/call-links")
     suspend fun postCallLinks(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.CallLinkCreateBody,
+    ): com.aivora.app.data.model.CallLinkDto
 
     @POST("api/me/two-step/off")
     suspend fun postMeTwoStepOff(

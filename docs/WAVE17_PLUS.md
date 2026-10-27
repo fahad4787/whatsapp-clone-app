@@ -54,15 +54,16 @@ See [WAVE18_STATUS.md](WAVE18_STATUS.md).
 
 ---
 
-### Wave 19 — Call links *(finish calls)*
-**Goal:** Shareable link joins a LiveKit room without prior chat.
+### Wave 19 — Call links *(finish calls)* ✅
+**Goal:** Shareable link joins a LiveKit room without prior chat.  
+**Doc:** [WAVE19_CALL_LINKS.md](WAVE19_CALL_LINKS.md)
 
 | # | Slice | Exit |
 |---|-------|------|
-| 19.1 | `POST /api/call-links`, `POST /api/call-links/:code` join | Token + room |
-| 19.2 | Replace stub dialog with create → copy/share | Link works |
-| 19.3 | Deep link / in-app join screen | Second device joins |
-| 19.4 | Admin: show link-created calls in history (reuse 16.4) | Visible |
+| 19.1 | `POST /api/call-links`, `POST /api/call-links/:code` join | Token + room ✅ |
+| 19.2 | Replace stub dialog with create → copy/share | Link works ✅ |
+| 19.3 | Deep link / in-app join screen | Second device joins ✅ |
+| 19.4 | Admin: show link-created calls in history (reuse 16.4) | Visible (existing call list) |
 
 ---
 

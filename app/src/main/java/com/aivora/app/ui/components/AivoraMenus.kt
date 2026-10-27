@@ -1,5 +1,7 @@
 package com.aivora.app.ui.components
 
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,7 +32,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -116,12 +120,53 @@ private fun OverflowRow(item: OverflowMenuItem, onDismiss: () -> Unit) {
 @Composable
 fun CreateCallLinkDialog(
     onDismiss: () -> Unit,
-    onCopy: () -> Unit = {},
-    onShare: () -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val api = remember { com.aivora.app.data.ChatRepository.api() }
     var video by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var createdUrl by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    fun createThen(action: (String) -> Unit) {
+        val existing = createdUrl
+        if (existing != null) {
+            action(existing)
+            onDismiss()
+            return
+        }
+        if (busy) return
+        busy = true
+        error = null
+        scope.launch {
+            runCatching {
+                api.postCallLinks(
+                    com.aivora.app.data.model.CallLinkCreateBody(
+                        media = if (video) "video" else "audio",
+                    ),
+                )
+            }.onSuccess { dto ->
+                val url = dto.url?.takeIf { it.isNotBlank() }
+                    ?: dto.code?.let {
+                        "https://whatsapp-clone-backend-hep1.onrender.com/call/$it"
+                    }
+                if (url.isNullOrBlank()) {
+                    error = "Bad response"
+                } else {
+                    createdUrl = url
+                    action(url)
+                    onDismiss()
+                }
+            }.onFailure {
+                error = it.message ?: "Could not create link"
+            }
+            busy = false
+        }
+    }
+
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!busy) onDismiss() },
         shape = RoundedCornerShape(20.dp),
         containerColor = MaterialTheme.colorScheme.surface,
         title = {
@@ -138,28 +183,59 @@ fun CreateCallLinkDialog(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     CallTypePill(
                         label = "Voice",
-                        icon = Icons.Default.Call,
+                        icon = AppIcons.Call,
                         selected = !video,
-                        onClick = { video = false },
+                        onClick = { if (!busy && createdUrl == null) video = false },
                         modifier = Modifier.weight(1f),
                     )
                     CallTypePill(
                         label = "Video",
-                        icon = Icons.Default.Videocam,
+                        icon = AppIcons.Videocam,
                         selected = video,
-                        onClick = { video = true },
+                        onClick = { if (!busy && createdUrl == null) video = true },
                         modifier = Modifier.weight(1f),
                     )
+                }
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(error!!, color = AivoraColors.Danger, fontSize = 13.sp)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onShare(); onDismiss() }) {
-                Text("Share link", color = AivoraColors.Primary, fontWeight = FontWeight.SemiBold)
+            TextButton(
+                onClick = {
+                    createThen { url ->
+                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_TEXT, url)
+                        }
+                        context.startActivity(
+                            android.content.Intent.createChooser(send, "Share call link"),
+                        )
+                    }
+                },
+                enabled = !busy,
+            ) {
+                Text(
+                    if (busy) "Creating…" else "Share link",
+                    color = AivoraColors.Primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         },
         dismissButton = {
-            TextButton(onClick = { onCopy(); onDismiss() }) {
+            TextButton(
+                onClick = {
+                    createThen { url ->
+                        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                            as android.content.ClipboardManager
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("Call link", url))
+                        android.widget.Toast.makeText(context, "Link copied", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                },
+                enabled = !busy,
+            ) {
                 Text("Copy link", color = AivoraColors.Primary, fontWeight = FontWeight.SemiBold)
             }
         },

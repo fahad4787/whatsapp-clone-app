@@ -2,6 +2,7 @@ package com.aivora.app.ui.navigation
 
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -11,6 +12,7 @@ import androidx.navigation.navArgument
 import com.aivora.app.ui.feature.auth.LoginScreen
 import com.aivora.app.ui.feature.auth.ProfileSetupScreen
 import com.aivora.app.ui.feature.calls.AudioCallScreen
+import com.aivora.app.ui.feature.calls.JoinCallLinkScreen
 import com.aivora.app.ui.feature.calls.NewCallScreen
 import com.aivora.app.ui.feature.calls.ScheduledCallsScreen
 import com.aivora.app.ui.feature.calls.VideoCallScreen
@@ -167,11 +169,15 @@ fun AivoraNavHost(
             route = Routes.ChatId,
             arguments = listOf(navArgument("id") { type = NavType.StringType }),
         ) { entry ->
-            ChatIdScreen(
-                chatId = entry.arguments?.getString("id").orEmpty(),
-                onBack = back,
-                onNavigate = go,
-            )
+            val chatId = entry.arguments?.getString("id").orEmpty()
+            // Force a fresh composition when switching chats (no 1→2 content flash).
+            key(chatId) {
+                ChatIdScreen(
+                    chatId = chatId,
+                    onBack = back,
+                    onNavigate = go,
+                )
+            }
         }
         composable(
             route = Routes.ChatMedia,
@@ -267,8 +273,20 @@ fun AivoraNavHost(
         composable(Routes.NewCall) {
             NewCallScreen(onBack = back, onNavigate = go)
         }
-        composable(Routes.Keypad) {
-            NewCallScreen(onBack = back, onNavigate = go, startKeypad = true)
+        composable(
+            route = Routes.CallLinkJoin,
+            arguments = listOf(navArgument("code") { type = NavType.StringType }),
+        ) { entry ->
+            JoinCallLinkScreen(
+                code = Uri.decode(entry.arguments?.getString("code").orEmpty()),
+                onBack = back,
+                onNavigate = { route ->
+                    navController.navigate(route) {
+                        popUpTo(Routes.CallLinkJoin) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+            )
         }
         composable(
             route = Routes.AudioCall,
@@ -308,6 +326,7 @@ fun AivoraNavHost(
             StatusViewerScreen(
                 statusId = entry.arguments?.getString("id").orEmpty(),
                 onBack = back,
+                onNavigate = go,
             )
         }
         composable(Routes.ProfileSetup) {

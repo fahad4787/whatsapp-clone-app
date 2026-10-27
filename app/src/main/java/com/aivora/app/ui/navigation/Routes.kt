@@ -21,9 +21,10 @@ object Routes {
     const val LocationShare = "location-share/{chat}"
     const val ContactShare = "contact-share/{chat}"
     const val NewCall = "new-call"
-    const val Keypad = "keypad"
     const val AudioCall = "call/audio/{name}"
     const val VideoCall = "call/video/{name}"
+    /** Wave 19 — join shareable call link by code. */
+    const val CallLinkJoin = "call-link/{code}"
     const val NewChat = "new-chat"
     const val NewGroup = "new-group"
     const val NewStatus = "new-status"
@@ -122,4 +123,7 @@ object Routes {
 
     fun videoCall(name: String = "Contact"): String =
         VideoCall.replace("{name}", android.net.Uri.encode(name))
+
+    fun callLinkJoin(code: String): String =
+        CallLinkJoin.replace("{code}", android.net.Uri.encode(code))
 }
