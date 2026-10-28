@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.chat
 
+import com.aivora.app.ui.icons.AppIcons
+
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -57,6 +59,7 @@ internal fun formatEventStart(iso: String): String = runCatching {
 internal fun formatLastSeen(iso: String): String = runCatching {
     val zoned = Instant.parse(iso).atZone(ZoneId.systemDefault())
     val today = LocalDate.now(zoned.zone)
+    // Compact so chat header stays one line next to call/video (Figma Contact controls).
     when (zoned.toLocalDate()) {
         today -> "last seen today at ${TimeFmt.format(zoned)}"
         today.minusDays(1) -> "last seen yesterday at ${TimeFmt.format(zoned)}"
@@ -159,7 +162,7 @@ internal fun LocationBubble(location: LocalLocation) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Default.LocationOn,
+                AppIcons.LocationOn,
                 contentDescription = "Location",
                 tint = AivoraColors.Primary,
                 modifier = Modifier.size(36.dp),

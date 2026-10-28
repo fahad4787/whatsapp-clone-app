@@ -26,6 +26,8 @@ fun ConversationDto.toLocalChat(): LocalChat {
         blockedByMe = blockedByMe,
         blockedMe = blockedMe,
         peerUserId = peer?.id,
+        peerPhone = peer?.phoneDisplay?.takeIf { it.isNotBlank() }
+            ?: peer?.phone?.takeIf { it.isNotBlank() },
         myRole = myRole,
         description = description,
         avatarUrl = avatarUrl ?: avatarThumb,

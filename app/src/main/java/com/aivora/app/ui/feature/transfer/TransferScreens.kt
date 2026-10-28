@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.transfer
 
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -94,8 +96,8 @@ fun TransferNewPhoneScreen(
         SettingsList(
             listOf(
                 null to listOf(
-                    SettingsItem("Scan QR code", "Camera access lets this phone scan the QR code your new phone shows.", Icons.Default.QrCode, onClick = { }),
-                    SettingsItem("Continue", null, Icons.Default.Devices, onClick = { onNavigate(Routes.Home) }),
+                    SettingsItem("Scan QR code", "Camera access lets this phone scan the QR code your new phone shows.", AppIcons.QrCode, onClick = { }),
+                    SettingsItem("Continue", null, AppIcons.Devices, onClick = { onNavigate(Routes.Home) }),
                 )
             )
         )

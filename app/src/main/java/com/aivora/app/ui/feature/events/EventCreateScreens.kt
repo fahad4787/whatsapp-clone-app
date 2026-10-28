@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.events
 
+import com.aivora.app.ui.icons.AppIcons
+
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,9 +27,6 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDefaults
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,12 +36,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -66,6 +61,8 @@ import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.EventCreateBody
 import com.aivora.app.data.model.SendMessageBody
 import com.aivora.app.data.toLocalMessage
+import com.aivora.app.ui.components.AivoraDatePickerDialog
+import com.aivora.app.ui.components.AivoraTimePickerDialog
 import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
@@ -76,7 +73,6 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
@@ -150,7 +146,7 @@ fun EventCreateChatScreen(
             navigationIcon = {
                 if (onBack != null) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(AppIcons.ArrowBack, contentDescription = "Back")
                     }
                 }
             },
@@ -190,7 +186,7 @@ fun EventCreateChatScreen(
             PickerField(
                 value = date?.format(DateLabelFmt).orEmpty(),
                 placeholder = "Choose a date",
-                trailing = { Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = AivoraColors.TextSecondary) },
+                trailing = { Icon(AppIcons.CalendarMonth, contentDescription = null, tint = AivoraColors.TextSecondary) },
                 onClick = { showDate = true },
             )
             Spacer(Modifier.height(12.dp))
@@ -200,7 +196,7 @@ fun EventCreateChatScreen(
                     PickerField(
                         value = startTime?.format(TimeLabelFmt).orEmpty(),
                         placeholder = "Start",
-                        trailing = { Icon(Icons.Default.AccessTime, contentDescription = null, tint = AivoraColors.TextSecondary) },
+                        trailing = { Icon(AppIcons.AccessTime, contentDescription = null, tint = AivoraColors.TextSecondary) },
                         onClick = { showStartTime = true },
                     )
                 }
@@ -209,7 +205,7 @@ fun EventCreateChatScreen(
                     PickerField(
                         value = endTime?.format(TimeLabelFmt).orEmpty(),
                         placeholder = "End",
-                        trailing = { Icon(Icons.Default.AccessTime, contentDescription = null, tint = AivoraColors.TextSecondary) },
+                        trailing = { Icon(AppIcons.AccessTime, contentDescription = null, tint = AivoraColors.TextSecondary) },
                         onClick = { showEndTime = true },
                     )
                 }
@@ -219,7 +215,7 @@ fun EventCreateChatScreen(
             PickerField(
                 value = formatZoneLabel(zoneId),
                 placeholder = "Timezone",
-                trailing = { Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = AivoraColors.TextSecondary) },
+                trailing = { Icon(AppIcons.KeyboardArrowDown, contentDescription = null, tint = AivoraColors.TextSecondary) },
                 onClick = { showZone = true },
             )
             Spacer(Modifier.height(16.dp))
@@ -240,7 +236,7 @@ fun EventCreateChatScreen(
                 value = location,
                 onValueChange = { location = it },
                 placeholder = "Add a place or address",
-                trailing = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = AivoraColors.TextSecondary) },
+                trailing = { Icon(AppIcons.LocationOn, contentDescription = null, tint = AivoraColors.TextSecondary) },
             )
             Spacer(Modifier.height(16.dp))
         }
@@ -298,155 +294,38 @@ fun EventCreateChatScreen(
         )
     }
 
-    // Force light Aivora chrome so pickers don't follow system dark / purple defaults.
-    if (showDate || showStartTime || showEndTime || showZone) {
-        AivoraTheme(darkTheme = false) {
-            if (showDate) {
-                val state = rememberDatePickerState(
-                    initialSelectedDateMillis = (date ?: LocalDate.now())
-                        .atStartOfDay(ZoneOffset.UTC)
-                        .toInstant()
-                        .toEpochMilli(),
-                )
-                DatePickerDialog(
-                    onDismissRequest = { showDate = false },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                state.selectedDateMillis?.let { millis ->
-                                    date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
-                                }
-                                showDate = false
-                            },
-                        ) { Text("OK", color = AivoraColors.Primary, fontWeight = FontWeight.SemiBold) }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showDate = false }) {
-                            Text("Cancel", color = AivoraColors.TextSecondary)
-                        }
-                    },
-                    colors = DatePickerDefaults.colors(
-                        containerColor = AivoraColors.LightSurface,
-                    ),
-                ) {
-                    DatePicker(
-                        state = state,
-                        colors = DatePickerDefaults.colors(
-                            containerColor = AivoraColors.LightSurface,
-                            selectedDayContainerColor = AivoraColors.Primary,
-                            selectedDayContentColor = Color.White,
-                            todayDateBorderColor = AivoraColors.Primary,
-                            selectedYearContainerColor = AivoraColors.Primary,
-                            selectedYearContentColor = Color.White,
-                        ),
-                    )
-                }
-            }
-            if (showStartTime) {
-                EventTimePickerDialog(
-                    initial = startTime ?: LocalTime.now().withSecond(0).withNano(0),
-                    onDismiss = { showStartTime = false },
-                    onConfirm = {
-                        startTime = it
-                        showStartTime = false
-                    },
-                )
-            }
-            if (showEndTime) {
-                EventTimePickerDialog(
-                    initial = endTime
-                        ?: (startTime?.plusHours(1) ?: LocalTime.now().plusHours(1).withSecond(0).withNano(0)),
-                    onDismiss = { showEndTime = false },
-                    onConfirm = {
-                        endTime = it
-                        showEndTime = false
-                    },
-                )
-            }
-            if (showZone) {
-                TimezonePickerDialog(
-                    selected = zoneId,
-                    onDismiss = { showZone = false },
-                    onSelect = {
-                        zoneId = it
-                        showZone = false
-                    },
-                )
-            }
-        }
+    if (showDate) {
+        AivoraDatePickerDialog(
+            initial = date ?: LocalDate.now(),
+            onDismiss = { showDate = false },
+            onConfirm = { date = it },
+        )
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EventTimePickerDialog(
-    initial: LocalTime,
-    onDismiss: () -> Unit,
-    onConfirm: (LocalTime) -> Unit,
-) {
-    val state = rememberTimePickerState(
-        initialHour = initial.hour,
-        initialMinute = initial.minute,
-        is24Hour = false,
-    )
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = AivoraColors.LightSurface,
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    "Select time",
-                    fontWeight = FontWeight.SemiBold,
-                    color = AivoraColors.Ink,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                )
-                TimePicker(
-                    state = state,
-                    colors = TimePickerDefaults.colors(
-                        clockDialColor = AivoraColors.SurfaceMuted,
-                        clockDialSelectedContentColor = Color.White,
-                        clockDialUnselectedContentColor = AivoraColors.Ink,
-                        selectorColor = AivoraColors.Primary,
-                        containerColor = AivoraColors.LightSurface,
-                        periodSelectorBorderColor = AivoraColors.BorderMuted,
-                        periodSelectorSelectedContainerColor = AivoraColors.PrimarySoft,
-                        periodSelectorUnselectedContainerColor = AivoraColors.SurfaceMuted,
-                        periodSelectorSelectedContentColor = AivoraColors.PrimaryDark,
-                        periodSelectorUnselectedContentColor = AivoraColors.TextSecondary,
-                        timeSelectorSelectedContainerColor = AivoraColors.PrimarySoft,
-                        timeSelectorUnselectedContainerColor = AivoraColors.SurfaceMuted,
-                        timeSelectorSelectedContentColor = AivoraColors.PrimaryDark,
-                        timeSelectorUnselectedContentColor = AivoraColors.Ink,
-                    ),
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = AivoraColors.TextSecondary)
-                    }
-                    TextButton(
-                        onClick = { onConfirm(LocalTime.of(state.hour, state.minute)) },
-                    ) {
-                        Text("OK", color = AivoraColors.Primary, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
+    if (showStartTime) {
+        AivoraTimePickerDialog(
+            initial = startTime ?: LocalTime.now().withSecond(0).withNano(0),
+            onDismiss = { showStartTime = false },
+            onConfirm = { startTime = it },
+        )
+    }
+    if (showEndTime) {
+        AivoraTimePickerDialog(
+            initial = endTime
+                ?: (startTime?.plusHours(1) ?: LocalTime.now().plusHours(1).withSecond(0).withNano(0)),
+            onDismiss = { showEndTime = false },
+            onConfirm = { endTime = it },
+        )
+    }
+    if (showZone) {
+        AivoraTheme(darkTheme = false) {
+            TimezonePickerDialog(
+                selected = zoneId,
+                onDismiss = { showZone = false },
+                onSelect = {
+                    zoneId = it
+                    showZone = false
+                },
+            )
         }
     }
 }

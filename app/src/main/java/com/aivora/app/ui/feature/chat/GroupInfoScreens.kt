@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.chat
 
+import com.aivora.app.ui.icons.AppIcons
+
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -83,7 +85,9 @@ fun GroupInfoScreen(
     val scope = rememberCoroutineScope()
     val api = remember { ChatRepository.api() }
     val myId = remember { SessionStore.userId(context) }
-    var conv by remember { mutableStateOf<ConversationDto?>(null) }
+    var conv by remember(chatId) {
+        mutableStateOf(com.aivora.app.data.local.InMemoryConversationDetailStore.get(chatId))
+    }
     var error by remember { mutableStateOf<String?>(null) }
     var editOpen by remember { mutableStateOf(false) }
     var addOpen by remember { mutableStateOf(false) }
@@ -94,6 +98,7 @@ fun GroupInfoScreen(
 
     fun applyConv(next: ConversationDto) {
         conv = next
+        com.aivora.app.data.local.InMemoryConversationDetailStore.put(chatId, next)
         InMemoryChatStore.upsertChat(next.toLocalChat())
     }
 
@@ -167,14 +172,14 @@ fun GroupInfoScreen(
                     add(
                         SettingsItem(
                             title = "Media, links, and docs",
-                            icon = Icons.Default.Photo,
+                            icon = AppIcons.Photo,
                             onClick = { onNavigate(Routes.chatMedia(chatId)) },
                         ),
                     )
                     add(
                         SettingsItem(
                             title = "Disappearing messages",
-                            icon = Icons.Default.Timer,
+                            icon = AppIcons.Timer,
                             trailing = formatDisappearing(conv?.disappearingSeconds ?: 0),
                             onClick = { showDisappearing = true },
                         ),
@@ -183,14 +188,14 @@ fun GroupInfoScreen(
                         add(
                             SettingsItem(
                                 title = "Edit group info",
-                                icon = Icons.Default.Edit,
+                                icon = AppIcons.Edit,
                                 onClick = { editOpen = true },
                             ),
                         )
                         add(
                             SettingsItem(
                                 title = "Change group photo",
-                                icon = Icons.Default.CameraAlt,
+                                icon = AppIcons.CameraAlt,
                                 onClick = { pickAvatar.launch("image/*") },
                             ),
                         )
@@ -199,7 +204,7 @@ fun GroupInfoScreen(
                         add(
                             SettingsItem(
                                 title = "Add participants",
-                                icon = Icons.Default.PersonAdd,
+                                icon = AppIcons.PersonAdd,
                                 onClick = { addOpen = true },
                             ),
                         )
@@ -291,7 +296,7 @@ fun GroupInfoScreen(
                     add(
                         SettingsItem(
                             title = "Exit group",
-                            icon = Icons.Default.ExitToApp,
+                            icon = AppIcons.ExitToApp,
                             danger = true,
                             onClick = { confirmLeave = true },
                         ),
@@ -300,7 +305,7 @@ fun GroupInfoScreen(
                         add(
                             SettingsItem(
                                 title = "Delete group",
-                                icon = Icons.Default.Delete,
+                                icon = AppIcons.Delete,
                                 danger = true,
                                 onClick = { confirmDissolve = true },
                             ),
@@ -394,7 +399,7 @@ fun GroupInfoScreen(
                     add(
                         AivoraSheetAction(
                             if (isTargetAdmin) "Dismiss as admin" else "Make group admin",
-                            Icons.Default.Edit,
+                            AppIcons.Edit,
                         ) {
                             memberTarget = null
                             scope.launch {
@@ -412,7 +417,7 @@ fun GroupInfoScreen(
                         },
                     )
                     add(
-                        AivoraSheetAction("Remove from group", Icons.Default.Delete, danger = true) {
+                        AivoraSheetAction("Remove from group", AppIcons.Delete, danger = true) {
                             memberTarget = null
                             scope.launch {
                                 runCatching {

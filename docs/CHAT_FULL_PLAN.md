@@ -1,7 +1,7 @@
 # Full chat plan (Wave 9+)
 
 Date: 2026-10-24  
-Status: **Wave 15 done** (Waves 9–15 + PERF F0–F5). Chat track complete. Calls track started — see `WAVE16_CALLS.md`.
+Status: **Wave 15 done** (Waves 9–15 + PERF F0–F8). Chat track complete. Calls **16.1–16.4 done**. Next roadmap: `WAVE17_PLUS.md`.
 
 ## Principle
 

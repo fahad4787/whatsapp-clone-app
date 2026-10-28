@@ -20,6 +20,7 @@ import com.aivora.app.ui.MainActivity
  */
 object MessageNotifier {
     private const val CHANNEL_ID = "messages"
+    private const val CALLS_CHANNEL_ID = "calls"
 
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < 26) return
@@ -27,6 +28,18 @@ object MessageNotifier {
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "Messages", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "New chat messages"
+                enableVibration(true)
+            },
+        )
+        ensureCallsChannel(context)
+    }
+
+    fun ensureCallsChannel(context: Context) {
+        if (Build.VERSION.SDK_INT < 26) return
+        val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        nm.createNotificationChannel(
+            NotificationChannel(CALLS_CHANNEL_ID, "Calls", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Incoming voice and video calls"
                 enableVibration(true)
             },
         )
@@ -77,5 +90,39 @@ object MessageNotifier {
             .build()
 
         nm.notify((conversationId ?: body).hashCode() and 0x7fffffff, notification)
+    }
+
+    fun showCall(
+        context: Context,
+        title: String,
+        body: String,
+        conversationId: String?,
+        callId: String,
+    ) {
+        if (!canPost(context)) return
+        ensureCallsChannel(context)
+        val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("incoming_call_id", callId)
+            if (!conversationId.isNullOrBlank()) putExtra("conversation_id", conversationId)
+        }
+        val pending = PendingIntent.getActivity(
+            context,
+            callId.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CALLS_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(title.ifBlank { "Incoming call" })
+            .setContentText(body)
+            .setAutoCancel(true)
+            .setContentIntent(pending)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .build()
+        nm.notify(callId.hashCode() and 0x7fffffff, notification)
     }
 }

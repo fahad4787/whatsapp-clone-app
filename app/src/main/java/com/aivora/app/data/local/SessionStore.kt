@@ -52,5 +52,7 @@ object SessionStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
         ChatListCache.clear(context)
         MessageCache.clear(context)
+        InMemoryCallHistoryStore.clear()
+        clearInMemoryListCaches()
     }
 }

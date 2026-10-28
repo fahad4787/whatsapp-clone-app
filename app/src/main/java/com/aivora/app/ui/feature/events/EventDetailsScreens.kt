@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.events
 
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -95,11 +97,11 @@ fun EventDetailsChatMessageScreen(
         SettingsList(
             listOf(
                 null to listOf(
-                    SettingsItem("Going", null, Icons.Default.Check, onClick = { }),
-                    SettingsItem("Maybe", null, Icons.Default.Info, onClick = { }),
-                    SettingsItem("Can't go", null, Icons.Default.Close, onClick = { }),
-                    SettingsItem("Edit event", null, Icons.Default.Edit, onClick = { onNavigate(Routes.EventEditChatMessage.replace("{chat}", "1").replace("{message}", "1")) }),
-                    SettingsItem("Cancel event", "Cancel this event?", Icons.Default.Delete, danger = true, onClick = { }),
+                    SettingsItem("Going", null, AppIcons.Check, onClick = { }),
+                    SettingsItem("Maybe", null, AppIcons.Info, onClick = { }),
+                    SettingsItem("Can't go", null, AppIcons.Close, onClick = { }),
+                    SettingsItem("Edit event", null, AppIcons.Edit, onClick = { onNavigate(Routes.EventEditChatMessage.replace("{chat}", "1").replace("{message}", "1")) }),
+                    SettingsItem("Cancel event", "Cancel this event?", AppIcons.Delete, danger = true, onClick = { }),
                 )
             )
         )

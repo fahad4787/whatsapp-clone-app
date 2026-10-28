@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.calls
 
+import com.aivora.app.ui.icons.AppIcons
+
 import android.media.AudioManager
 import android.media.RingtoneManager
 import android.os.Build
@@ -44,14 +46,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.call.ActiveCallSession
+import com.aivora.app.data.call.CallLog
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.navigation.Routes
+import com.aivora.app.ui.theme.AivoraColors
 import kotlinx.coroutines.launch
 
-private val WaBg = Color(0xFF0B141A)
-private val WaGreen = Color(0xFF00A884)
-private val WaRed = Color(0xFFF15C6D)
-private val WaMuted = Color(0xFF8696A0)
+/** Match Bolta Figma call chrome (light), not WhatsApp dark. */
+private val CallBg = AivoraColors.ChatWallpaperLight
+private val CallInk = Color(0xFF17182B)
+private val CallGreen = AivoraColors.Primary
+private val CallRed = Color(0xFFE64C53)
+private val CallMuted = AivoraColors.TextSecondary
 
 @Composable
 fun IncomingCallOverlay(
@@ -61,8 +67,17 @@ fun IncomingCallOverlay(
     val call = incoming ?: return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val name = call.caller?.name?.ifBlank { null } ?: "Incoming call"
+    val groupTitle = call.groupTitle?.ifBlank { null }
+    val name = groupTitle
+        ?: call.caller?.name?.ifBlank { null }
+        ?: "Incoming call"
     val isVideo = call.media.equals("video", ignoreCase = true)
+    val incomingLabel = when {
+        groupTitle != null && isVideo -> "Incoming group video call"
+        groupTitle != null -> "Incoming group voice call"
+        isVideo -> "Incoming video call"
+        else -> "Incoming voice call"
+    }
 
     CallSystemBars()
 
@@ -104,20 +119,24 @@ fun IncomingCallOverlay(
     fun decline() {
         scope.launch {
             val id = call.id ?: return@launch
+            CallLog.i("decline callId=$id")
             ActiveCallSession.clearIncoming()
             runCatching { NetworkModule.api().postCallsIdAction(id, "reject") }
+                .onFailure { CallLog.w("reject api failed callId=$id", it) }
         }
     }
 
     fun accept() {
         scope.launch {
             val id = call.id ?: return@launch
+            CallLog.i("accept callId=$id media=${call.media}")
             val result = runCatching {
                 NetworkModule.api().postCallsIdAction(id, "answer")
-            }.getOrNull()
+            }.onFailure { CallLog.e("answer api failed callId=$id", it) }.getOrNull()
             val token = result?.token
             val url = result?.livekitUrl
             if (token.isNullOrBlank() || url.isNullOrBlank()) {
+                CallLog.w("accept missing token/url callId=$id")
                 ActiveCallSession.clearIncoming()
                 return@launch
             }
@@ -136,7 +155,7 @@ fun IncomingCallOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(WaBg)
+            .background(CallBg)
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
@@ -148,38 +167,32 @@ fun IncomingCallOverlay(
         ) {
             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Lock, null, tint = WaMuted, modifier = Modifier.size(14.dp))
+                Icon(AppIcons.Lock, null, tint = CallMuted, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.size(6.dp))
-                Text("End-to-end encrypted", color = WaMuted, fontSize = 13.sp)
+                Text("End-to-end encrypted", color = CallMuted, fontSize = 13.sp)
             }
             Spacer(Modifier.height(48.dp))
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(200.dp)) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(224.dp)) {
                 Box(
                     Modifier
-                        .size(200.dp)
+                        .size(224.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.04f)),
+                        .background(AivoraColors.Primary.copy(alpha = 0.08f)),
                 )
-                Box(
-                    Modifier
-                        .size(168.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.06f)),
-                )
-                Avatar(name, size = 136)
+                Avatar(name, size = 160)
             }
             Spacer(Modifier.height(28.dp))
             Text(
                 name,
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Normal,
+                color = CallInk,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(10.dp))
             Text(
-                if (isVideo) "Incoming video call" else "Incoming voice call",
-                color = WaMuted,
+                incomingLabel,
+                color = CallMuted,
                 fontSize = 15.sp,
             )
 
@@ -196,28 +209,28 @@ fun IncomingCallOverlay(
                         modifier = Modifier
                             .size(64.dp)
                             .clip(CircleShape)
-                            .background(WaRed)
+                            .background(CallRed)
                             .clickable { decline() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Default.CallEnd, "Decline", tint = Color.White, modifier = Modifier.size(30.dp))
+                        Icon(AppIcons.CallEnd, "Decline", tint = Color.White, modifier = Modifier.size(30.dp))
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text("Decline", color = WaMuted, fontSize = 13.sp)
+                    Text("Decline", color = CallInk, fontSize = 13.sp)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
                             .size(64.dp)
                             .clip(CircleShape)
-                            .background(WaGreen)
+                            .background(CallGreen)
                             .clickable { accept() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Default.Call, "Accept", tint = Color.White, modifier = Modifier.size(30.dp))
+                        Icon(AppIcons.Call, "Accept", tint = Color.White, modifier = Modifier.size(30.dp))
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text("Accept", color = WaMuted, fontSize = 13.sp)
+                    Text("Accept", color = CallInk, fontSize = 13.sp)
                 }
             }
         }

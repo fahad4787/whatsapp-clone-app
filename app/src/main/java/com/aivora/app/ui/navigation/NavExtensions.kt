@@ -13,8 +13,8 @@ fun isDetailRoute(route: String?): Boolean {
 }
 
 /**
- * Navigate forward. Detail destinations skip launchSingleTop so enter/exit
- * animations always run (reopening the same chat still fades in).
+ * Navigate forward. Detail destinations skip launchSingleTop so reopening
+ * the same chat still creates a fresh entry.
  */
 fun NavHostController.navigateSingleTop(route: String) {
     val base = route.substringBefore('?')

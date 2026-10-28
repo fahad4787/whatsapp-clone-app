@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.chat
 
+import com.aivora.app.ui.icons.AppIcons
+
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -35,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,7 +47,9 @@ import com.aivora.app.data.local.LocalMediaKind
 import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.toLocalMessage
+import com.aivora.app.ui.components.AivoraNoOverscroll
 import com.aivora.app.ui.components.AivoraScaffold
+import com.aivora.app.ui.media.rememberSizedImageModel
 import com.aivora.app.ui.theme.AivoraColors
 
 private val tabs = listOf("Media", "Docs", "Links")
@@ -60,18 +65,42 @@ fun ChatMediaScreen(
     }
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
     var tab by remember { mutableIntStateOf(0) }
-    var items by remember { mutableStateOf<List<LocalMessage>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    fun seedFromChat(tabIndex: Int): List<LocalMessage> {
+        val msgs = com.aivora.app.data.local.InMemoryChatStore.messages(chatId).value
+        return when (tabIndex) {
+            0 -> msgs.filter {
+                it.mediaKind == LocalMediaKind.Image ||
+                    it.mediaKind == LocalMediaKind.Video ||
+                    it.mediaKind == LocalMediaKind.Audio
+            }.asReversed()
+            1 -> msgs.filter { it.mediaKind == LocalMediaKind.File }.asReversed()
+            else -> msgs.filter { it.linkPreview != null }.asReversed()
+        }
+    }
+    val initialItems = remember(chatId, tab) {
+        com.aivora.app.data.local.InMemoryMediaGalleryStore.get(chatId, tab) ?: seedFromChat(tab)
+    }
+    var items by remember(chatId, tab) { mutableStateOf(initialItems) }
+    var loading by remember(chatId, tab) {
+        mutableStateOf(initialItems.isEmpty() && useRemote)
+    }
 
     LaunchedEffect(chatId, tab, useRemote) {
-        loading = true
+        val warm = com.aivora.app.data.local.InMemoryMediaGalleryStore.get(chatId, tab)
+            ?: seedFromChat(tab).takeIf { it.isNotEmpty() }
+        if (warm != null) {
+            items = warm
+            loading = false
+        } else if (useRemote) {
+            loading = true
+        }
         if (!useRemote) {
-            items = emptyList()
+            items = warm.orEmpty()
             loading = false
             return@LaunchedEffect
         }
         val uid = SessionStore.userId(context).orEmpty()
-        items = runCatching {
+        val fresh = runCatching {
             when (tab) {
                 0 -> api.getConversationsIdMedia(chatId, type = "all", limit = 80)
                     .items
@@ -89,7 +118,9 @@ fun ChatMediaScreen(
                     .map { it.toLocalMessage(uid) }
                     .filter { it.linkPreview != null }
             }
-        }.getOrDefault(emptyList())
+        }.getOrDefault(warm.orEmpty())
+        com.aivora.app.data.local.InMemoryMediaGalleryStore.put(chatId, tab, fresh)
+        items = fresh
         loading = false
     }
 
@@ -148,6 +179,8 @@ fun ChatMediaScreen(
                 }
             }
             else -> {
+                val cellDp = (LocalConfiguration.current.screenWidthDp.dp - 24.dp) / 3
+                AivoraNoOverscroll {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     contentPadding = PaddingValues(8.dp),
@@ -155,7 +188,7 @@ fun ChatMediaScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(items, key = { it.id }) { msg ->
+                    items(items, key = { it.id }, contentType = { "media" }) { msg ->
                         Box(
                             modifier = Modifier
                                 .aspectRatio(1f)
@@ -175,14 +208,18 @@ fun ChatMediaScreen(
                             when (msg.mediaKind) {
                                 LocalMediaKind.Image, LocalMediaKind.Video -> {
                                     AsyncImage(
-                                        model = msg.mediaUri,
+                                        model = rememberSizedImageModel(
+                                            data = msg.mediaUri,
+                                            width = cellDp,
+                                            height = cellDp,
+                                        ),
                                         contentDescription = null,
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop,
                                     )
                                     if (msg.mediaKind == LocalMediaKind.Video) {
                                         Icon(
-                                            Icons.Default.PlayArrow,
+                                            AppIcons.PlayArrow,
                                             contentDescription = "Video",
                                             tint = MaterialTheme.colorScheme.onPrimary,
                                         )
@@ -190,13 +227,14 @@ fun ChatMediaScreen(
                                 }
                                 LocalMediaKind.Audio -> Text("♪", color = AivoraColors.Primary)
                                 else -> Icon(
-                                    Icons.Default.Description,
+                                    AppIcons.Description,
                                     contentDescription = null,
                                     tint = AivoraColors.Primary,
                                 )
                             }
                         }
                     }
+                }
                 }
             }
         }

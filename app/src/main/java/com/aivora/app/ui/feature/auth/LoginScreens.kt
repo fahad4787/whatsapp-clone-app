@@ -34,8 +34,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -70,6 +68,7 @@ import com.aivora.app.data.model.DeviceInfo
 import com.aivora.app.data.model.OtpRequestBody
 import com.aivora.app.data.model.OtpVerifyBody
 import com.aivora.app.ui.components.AivoraLogo
+import com.aivora.app.ui.components.AivoraNoOverscroll
 import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
@@ -134,21 +133,27 @@ fun LoginScreen(
             properties = DialogProperties(usePlatformDefaultWidth = true),
             title = { Text("Country") },
             text = {
-                LazyColumn(modifier = Modifier.height(280.dp)) {
-                    items(countries, key = { it.iso ?: it.dial ?: it.name.orEmpty() }) { row ->
-                        Text(
-                            "${row.name} (${row.dial})",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    country = row.name ?: country
-                                    dial = row.dial?.takeIf { it.isNotBlank() } ?: dial
-                                    pickCountry = false
-                                }
-                                .padding(vertical = 12.dp),
-                            fontSize = 16.sp,
-                            color = AivoraColors.Ink,
-                        )
+                AivoraNoOverscroll {
+                    Column(
+                        modifier = Modifier
+                            .height(280.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        countries.forEach { row ->
+                            Text(
+                                "${row.name} (${row.dial})",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        country = row.name ?: country
+                                        dial = row.dial?.takeIf { it.isNotBlank() } ?: dial
+                                        pickCountry = false
+                                    }
+                                    .padding(vertical = 12.dp),
+                                fontSize = 16.sp,
+                                color = AivoraColors.Ink,
+                            )
+                        }
                     }
                 }
             },

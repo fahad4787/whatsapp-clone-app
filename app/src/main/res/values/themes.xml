@@ -5,7 +5,10 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowBackground">@color/bg_app</item>
     </style>
-    <style name="Theme.Aivora.Splash" parent="Theme.Aivora">
-        <item name="android:windowBackground">@drawable/splash_background</item>
+    <!-- SplashScreen API — use real launcher adaptive icon (not aivora_mark). -->
+    <style name="Theme.Aivora.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/bg_app</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Aivora</item>
     </style>
 </resources>

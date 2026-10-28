@@ -22,6 +22,8 @@ object AivoraDimens {
     val AvatarProfile = 96.dp
     val BottomNavIcon = 22.dp
     val FabSize = 56.dp
+    /** Figma Settings “Action icon” instance. */
+    val SettingsIcon = 24.dp
     val ScreenHorizontal = 24.dp
     val CardHorizontal = 12.dp
 }

@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.chat
 
+import com.aivora.app.ui.icons.AppIcons
+
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -100,7 +102,7 @@ fun PollCreateScreen(
             navigationIcon = {
                 if (onBack != null) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(AppIcons.ArrowBack, contentDescription = "Back")
                     }
                 }
             },
@@ -163,7 +165,7 @@ fun PollCreateScreen(
                             enabled = options.size > 2,
                         ) {
                             Icon(
-                                Icons.Default.Close,
+                                AppIcons.Close,
                                 contentDescription = "Remove",
                                 tint = if (options.size > 2) {
                                     AivoraColors.Ink
@@ -188,7 +190,7 @@ fun PollCreateScreen(
                         .clickable { options.add("") },
                 ) {
                     Icon(
-                        Icons.Default.AddCircleOutline,
+                        AppIcons.AddCircleOutline,
                         contentDescription = null,
                         tint = AivoraColors.Primary,
                     )

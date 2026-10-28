@@ -21,14 +21,21 @@ android {
         buildConfigField("String", "WS_BASE_URL", "\"wss://whatsapp-clone-backend-hep1.onrender.com/ws/\"")
         // OTP stays for release / final; debug auto-verifies with 000000 (server OTP_DEV_BYPASS).
         buildConfigField("boolean", "DEV_AUTO_OTP", "false")
+        // LiveKit/WebRTC .so dominate APK; ship device ABIs only (Mate/Vivo). Emulator x86 needs a local override.
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
     }
 
     buildTypes {
         debug {
+            // Keep debug unminified — R8 debug slowed iteration; release still minifies.
+            isMinifyEnabled = false
             buildConfigField("boolean", "DEV_AUTO_OTP", "true")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             buildConfigField("boolean", "DEV_AUTO_OTP", "false")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -43,6 +50,19 @@ android {
         buildConfig = true
     }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    lint {
+        // ComponentActivity + Activity Result; lint falsely flags when Fragment is transitive-old.
+        disable += "InvalidFragmentVersionForActivityResult"
+    }
+}
+
+// Opt-in: ./gradlew :app:compileDebugKotlin -PcomposeCompilerReports=true
+// → app/build/compose_compiler/ (skippable / restartable reports for H1 cuts)
+composeCompiler {
+    if (project.findProperty("composeCompilerReports") == "true") {
+        metricsDestination.set(layout.buildDirectory.dir("compose_compiler"))
+        reportsDestination.set(layout.buildDirectory.dir("compose_compiler"))
+    }
 }
 
 dependencies {
@@ -53,12 +73,15 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
     implementation("androidx.navigation:navigation-compose:2.8.4")
     implementation("androidx.core:core-splashscreen:1.0.1")
+    // F13 — WhatsApp-style native recycle on hot lists (Mate-class fling).
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
@@ -71,7 +94,6 @@ dependencies {
 
     implementation("io.coil-kt.coil3:coil-compose:3.0.4")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     // BoM 33+ folds KTX into the main artifact

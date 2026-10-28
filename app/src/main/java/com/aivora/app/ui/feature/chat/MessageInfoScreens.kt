@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.chat
 
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -61,7 +61,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraScaffold
+import com.aivora.app.ui.components.AivoraScrollColumn
 import com.aivora.app.ui.components.EmptyState
+import androidx.compose.ui.unit.sp
 import com.aivora.app.ui.components.InfoBanner
 import com.aivora.app.ui.components.LinkButton
 import com.aivora.app.ui.components.PersonRow
@@ -98,14 +100,21 @@ fun MessageInfoChatMessageScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var info by remember(messageId) { mutableStateOf<MessageInfoDto?>(null) }
+    var info by remember(messageId) {
+        mutableStateOf(com.aivora.app.data.local.InMemoryMessageInfoStore.get(messageId))
+    }
     var failed by remember(messageId) { mutableStateOf(false) }
     LaunchedEffect(messageId) {
-        info = null
+        // Keep cached receipts painted — never wipe to spinner on reopen.
         failed = false
         runCatching { ChatRepository.api().getMessagesIdInfo(messageId) }
-            .onSuccess { info = it }
-            .onFailure { failed = true }
+            .onSuccess {
+                com.aivora.app.data.local.InMemoryMessageInfoStore.put(messageId, it)
+                info = it
+            }
+            .onFailure {
+                if (info == null) failed = true
+            }
     }
     AivoraScaffold(title = "Message info", onBack = onBack) {
         val loaded = info
@@ -113,35 +122,36 @@ fun MessageInfoChatMessageScreen(
             failed -> EmptyState(
                 title = "Couldn't load info",
                 body = "Check your connection and try again.",
-                icon = Icons.Default.Info,
+                icon = AppIcons.Info,
             )
             loaded == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = AivoraColors.Primary)
             }
-            else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                receiptSection("Read by", "No one has read this yet", loaded.read)
-                receiptSection("Delivered to", "Not delivered to anyone yet", loaded.delivered)
+            else -> {
+                AivoraScrollColumn(modifier = Modifier.fillMaxSize()) {
+                    ReceiptSection("Read by", "No one has read this yet", loaded.read)
+                    ReceiptSection("Delivered to", "Not delivered to anyone yet", loaded.delivered)
+                }
             }
         }
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.receiptSection(
+@Composable
+private fun ReceiptSection(
     title: String,
     emptyText: String,
     receipts: List<MessageReceiptDto>,
 ) {
-    item { SectionHeader(title) }
+    SectionHeader(title)
     if (receipts.isEmpty()) {
-        item {
-            Text(
-                emptyText,
-                color = AivoraColors.TextSecondary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
+        Text(
+            emptyText,
+            color = AivoraColors.TextSecondary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
     } else {
-        items(receipts) { r ->
+        receipts.forEach { r ->
             val name = r.displayName?.takeIf { it.isNotBlank() } ?: "Unknown"
             Row(
                 modifier = Modifier
@@ -153,7 +163,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.receiptSection(
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(name, fontWeight = FontWeight.SemiBold, color = AivoraColors.Ink)
                     formatReceiptTime(r.at)?.let {
-                        Text(it, color = AivoraColors.TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                        Text(it, color = AivoraColors.TextSecondary, fontSize = 13.sp)
                     }
                 }
             }

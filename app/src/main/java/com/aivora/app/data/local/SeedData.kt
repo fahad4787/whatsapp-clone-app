@@ -1,5 +1,8 @@
 package com.aivora.app.data.local
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class LocalChat(
     val id: String,
     val title: String,
@@ -18,6 +21,8 @@ data class LocalChat(
     val blockedMe: Boolean = false,
     /** Peer user id for 1:1 chats (reports / profile). */
     val peerUserId: String? = null,
+    /** Peer phone for contact info (display). */
+    val peerPhone: String? = null,
     /** Group: "admin" | "member". */
     val myRole: String? = null,
     val description: String? = null,
@@ -47,12 +52,14 @@ enum class MessageDeliveryStatus {
     Read,
 }
 
+@Immutable
 data class LocalReplyPreview(
     val id: String,
     val body: String,
     val deleted: Boolean = false,
 )
 
+@Immutable
 data class LocalReaction(
     val emoji: String,
     val count: Int,
@@ -66,6 +73,7 @@ enum class LocalMediaKind {
     File,
 }
 
+@Immutable
 data class LocalLinkPreview(
     val url: String,
     val title: String? = null,
@@ -74,8 +82,10 @@ data class LocalLinkPreview(
     val imageUrl: String? = null,
 )
 
+@Immutable
 data class LocalPollOption(val id: String, val text: String, val votes: Int, val mine: Boolean)
 
+@Immutable
 data class LocalPoll(
     val question: String,
     val multiple: Boolean,
@@ -84,10 +94,13 @@ data class LocalPoll(
     val options: List<LocalPollOption>,
 )
 
+@Immutable
 data class LocalContact(val name: String, val phones: List<String>, val userId: String?)
 
+@Immutable
 data class LocalLocation(val lat: Double, val lng: Double, val name: String?, val address: String?)
 
+@Immutable
 data class LocalEvent(
     val title: String,
     val description: String?,
@@ -102,6 +115,7 @@ data class LocalEvent(
     val myAnswer: String?,
 )
 
+@Immutable
 data class LocalMessage(
     val id: String,
     val mine: Boolean,

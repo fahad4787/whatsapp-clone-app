@@ -1,5 +1,7 @@
 package com.aivora.app.ui.components
 
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -48,6 +51,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.aivora.app.ui.icons.AivoraIconChrome
+import com.aivora.app.ui.icons.AivoraIconSlot
 import com.aivora.app.ui.theme.AivoraColors
 
 /**
@@ -169,7 +174,7 @@ fun AivoraBottomSheet(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
-                                    Icons.Default.Close,
+                                    AppIcons.Close,
                                     contentDescription = "Close",
                                     tint = AivoraColors.InkMuted,
                                     modifier = Modifier.size(16.dp),
@@ -213,23 +218,10 @@ fun AivoraSheetActionList(
                     .padding(horizontal = 18.dp, vertical = 15.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(
-                            (if (action.danger) AivoraColors.Danger else AivoraColors.Primary)
-                                .copy(alpha = 0.14f),
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        action.icon,
-                        contentDescription = null,
-                        tint = if (action.danger) AivoraColors.Danger else AivoraColors.Primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
+                AivoraIconSlot(
+                    chrome = if (action.danger) AivoraIconChrome.SheetListDanger else AivoraIconChrome.SheetList,
+                    imageVector = action.icon,
+                )
                 Spacer(Modifier.width(16.dp))
                 Text(
                     action.label,
@@ -272,20 +264,10 @@ fun AivoraSheetActionGrid(
                             .padding(vertical = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(AivoraColors.SoftMint),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                action.icon,
-                                contentDescription = null,
-                                tint = AivoraColors.Primary,
-                                modifier = Modifier.size(26.dp),
-                            )
-                        }
+                        AivoraIconSlot(
+                            chrome = AivoraIconChrome.SheetTile,
+                            imageVector = action.icon,
+                        )
                         Spacer(Modifier.height(8.dp))
                         Text(
                             action.label,

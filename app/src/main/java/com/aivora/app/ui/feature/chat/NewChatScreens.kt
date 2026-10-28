@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.chat
 
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,7 +52,7 @@ fun NewChatScreen(
                 onClick = { onNavigate(Routes.NewGroup) },
                 containerColor = AivoraColors.Primary,
                 contentColor = AivoraColors.OnPrimary,
-            ) { Icon(Icons.Default.Add, contentDescription = null) }
+            ) { Icon(AppIcons.Add, contentDescription = null) }
         },
     ) {
         InfoBanner("All registered users — tap to chat, or filter with search")

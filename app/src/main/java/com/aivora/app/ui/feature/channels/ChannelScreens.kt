@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.channels
 
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -52,8 +54,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.key
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraScaffold
+import com.aivora.app.ui.components.AivoraScrollColumn
 import com.aivora.app.ui.components.EmptyState
 import com.aivora.app.ui.components.InfoBanner
 import com.aivora.app.ui.components.LinkButton
@@ -95,12 +99,12 @@ fun ChannelSlugScreen(
         title = title,
         onBack = onBack,
         actions = {
-            IconButton(onClick = { }) { Icon(Icons.Default.Search, null) }
-            IconButton(onClick = { }) { Icon(Icons.Default.MoreVert, null) }
+            IconButton(onClick = { }) { Icon(AppIcons.Search, null) }
+            IconButton(onClick = { }) { Icon(AppIcons.MoreVert, null) }
         },
         fab = {
             FloatingActionButton(onClick = { }, containerColor = AivoraColors.Primary, contentColor = AivoraColors.OnPrimary) {
-                Icon(Icons.Default.Edit, contentDescription = "New channel post")
+                Icon(AppIcons.Edit, contentDescription = "New channel post")
             }
         },
     ) {
@@ -110,18 +114,27 @@ fun ChannelSlugScreen(
             "Today's briefing is live.",
             "Tap follow to get notified.",
         )
-        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(posts) { p ->
-                Column(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                    Text(p, style = MaterialTheme.typography.bodyLarge)
-                    Text("View count · Reactions", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        AivoraScrollColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            posts.forEach { p ->
+                key(p) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+                        Text(p, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "View count · Reactions",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
-            item {
-                PrimaryButton("Follow channel", onClick = { })
-                Spacer(Modifier.height(8.dp))
-                LinkButton("Report this channel") { }
-            }
+            PrimaryButton("Follow channel", onClick = { })
+            Spacer(Modifier.height(8.dp))
+            LinkButton("Report this channel") { }
         }
     }
 }

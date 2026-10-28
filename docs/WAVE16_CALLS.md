@@ -1,7 +1,7 @@
 # Wave 16 — Calls (LiveKit Cloud)
 
-Date: 2026-10-26  
-Status: **16.2 in progress**  
+Date: 2026-10-27  
+Status: **16.4 done** — next roadmap: [`WAVE17_PLUS.md`](WAVE17_PLUS.md)  
 Hosting: **LiveKit Cloud free (Build) tier**
 
 ## Setup
@@ -17,32 +17,35 @@ LIVEKIT_API_SECRET=…
 | # | Feature | Status |
 |---|---------|--------|
 | 16.1 | 1:1 audio/video + ring/answer/end | Done |
-| 16.2 | Polish: WhatsApp-like UI, sync end/decline, single timer, history + Calls tab | In progress |
-| 16.3 | Group / scheduled calls | Later |
-| 16.4 | Admin live-calls view | Later |
+| 16.2 | Polish: Bolta call UI, sync end/decline, history + Calls tab, system notices | Done |
+| 16.3 | Group / scheduled calls | Done |
+| 16.4 | Admin live-calls view | Done |
 
-## 16.2 use cases
+## 16.4 — Admin live calls
 
-1. Start voice/video from chat header  
-2. Incoming full-screen Accept / Decline (ringtone)  
-3. Decline → both sides leave (no connect)  
-4. Cancel / hang up while ringing → peer dismisses  
-5. No answer timeout → both leave + missed in history  
-6. In-call: mute, speaker/camera, hang up — icon-only controls, one timer  
-7. Calls tab: live history (all / missed / voice / video) + call back  
-
-## APIs
+### APIs
 
 | Method | Path | Notes |
 |--------|------|-------|
-| POST | `/api/calls` | start |
-| GET | `/api/calls/:id` | detail |
-| POST | `/api/calls/:id/:action` | `answer` \| `reject` \| `end` |
-| GET | `/api/calls/history` | recent calls for me |
+| GET | `/api/admin/calls/live` | RINGING + ACTIVE |
+| GET | `/api/admin/calls` | History; `?q=&status=&media=&limit=` |
+| POST | `/api/admin/calls/:id/end` | Force-end (`admin_force_end`) |
 
-## Exit checks (16.2)
+Metrics also expose `calls_active` and `calls_today`.
 
-- [ ] Decline never puts either side into Connected  
-- [ ] Cancel/no-answer clears the other device’s call UI  
-- [ ] One timer only when live  
-- [ ] Calls tab shows real history; tap redials  
+### Admin UI
+
+- **Live calls** (`/live`): SSE stream (`GET /api/admin/calls/stream?token=`), Force end, no Refresh button  
+- **Call history** (`/calls`): search + filters; reloads on call stream events  
+- **Dashboard**: active/today call counters from stream + 30s metrics poll  
+
+### Realtime
+
+Call create / answer / reject / end / timeout / admin force-end emit `callBus.changed()` → SSE clients get a fresh live snapshot.
+
+### Exit checks
+
+- [x] Live list shows ringing/active rooms  
+- [x] Force-end notifies participants via `call.ended`  
+- [x] History searchable by phone/name/room/id  
+- [x] Metrics include call counters  

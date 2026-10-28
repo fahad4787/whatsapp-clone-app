@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.chat
 
+import com.aivora.app.ui.icons.AppIcons
+
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.material.icons.Icons
@@ -218,7 +220,7 @@ object ChatControls {
             add(
                 AivoraSheetAction(
                     if (chat.isGroup) "Group info" else "Contact info",
-                    Icons.Default.Person,
+                    AppIcons.Person,
                 ) {
                     onDismiss()
                     view()
@@ -227,7 +229,7 @@ object ChatControls {
         }
         if (onScheduleCall != null && !chat.isGroup) {
             add(
-                AivoraSheetAction("Schedule call", Icons.Default.Event) {
+                AivoraSheetAction("Schedule call", AppIcons.Event) {
                     onDismiss()
                     onScheduleCall()
                 },
@@ -235,7 +237,7 @@ object ChatControls {
         }
         if (onExport != null) {
             add(
-                AivoraSheetAction("Export chat", Icons.Default.Upload) {
+                AivoraSheetAction("Export chat", AppIcons.Upload) {
                     onDismiss()
                     onExport()
                 },
@@ -243,7 +245,7 @@ object ChatControls {
         }
         if (includeSearch && onSearch != null) {
             add(
-                AivoraSheetAction("Search", Icons.Default.Search) {
+                AivoraSheetAction("Search", AppIcons.Search) {
                     onDismiss()
                     onSearch()
                 },
@@ -252,7 +254,7 @@ object ChatControls {
         add(
             AivoraSheetAction(
                 if (chat.isMuted) "Unmute" else "Mute notifications",
-                if (chat.isMuted) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
+                if (chat.isMuted) AppIcons.NotificationsActive else AppIcons.NotificationsOff,
             ) {
                 onDismiss()
                 scope.launch {
@@ -266,7 +268,7 @@ object ChatControls {
         add(
             AivoraSheetAction(
                 if (chat.pinned) "Unpin" else "Pin",
-                Icons.Default.PushPin,
+                AppIcons.PushPin,
             ) {
                 onDismiss()
                 scope.launch {
@@ -280,7 +282,7 @@ object ChatControls {
         add(
             AivoraSheetAction(
                 if (chat.favorite) "Remove from favourites" else "Add to favourites",
-                if (chat.favorite) Icons.Default.Star else Icons.Default.StarBorder,
+                if (chat.favorite) AppIcons.Star else AppIcons.StarBorder,
             ) {
                 onDismiss()
                 scope.launch {
@@ -293,7 +295,7 @@ object ChatControls {
         )
         if (onWallpaper != null) {
             add(
-                AivoraSheetAction("Chat wallpaper", Icons.Default.Wallpaper) {
+                AivoraSheetAction("Chat wallpaper", AppIcons.Wallpaper) {
                     onDismiss()
                     onWallpaper()
                 },
@@ -302,7 +304,7 @@ object ChatControls {
         add(
             AivoraSheetAction(
                 if (chat.archived) "Unarchive" else "Archive",
-                if (chat.archived) Icons.Default.Unarchive else Icons.Default.Archive,
+                if (chat.archived) AppIcons.Unarchive else AppIcons.Archive,
             ) {
                 onDismiss()
                 val willArchive = !chat.archived
@@ -318,7 +320,7 @@ object ChatControls {
         )
         if (includeReport && onReport != null) {
             add(
-                AivoraSheetAction("Report", Icons.Default.Flag, danger = true) {
+                AivoraSheetAction("Report", AppIcons.Flag, danger = true) {
                     onDismiss()
                     onReport()
                 },
@@ -327,7 +329,7 @@ object ChatControls {
         if (!chat.isGroup) {
             if (chat.blockedByMe) {
                 add(
-                    AivoraSheetAction("Unblock", Icons.Default.Block) {
+                    AivoraSheetAction("Unblock", AppIcons.Block) {
                         onDismiss()
                         scope.launch {
                             val ok = unblock(api, useRemote, chat)
@@ -341,7 +343,7 @@ object ChatControls {
                 )
             } else {
                 add(
-                    AivoraSheetAction("Block", Icons.Default.Block, danger = true) {
+                    AivoraSheetAction("Block", AppIcons.Block, danger = true) {
                         onDismiss()
                         scope.launch {
                             val ok = block(api, useRemote, chat)
@@ -357,12 +359,78 @@ object ChatControls {
         }
         if (includeClear && onClear != null) {
             add(
-                AivoraSheetAction("Clear chat", Icons.Default.Delete, danger = true) {
+                AivoraSheetAction("Clear chat", AppIcons.Delete, danger = true) {
                     onDismiss()
                     onClear()
                 },
             )
         }
+    }
+
+    /**
+     * Chat header ⋮ — common actions only (Figma header has call/video; details page
+     * owns schedule / export / pin / favourite / archive / block / report).
+     */
+    fun headerOverflowMenuItems(
+        chat: LocalChat,
+        scope: CoroutineScope,
+        context: Context,
+        api: AivoraApi,
+        useRemote: Boolean,
+        onDismiss: () -> Unit,
+        onSearch: () -> Unit,
+        onClear: () -> Unit,
+        onViewInfo: () -> Unit,
+        onMedia: () -> Unit,
+        onWallpaper: () -> Unit,
+    ): List<OverflowMenuItem> = buildList {
+        add(
+            OverflowMenuItem(
+                if (chat.isGroup) "Group info" else "Contact info",
+                AppIcons.Person,
+            ) {
+                onDismiss()
+                onViewInfo()
+            },
+        )
+        add(
+            OverflowMenuItem("Search", AppIcons.Search) {
+                onDismiss()
+                onSearch()
+            },
+        )
+        add(
+            OverflowMenuItem(
+                if (chat.isMuted) "Unmute" else "Mute",
+                if (chat.isMuted) AppIcons.NotificationsActive else AppIcons.NotificationsOff,
+            ) {
+                onDismiss()
+                scope.launch {
+                    val ok = toggleMute(api, useRemote, chat)
+                    if (!ok) {
+                        Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+        )
+        add(
+            OverflowMenuItem("Media", AppIcons.Photo) {
+                onDismiss()
+                onMedia()
+            },
+        )
+        add(
+            OverflowMenuItem("Wallpaper", AppIcons.Wallpaper) {
+                onDismiss()
+                onWallpaper()
+            },
+        )
+        add(
+            OverflowMenuItem("Clear chat", AppIcons.Delete, danger = true) {
+                onDismiss()
+                onClear()
+            },
+        )
     }
 
     /** Same actions as [sheetActions], shaped for the chat ⋮ overflow menu. */
@@ -411,7 +479,7 @@ object ChatControls {
             val insertAt = sheets.indexOfFirst { it.label == "Search" }.let { if (it < 0) 1 else it + 1 }
             sheets.add(
                 insertAt.coerceAtMost(sheets.size),
-                AivoraSheetAction("Media", Icons.Default.Photo) {
+                AivoraSheetAction("Media", AppIcons.Photo) {
                     onDismiss()
                     onMedia()
                 },
@@ -421,7 +489,7 @@ object ChatControls {
         if (onBlockRequest != null && !chat.blockedByMe && !chat.isGroup) {
             val idx = sheets.indexOfFirst { it.label == "Block" }
             if (idx >= 0) {
-                sheets[idx] = AivoraSheetAction("Block", Icons.Default.Block, danger = true) {
+                sheets[idx] = AivoraSheetAction("Block", AppIcons.Block, danger = true) {
                     onDismiss()
                     onBlockRequest()
                 }

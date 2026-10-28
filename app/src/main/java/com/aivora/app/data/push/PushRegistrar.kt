@@ -6,6 +6,7 @@ import android.util.Log
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.PushTokenBody
+import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,7 @@ object PushRegistrar {
         if (token.isNullOrBlank()) return
         scope.launch {
             try {
+                ensureFirebase(context.applicationContext)
                 val fcmToken = FirebaseMessaging.getInstance().token.await()
                 if (fcmToken.isNullOrBlank()) return@launch
                 registerToken(context, fcmToken)
@@ -35,6 +37,7 @@ object PushRegistrar {
         val access = SessionStore.accessToken(context) ?: return
         scope.launch {
             try {
+                ensureFirebase(context.applicationContext)
                 val api = NetworkModule.api(NetworkModule.okHttp { access })
                 api.putMePushToken(
                     PushTokenBody(
@@ -48,5 +51,13 @@ object PushRegistrar {
                 Log.w(TAG, "Failed to register push token", e)
             }
         }
+    }
+
+    /** FirebaseInitProvider removed for cold start — init once before FCM use. */
+    private fun ensureFirebase(appContext: Context) {
+        if (FirebaseApp.getApps(appContext).isEmpty()) {
+            FirebaseApp.initializeApp(appContext)
+        }
+        FirebaseMessaging.getInstance().isAutoInitEnabled = true
     }
 }

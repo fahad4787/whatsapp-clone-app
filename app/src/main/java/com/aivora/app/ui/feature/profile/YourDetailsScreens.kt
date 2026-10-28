@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.profile
 
+import com.aivora.app.ui.icons.AppIcons
+
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -84,16 +86,22 @@ fun YourDetailsScreen(
         NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
     }
 
-    var name by remember { mutableStateOf("") }
-    var about by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
+    val cachedMe = remember { com.aivora.app.data.local.InMemoryMeStore.me }
+    var name by remember { mutableStateOf(cachedMe?.displayName.orEmpty()) }
+    var about by remember { mutableStateOf(cachedMe?.about.orEmpty()) }
+    var phone by remember {
+        mutableStateOf(cachedMe?.phone?.ifBlank { null } ?: SessionStore.phone(context).orEmpty())
+    }
     var links by remember { mutableStateOf("") }
-    var avatarUrl by remember { mutableStateOf<String?>(null) }
+    var avatarUrl by remember { mutableStateOf(cachedMe?.avatarUrl) }
     var editingField by remember { mutableStateOf<String?>(null) }
     var showEditPhoto by remember { mutableStateOf(false) }
     var showCrop by remember { mutableStateOf(false) }
     var photoUri by remember { mutableStateOf<String?>(null) }
-    var loading by remember { mutableStateOf(true) }
+    // Spinner only when we have nothing cached to paint.
+    var loading by remember {
+        mutableStateOf(cachedMe == null && name.isBlank() && phone.isBlank())
+    }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -113,16 +121,25 @@ fun YourDetailsScreen(
         about = aboutText.orEmpty()
         phone = phoneText.orEmpty()
         avatarUrl = avatar
+        com.aivora.app.data.local.InMemoryMeStore.replace(displayName, aboutText, phoneText, avatar)
     }
 
     LaunchedEffect(Unit) {
-        loading = true
+        val warm = com.aivora.app.data.local.InMemoryMeStore.me
+        if (warm != null) {
+            applyUser(warm.displayName, warm.about, warm.phone, warm.avatarUrl)
+            loading = false
+        } else if (name.isNotBlank() || phone.isNotBlank()) {
+            loading = false
+        } else {
+            loading = true
+        }
         error = null
         try {
             val me = api.getMe()
             applyUser(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
         } catch (e: Exception) {
-            error = e.message ?: "Could not load profile"
+            if (name.isBlank()) error = e.message ?: "Could not load profile"
         } finally {
             loading = false
         }
@@ -175,9 +192,9 @@ fun YourDetailsScreen(
         ) {
             AivoraSheetActionList(
                 actions = listOf(
-                    AivoraSheetAction("Take photo", Icons.Default.CameraAlt, onClick = media.takePhoto),
-                    AivoraSheetAction("Choose photo", Icons.Default.PhotoLibrary, onClick = media.pickGallery),
-                    AivoraSheetAction("Delete photo", Icons.Default.Delete, danger = true) {
+                    AivoraSheetAction("Take photo", AppIcons.CameraAlt, onClick = media.takePhoto),
+                    AivoraSheetAction("Choose photo", AppIcons.PhotoLibrary, onClick = media.pickGallery),
+                    AivoraSheetAction("Delete photo", AppIcons.Delete, danger = true) {
                         showEditPhoto = false
                         saving = true
                         scope.launch {
@@ -436,14 +453,14 @@ private fun EditPhotoCropScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             IconButton(onClick = onCancel, enabled = !busy) {
-                Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color.White)
+                Icon(AppIcons.Close, contentDescription = "Cancel", tint = Color.White)
             }
             Text("Move and scale", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             IconButton(onClick = onDone, enabled = !busy) {
                 if (busy) {
                     CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp, color = AivoraColors.Primary)
                 } else {
-                    Icon(Icons.Default.Check, contentDescription = "Done", tint = AivoraColors.Primary)
+                    Icon(AppIcons.Check, contentDescription = "Done", tint = AivoraColors.Primary)
                 }
             }
         }

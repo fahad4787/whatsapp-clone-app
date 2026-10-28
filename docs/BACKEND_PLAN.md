@@ -1,7 +1,7 @@
 # Backend build plan (feature-by-feature)
 
 Date: 2026-10-22  
-Status: **MVP Waves 0–8 done.** Next: full chat — see `CHAT_FULL_PLAN.md` (Waves 9–15).
+Status: **MVP 0–8 + chat 9–15 + calls 16 done.** Next: `WAVE17_PLUS.md` (export, status, call links, admin ops…).
 
 ## Locked constraints
 

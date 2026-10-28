@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.community
 
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -100,11 +102,11 @@ fun CommunityIdScreen(
         SettingsList(
             listOf(
                 "Announcement" to listOf(
-                    SettingsItem("Community announcements", "Everyone in the community", Icons.Default.Groups, onClick = { onNavigate(Routes.ChatId.replace("{id}", "ann")) }),
+                    SettingsItem("Community announcements", "Everyone in the community", AppIcons.Groups, onClick = { onNavigate(Routes.ChatId.replace("{id}", "ann")) }),
                 ),
                 "Groups" to listOf(
-                    SettingsItem("General", "128 members", Icons.Default.Groups, onClick = { onNavigate(Routes.ChatId.replace("{id}", "g1")) }),
-                    SettingsItem("Events", "42 members", Icons.Default.Event, onClick = { onNavigate(Routes.ChatId.replace("{id}", "g2")) }),
+                    SettingsItem("General", "128 members", AppIcons.Groups, onClick = { onNavigate(Routes.ChatId.replace("{id}", "g1")) }),
+                    SettingsItem("Events", "42 members", AppIcons.Event, onClick = { onNavigate(Routes.ChatId.replace("{id}", "g2")) }),
                 ),
             )
         )

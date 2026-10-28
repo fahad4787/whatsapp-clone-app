@@ -1,10 +1,11 @@
 package com.aivora.app.ui.feature.home
 
-import androidx.compose.foundation.ExperimentalFoundationApi
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Videocam
@@ -65,11 +67,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -90,12 +96,20 @@ import com.aivora.app.data.local.InMemoryStatusStore
 import com.aivora.app.data.local.LocalChat
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.ReportRequestBody
+import com.aivora.app.data.realtime.PresenceLifecycle
 import com.aivora.app.data.realtime.RealtimeClient
 import com.aivora.app.ui.components.AivoraBottomNav
 import com.aivora.app.ui.components.AivoraBottomSheet
 import com.aivora.app.ui.components.AivoraFilterBar
 import com.aivora.app.ui.components.AivoraFilterOption
+import com.aivora.app.ui.components.AivoraNoOverscroll
 import com.aivora.app.ui.components.AivoraOverflowMenu
+import com.aivora.app.ui.perf.CallListAdapter
+import com.aivora.app.ui.perf.CallListItem
+import com.aivora.app.ui.perf.ChatListAdapter
+import com.aivora.app.ui.perf.LockedChatsFooterAdapter
+import com.aivora.app.ui.perf.RecyclerHost
+import androidx.recyclerview.widget.ConcatAdapter
 import com.aivora.app.ui.components.AivoraSheetActionList
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.ClearCallLogDialog
@@ -119,6 +133,17 @@ private enum class ChatFilter(val label: String) {
     Groups("Groups"),
     Archived("Archived"),
 }
+
+@androidx.compose.runtime.Immutable
+private data class CallRow(
+    val id: String,
+    val name: String,
+    val detail: String,
+    val missed: Boolean,
+    val video: Boolean,
+    val time: String,
+    val conversationId: String?,
+)
 
 private enum class CallFilter(val label: String) {
     All("All"),
@@ -162,13 +187,16 @@ fun HomeScreen(
             InMemoryChatStore.useOfflineSeed()
             return@LaunchedEffect
         }
-        // Paint cached list immediately (WhatsApp-style cold start).
-        InMemoryChatStore.hydrateFromCache(
-            com.aivora.app.data.local.ChatListCache.load(context),
-        )
-        // Warm in-memory threads from disk so reopen is instant (no black wait).
-        ChatRepository.hydrateRecentFromDisk(context)
-        // WS first — calls use toUser over the socket; waiting for HTTP left a miss window.
+        // PERF C2: prefs + message-file hydrate off Main; StateFlow still updates UI.
+        // StartupWarm often already filled the list — these are no-ops when warm.
+        withContext(Dispatchers.IO) {
+            InMemoryChatStore.hydrateFromCache(
+                com.aivora.app.data.local.ChatListCache.load(context),
+            )
+            ChatRepository.hydrateRecentFromDisk(context)
+        }
+        // WS after first paint (PresenceLifecycle.allowConnect); idempotent if already up.
+        PresenceLifecycle.allowConnect(context)
         RealtimeClient.startFromSession(context)
         // Defer HTTP so first home frames are not competing with list fetch (PERF F8).
         kotlinx.coroutines.delay(100)
@@ -178,7 +206,7 @@ fun HomeScreen(
                 runCatching { api.getMe().id?.let { SessionStore.saveUserId(context, it) } }
             }
             ChatRepository.refreshConversations(context)
-            ChatRepository.hydrateRecentFromDisk(context)
+            ChatRepository.hydrateRecentFromDiskAsync(context)
             // Prefetch uncached top chats in background (first-open black screen).
             launch { ChatRepository.warmRecentThreads(context) }
         } catch (_: Exception) {
@@ -239,7 +267,7 @@ fun HomeScreen(
                     when (settled) {
                         0 -> {
                             IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
-                                Icon(Icons.Default.CameraAlt, contentDescription = "Camera")
+                                Icon(AppIcons.CameraAlt, contentDescription = "Camera")
                             }
                             Box {
                                 IconButton(onClick = { menuOpen = true }) {
@@ -252,22 +280,22 @@ fun HomeScreen(
                                     expanded = menuOpen,
                                     onDismiss = { menuOpen = false },
                                     items = listOf(
-                                        OverflowMenuItem("New group", Icons.Default.GroupAdd) {
+                                        OverflowMenuItem("New group", AppIcons.GroupAdd) {
                                             onNavigate(Routes.NewGroup)
                                         },
-                                        OverflowMenuItem("Chat privacy", Icons.Default.Lock) {
+                                        OverflowMenuItem("Chat privacy", AppIcons.Lock) {
                                             onNavigate(Routes.SettingsPrivacy)
                                         },
-                                        OverflowMenuItem("Favourites", Icons.Default.Star) {
+                                        OverflowMenuItem("Favourites", AppIcons.Star) {
                                             filter = ChatFilter.Favourites
                                             scope.launch {
                                                 pagerState.animateScrollToPage(0, animationSpec = pageSnap)
                                             }
                                         },
-                                        OverflowMenuItem("Linked devices", Icons.Outlined.Devices) {
+                                        OverflowMenuItem("Linked devices", AppIcons.Devices) {
                                             onNavigate(Routes.SettingsDevices)
                                         },
-                                        OverflowMenuItem("Settings", Icons.Default.Settings) {
+                                        OverflowMenuItem("Settings", AppIcons.Settings) {
                                             onNavigate(Routes.SettingsProfile)
                                         },
                                     ),
@@ -286,7 +314,10 @@ fun HomeScreen(
                                     expanded = menuOpen,
                                     onDismiss = { menuOpen = false },
                                     items = listOf(
-                                        OverflowMenuItem("Settings", Icons.Default.Settings) {
+                                        OverflowMenuItem("Status privacy", AppIcons.Lock) {
+                                            onNavigate(Routes.SettingsPrivacyStatus)
+                                        },
+                                        OverflowMenuItem("Settings", AppIcons.Settings) {
                                             onNavigate(Routes.SettingsProfile)
                                         },
                                     ),
@@ -302,10 +333,10 @@ fun HomeScreen(
                                     expanded = menuOpen,
                                     onDismiss = { menuOpen = false },
                                     items = listOf(
-                                        OverflowMenuItem("Create call link", Icons.Default.Link) {
+                                        OverflowMenuItem("Create call link", AppIcons.Link) {
                                             showCreateCallLink = true
                                         },
-                                        OverflowMenuItem("Clear call log", Icons.Default.Delete, danger = true) {
+                                        OverflowMenuItem("Clear call log", AppIcons.Delete, danger = true) {
                                             showClearCallLog = true
                                         },
                                     ),
@@ -349,11 +380,11 @@ fun HomeScreen(
                     haptics.tick()
                     onNavigate(Routes.NewChat)
                 }
-                1 -> HomeFab(Icons.Default.CameraAlt, "Camera status") {
+                1 -> HomeFabRes(AivoraIcons.Camera, "Camera status") {
                     haptics.tick()
                     onNavigate(Routes.camera("status"))
                 }
-                2 -> HomeFab(Icons.Default.Call, "New call") {
+                2 -> HomeFabRes(AivoraIcons.Call, "New call") {
                     haptics.tick()
                     onNavigate(Routes.NewCall)
                 }
@@ -386,11 +417,13 @@ fun HomeScreen(
                         haptics.tick()
                         onNavigate(Routes.ChatId.replace("{id}", id))
                     },
+                    selected = pagerState.currentPage == 0,
                 )
                 1 -> StatusTab(
                     query = query,
                     onQueryChange = { query = it },
                     onNavigate = onNavigate,
+                    selected = pagerState.currentPage == 1,
                 )
                 2 -> CallsTab(
                     query = query,
@@ -399,6 +432,7 @@ fun HomeScreen(
                     onFilterChange = { callFilter = it },
                     onNavigate = onNavigate,
                     callLogCleared = callLogCleared,
+                    selected = pagerState.currentPage == 2,
                 )
                 else -> ProfileTab(
                     query = query,
@@ -454,7 +488,7 @@ private fun HomeFabRes(
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChatsTab(
     query: String,
@@ -463,6 +497,7 @@ private fun ChatsTab(
     onFilterChange: (ChatFilter) -> Unit,
     onNavigate: (String) -> Unit,
     onOpenChat: (String) -> Unit,
+    selected: Boolean = true,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -472,7 +507,12 @@ private fun ChatsTab(
         NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
     }
     var menuChat by remember { mutableStateOf<LocalChat?>(null) }
-    val allChats by InMemoryChatStore.chats.collectAsState()
+    // PERF M6: stop collecting chat list while another home tab is settled.
+    var allChats by remember { mutableStateOf(InMemoryChatStore.chats.value) }
+    LaunchedEffect(selected) {
+        if (!selected) return@LaunchedEffect
+        InMemoryChatStore.chats.collect { allChats = it }
+    }
 
     val chats = remember(allChats, query, filter) {
         allChats
@@ -525,121 +565,42 @@ private fun ChatsTab(
             onSelect = { onFilterChange(barFilters[it]) },
         )
         Spacer(Modifier.height(4.dp))
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 2.dp, bottom = 8.dp),
-        ) {
-            if (chats.isEmpty()) {
-                item {
-                    Text(
-                        "No chats here",
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            items(chats, key = { it.id }) { chat ->
-                // `chats` is already filtered from allChats — use row directly (no O(n) find).
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .combinedClickable(
-                            onClick = { onOpenChat(chat.id) },
-                            onLongClick = {
-                                haptics.tick()
-                                menuChat = chat
-                            },
-                        )
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Avatar(chat.title, size = 52)
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                chat.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = AivoraColors.Ink,
-                                modifier = Modifier.weight(1f, fill = false),
-                            )
-                            if (chat.pinned) {
-                                Spacer(Modifier.width(6.dp))
-                                Icon(
-                                    Icons.Default.PushPin,
-                                    contentDescription = "Pinned",
-                                    tint = AivoraColors.TextSecondary,
-                                    modifier = Modifier.size(14.dp),
-                                )
-                            }
-                            if (chat.isMuted) {
-                                Spacer(Modifier.width(6.dp))
-                                Icon(
-                                    Icons.Default.NotificationsOff,
-                                    contentDescription = "Muted",
-                                    tint = AivoraColors.TextSecondary,
-                                    modifier = Modifier.size(14.dp),
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            chat.preview,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = AivoraColors.TextSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            chat.time,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 12.sp,
-                            color = if (chat.unread > 0) AivoraColors.Primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (chat.unread > 0) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            UnreadBadge(chat.unread)
-                        }
-                    }
-                }
-            }
-            if (filter == ChatFilter.All) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigate(Routes.LockedChats) }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(52.dp)
-                                .clip(CircleShape)
-                                .background(AivoraColors.Primary.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Default.Lock, null, tint = AivoraColors.Primary)
-                        }
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column {
-                            Text("Locked chats", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                            Text(
-                                "Authenticate to unlock",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
+        val openChatState = rememberUpdatedState(onOpenChat)
+        val navigateState = rememberUpdatedState(onNavigate)
+        val chatAdapter = remember {
+            ChatListAdapter(
+                onOpen = { id -> openChatState.value(id) },
+                onLongPress = { chat ->
+                    haptics.tick()
+                    menuChat = chat
+                },
+            )
+        }
+        val lockedFooter = remember {
+            LockedChatsFooterAdapter { navigateState.value(Routes.LockedChats) }
+        }
+        lockedFooter.visible = filter == ChatFilter.All
+        val homeConcat = remember { ConcatAdapter(chatAdapter, lockedFooter) }
+        if (chats.isEmpty() && filter != ChatFilter.All) {
+            Text(
+                "No chats here",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                color = AivoraColors.TextSecondary,
+            )
+        } else {
+            RecyclerHost(
+                modifier = Modifier.fillMaxSize(),
+                onRecyclerReady = { rv ->
+                    rv.adapter = homeConcat
+                    val d = rv.resources.displayMetrics.density
+                    rv.setPadding(0, (2 * d).toInt(), 0, (8 * d).toInt())
+                },
+                update = { rv ->
+                    if (rv.adapter !== homeConcat) rv.adapter = homeConcat
+                    lockedFooter.visible = filter == ChatFilter.All
+                    chatAdapter.submitList(chats)
+                },
+            )
         }
     }
 
@@ -741,6 +702,82 @@ private fun HomeSearchBar(
 }
 
 @Composable
+private fun HomeChatRow(
+    chat: LocalChat,
+    onOpen: () -> Unit,
+    onLongPress: () -> Unit,
+) {
+    val open by rememberUpdatedState(onOpen)
+    val longPress by rememberUpdatedState(onLongPress)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(chat.id) {
+                detectTapGestures(
+                    onTap = { open() },
+                    onLongPress = { longPress() },
+                )
+            }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Avatar(chat.title, size = 52)
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    chat.title,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = AivoraColors.Ink,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (chat.pinned) {
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        AppIcons.PushPin,
+                        contentDescription = "Pinned",
+                        tint = AivoraColors.TextSecondary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+                if (chat.isMuted) {
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        AppIcons.NotificationsOff,
+                        contentDescription = "Muted",
+                        tint = AivoraColors.TextSecondary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                chat.preview,
+                fontSize = 14.sp,
+                color = AivoraColors.TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                chat.time,
+                fontSize = 12.sp,
+                color = if (chat.unread > 0) AivoraColors.Primary else AivoraColors.TextSecondary,
+            )
+            if (chat.unread > 0) {
+                Spacer(modifier = Modifier.height(6.dp))
+                UnreadBadge(chat.unread)
+            }
+        }
+    }
+}
+
+@Composable
 private fun UnreadBadge(count: Int) {
     Box(
         modifier = Modifier
@@ -764,6 +801,7 @@ private fun StatusTab(
     query: String,
     onQueryChange: (String) -> Unit,
     onNavigate: (String) -> Unit,
+    selected: Boolean = true,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
@@ -774,11 +812,26 @@ private fun StatusTab(
         com.aivora.app.data.local.PendingMedia.set(uri.toString())
         onNavigate(Routes.NewStatus)
     }
-    LaunchedEffect(useRemote) {
-        StatusRepository.hydrateFromDisk(context)
+    // PERF H4: hydrate/refresh when Updates is selected — not on every Activity RESUMED.
+    // Warm memory: skip disk; defer HTTP so first frame stays painted (cache-first).
+    LaunchedEffect(selected, useRemote) {
+        if (!selected) return@LaunchedEffect
+        val warm = InMemoryStatusStore.statuses.value.isNotEmpty()
+        if (!warm) {
+            withContext(Dispatchers.IO) {
+                StatusRepository.hydrateFromDisk(context)
+            }
+        } else {
+            delay(400)
+        }
         if (useRemote) StatusRepository.refresh(context, api)
     }
-    val statuses by InMemoryStatusStore.statuses.collectAsState()
+    // PERF M6: cancel status flow while Updates tab is not settled.
+    var statuses by remember { mutableStateOf(InMemoryStatusStore.statuses.value) }
+    LaunchedEffect(selected) {
+        if (!selected) return@LaunchedEffect
+        InMemoryStatusStore.statuses.collect { statuses = it }
+    }
     val mine = remember(statuses) { InMemoryStatusStore.myStatuses() }
     // One row per author (WhatsApp-style), not one row per status item.
     val recent = remember(statuses, query) {
@@ -796,6 +849,7 @@ private fun StatusTab(
     }
     val myName = "You"
 
+    AivoraNoOverscroll {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
             val subtitle = when {
@@ -837,7 +891,7 @@ private fun StatusTab(
                 if (mine.isNotEmpty()) {
                     IconButton(onClick = { onNavigate(Routes.camera("status")) }) {
                         Icon(
-                            Icons.Default.CameraAlt,
+                            AppIcons.CameraAlt,
                             contentDescription = "Add status",
                             tint = AivoraColors.Primary,
                         )
@@ -851,7 +905,7 @@ private fun StatusTab(
                 horizontalArrangement = Arrangement.spacedBy(AivoraDimens.Space2),
             ) {
                 StatusActionPill(
-                    icon = Icons.Default.PhotoLibrary,
+                    icon = AppIcons.PhotoLibrary,
                     label = "Gallery",
                     modifier = Modifier.weight(1f),
                     onClick = { gallery.pickGallery() },
@@ -927,6 +981,7 @@ private fun StatusTab(
             }
         }
         item { Spacer(Modifier.height(24.dp)) }
+    }
     }
 }
 
@@ -1009,34 +1064,33 @@ private fun CallsTab(
     onFilterChange: (CallFilter) -> Unit,
     onNavigate: (String) -> Unit,
     callLogCleared: Boolean = false,
+    selected: Boolean = true,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val api = remember { ChatRepository.api() }
-    var items by remember { mutableStateOf<List<com.aivora.app.data.model.CallHistoryItemDto>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    val items by com.aivora.app.data.local.InMemoryCallHistoryStore.items.collectAsState()
+    // Only show Loading when we have nothing to paint — WhatsApp never blanks a warm tab.
+    var loading by remember {
+        mutableStateOf(com.aivora.app.data.local.InMemoryCallHistoryStore.items.value.isEmpty())
+    }
     val useRemote = !SessionStore.accessToken(context).isNullOrBlank()
 
-    LaunchedEffect(useRemote, callLogCleared) {
+    // PERF M6: fetch call history only while Calls tab is selected.
+    // Keep last list on screen; refresh in place (no Loading wipe).
+    LaunchedEffect(selected, useRemote, callLogCleared) {
+        if (!selected) return@LaunchedEffect
         if (!useRemote || callLogCleared) {
-            items = emptyList()
+            com.aivora.app.data.local.InMemoryCallHistoryStore.clear()
             loading = false
             return@LaunchedEffect
         }
-        loading = true
-        items = runCatching { api.getCallsHistory().items }.getOrDefault(emptyList())
+        val warm = com.aivora.app.data.local.InMemoryCallHistoryStore.items.value
+        loading = warm.isEmpty()
+        val fresh = runCatching { api.getCallsHistory().items }.getOrDefault(warm)
+        com.aivora.app.data.local.InMemoryCallHistoryStore.replace(fresh)
         loading = false
     }
-
-    data class CallRow(
-        val id: String,
-        val name: String,
-        val detail: String,
-        val missed: Boolean,
-        val video: Boolean,
-        val time: String,
-        val conversationId: String?,
-    )
 
     fun formatCallTime(iso: String?): String {
         if (iso.isNullOrBlank()) return ""
@@ -1145,8 +1199,8 @@ private fun CallsTab(
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            CallQuickAction(Icons.Default.Call, "New call") { onNavigate(Routes.NewCall) }
-            CallQuickAction(Icons.Default.Event, "Schedule") { onNavigate(Routes.ScheduledCalls) }
+            CallQuickAction(AppIcons.Call, "New call") { onNavigate(Routes.NewCall) }
+            CallQuickAction(AppIcons.Event, "Schedule") { onNavigate(Routes.ScheduledCalls) }
         }
         Spacer(Modifier.height(6.dp))
         AivoraFilterBar(
@@ -1155,66 +1209,45 @@ private fun CallsTab(
             onSelect = { onFilterChange(CallFilter.entries[it]) },
         )
         Spacer(Modifier.height(4.dp))
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            if (loading) {
-                item {
-                    Text(
-                        "Loading…",
-                        modifier = Modifier.padding(AivoraDimens.ScreenHorizontal, 24.dp),
-                        color = AivoraColors.TextSecondary,
-                    )
-                }
-            } else if (filtered.isEmpty()) {
-                item {
-                    Text(
-                        "No calls yet",
-                        modifier = Modifier.padding(AivoraDimens.ScreenHorizontal, 24.dp),
-                        color = AivoraColors.TextSecondary,
-                    )
-                }
+        val callItems = remember(filtered) {
+            filtered.map {
+                CallListItem(
+                    id = it.id.ifBlank { it.name + it.time },
+                    name = it.name,
+                    detail = it.detail,
+                    missed = it.missed,
+                    video = it.video,
+                    time = it.time,
+                )
             }
-            items(filtered, key = { it.id.ifBlank { it.name + it.time } }) { row ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { redial(row) }
-                        .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Avatar(row.name, size = 48)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            row.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (row.missed) AivoraColors.Danger else AivoraColors.Ink,
-                        )
-                        Text(
-                            row.detail,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = AivoraColors.TextSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            row.time,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = AivoraColors.TextSecondary,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Icon(
-                            if (row.video) Icons.Default.Videocam else Icons.Default.Call,
-                            contentDescription = null,
-                            tint = AivoraColors.Primary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-            }
-            item { Spacer(Modifier.height(24.dp)) }
+        }
+        val callRowsById = remember(filtered) {
+            filtered.associateBy { it.id.ifBlank { it.name + it.time } }
+        }
+        val clickRef = remember { arrayOf<(CallListItem) -> Unit>({}) }
+        clickRef[0] = { item -> callRowsById[item.id]?.let { redial(it) } }
+        val callAdapter = remember {
+            CallListAdapter { item -> clickRef[0](item) }
+        }
+        when {
+            loading -> Text(
+                "Loading…",
+                modifier = Modifier.padding(AivoraDimens.ScreenHorizontal, 24.dp),
+                color = AivoraColors.TextSecondary,
+            )
+            filtered.isEmpty() -> Text(
+                "No calls yet",
+                modifier = Modifier.padding(AivoraDimens.ScreenHorizontal, 24.dp),
+                color = AivoraColors.TextSecondary,
+            )
+            else -> RecyclerHost(
+                modifier = Modifier.fillMaxSize(),
+                onRecyclerReady = { rv -> rv.adapter = callAdapter },
+                update = { rv ->
+                    if (rv.adapter !== callAdapter) rv.adapter = callAdapter
+                    callAdapter.submitList(callItems)
+                },
+            )
         }
     }
 }

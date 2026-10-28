@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,10 @@ object LiveKitCallController {
     private var room: Room? = null
     private var eventsJob: Job? = null
     private var appContext: Context? = null
+    private var connectGeneration = 0
+
+    /** Enable video after connect if [enableMedia] raced ahead of publisher setup. */
+    private var pendingEnableVideo: Boolean? = null
 
     private val _roomConnected = MutableStateFlow(false)
     val roomConnected: StateFlow<Boolean> = _roomConnected.asStateFlow()
@@ -49,7 +54,7 @@ object LiveKitCallController {
     val speakerOn: StateFlow<Boolean> = _speakerOn.asStateFlow()
 
     /**
-     * @param waitForPeer when true (caller), keep mic/camera off until [enableMedia] / remote joins.
+     * @param waitForPeer when true (caller), keep mic/camera unpublished until [enableMedia] / remote joins.
      */
     suspend fun connect(
         context: Context,
@@ -59,13 +64,22 @@ object LiveKitCallController {
         waitForPeer: Boolean,
     ) {
         disconnect()
+        val gen = ++connectGeneration
         val appCtx = context.applicationContext
         appContext = appCtx
+        CallLog.i("livekit connect video=$enableVideo waitForPeer=$waitForPeer gen=$gen")
         val created = LiveKit.create(appCtx)
         room = created
         eventsJob = scope.launch {
             created.events.collect { event ->
                 when (event) {
+                    is RoomEvent.Connected -> {
+                        // Publisher PC is ready — flush any enable that arrived during connect.
+                        pendingEnableVideo?.let { pending ->
+                            pendingEnableVideo = null
+                            scope.launch { publishMedia(pending) }
+                        }
+                    }
                     is RoomEvent.ParticipantConnected -> {
                         refreshRemoteJoined(created)
                         if (_remoteJoined.value) {
@@ -96,18 +110,21 @@ object LiveKitCallController {
             }
         }
         created.connect(url, token)
+        if (gen != connectGeneration) return
+
         _roomConnected.value = true
         refreshRemoteJoined(created)
 
-        if (waitForPeer && !_remoteJoined.value) {
-            // Ringing: join room for fast connect, but do not publish yet.
-            // Keep Mute UI off (WhatsApp-like) — mic is just unpublished.
-            created.localParticipant.setMicrophoneEnabled(false)
-            created.localParticipant.setCameraEnabled(false)
-            _muted.value = false
-            _cameraOff.value = !enableVideo
-        } else {
-            enableMedia(enableVideo)
+        val pending = pendingEnableVideo
+        pendingEnableVideo = null
+        when {
+            pending != null -> publishMedia(pending)
+            waitForPeer && !_remoteJoined.value -> {
+                // Ringing: joined for fast connect; tracks stay unpublished (no publish API).
+                _muted.value = false
+                _cameraOff.value = !enableVideo
+            }
+            else -> publishMedia(enableVideo)
         }
         // Voice → earpiece; video → speaker. Same for caller and callee.
         setSpeaker(appCtx, enableVideo)
@@ -116,32 +133,30 @@ object LiveKitCallController {
     /** Unmute / publish after callee accepts (or remote appears). */
     fun enableMedia(enableVideo: Boolean) {
         scope.launch {
-            val lp = room?.localParticipant ?: return@launch
-            lp.setMicrophoneEnabled(true)
-            _muted.value = false
-            if (enableVideo) {
-                lp.setCameraEnabled(true)
-                refreshLocalVideo()
-                _cameraOff.value = false
-            } else {
-                lp.setCameraEnabled(false)
-                _cameraOff.value = true
+            if (!_roomConnected.value || room == null) {
+                pendingEnableVideo = enableVideo
+                return@launch
             }
+            publishMedia(enableVideo)
         }
     }
 
     fun setMuted(muted: Boolean) {
         _muted.value = muted
         scope.launch {
-            room?.localParticipant?.setMicrophoneEnabled(!muted)
+            runCatching {
+                room?.localParticipant?.setMicrophoneEnabled(!muted)
+            }.onFailure { CallLog.w("setMuted failed", it) }
         }
     }
 
     fun setCameraOff(off: Boolean) {
         _cameraOff.value = off
         scope.launch {
-            room?.localParticipant?.setCameraEnabled(!off)
-            if (!off) refreshLocalVideo() else _localVideo.value = null
+            runCatching {
+                room?.localParticipant?.setCameraEnabled(!off)
+                if (!off) refreshLocalVideo() else _localVideo.value = null
+            }.onFailure { CallLog.w("setCameraOff failed", it) }
         }
     }
 
@@ -164,8 +179,11 @@ object LiveKitCallController {
     }
 
     fun disconnect() {
+        connectGeneration++
+        CallLog.d("livekit disconnect gen=$connectGeneration")
         eventsJob?.cancel()
         eventsJob = null
+        pendingEnableVideo = null
         room?.disconnect()
         room?.release()
         room = null
@@ -183,6 +201,44 @@ object LiveKitCallController {
         _muted.value = false
         _cameraOff.value = false
         _speakerOn.value = false
+    }
+
+    private suspend fun publishMedia(enableVideo: Boolean) {
+        // Slow devices (Xsmart Mate 10): connect() can return before engine.publisher exists.
+        repeat(8) { attempt ->
+            val lp = room?.localParticipant
+            if (lp == null || !_roomConnected.value) {
+                pendingEnableVideo = enableVideo
+                return
+            }
+            val result = runCatching {
+                lp.setMicrophoneEnabled(true)
+                if (enableVideo) {
+                    lp.setCameraEnabled(true)
+                    refreshLocalVideo()
+                } else {
+                    lp.setCameraEnabled(false)
+                }
+            }
+            if (result.isSuccess) {
+                _muted.value = false
+                _cameraOff.value = !enableVideo
+                return
+            }
+            val err = result.exceptionOrNull()
+            val publisherNotReady =
+                err is IllegalStateException &&
+                    (err.message?.contains("publisher", ignoreCase = true) == true)
+            if (!publisherNotReady) {
+                CallLog.e("publishMedia failed", err)
+                return
+            }
+            CallLog.w("publisher not ready, retry ${attempt + 1}")
+            delay(150L * (attempt + 1))
+        }
+        // Keep trying once Connected fires.
+        pendingEnableVideo = enableVideo
+        CallLog.e("publishMedia exhausted retries; queued pending enable")
     }
 
     private fun refreshRemoteJoined(room: Room) {

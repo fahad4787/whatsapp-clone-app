@@ -11,6 +11,7 @@ import com.aivora.app.data.local.LocalPollOption
 import com.aivora.app.data.local.LocalReaction
 import com.aivora.app.data.local.LocalReplyPreview
 import com.aivora.app.data.local.MessageDeliveryStatus
+import com.aivora.app.data.local.looksLikeSystemNotice
 import com.aivora.app.data.model.MessageDto
 
 private const val DISAPPEARED_TEXT = "This message has disappeared"
@@ -180,7 +181,9 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         event = localEvent,
         expiresAtIso = expiresAt,
         disappeared = disappeared,
-        system = system,
+        system = system ||
+            type.equals("system", ignoreCase = true) ||
+            looksLikeSystemNotice(text.orEmpty()),
         editedAtIso = editedAt,
         viewOnce = viewOnce,
     )

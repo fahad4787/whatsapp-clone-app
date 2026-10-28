@@ -1,8 +1,17 @@
 # Architecture
 
+## Docs in this folder (backend phase)
+
+| File | Use |
+|------|-----|
+| `ARCHITECTURE.md` | This file — topology + layers |
+| `ROUTES.txt` | APK-recovered nav destinations |
+| `SCREENS.md` | Screen ↔ feature map |
+| `UI_STRINGS.txt` | Copy / i18n inventory |
+
 ## Current phase: frontend first
 
-The Compose UI runs with **local mock data** (`ui/mock/MockData`).  
+The Compose UI runs with **local mock data** (`InMemoryChatStore` / seed).  
 **Backend / Firebase wiring is deferred** until the frontend is signed off.
 
 Saved backend discussion plan (later): Cursor plan `backend_rebuild_discussion_a85c9718`.

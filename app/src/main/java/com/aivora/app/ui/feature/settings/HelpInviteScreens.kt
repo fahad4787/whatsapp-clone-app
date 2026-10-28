@@ -1,7 +1,15 @@
 package com.aivora.app.ui.feature.settings
 
+import com.aivora.app.ui.icons.AppIcons
+
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -18,7 +27,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.HelpOutline
@@ -35,11 +47,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.aivora.app.ui.components.AivoraBottomSheet
 import com.aivora.app.ui.components.AivoraScaffold
+import com.aivora.app.ui.components.AivoraScrollColumn
+import com.aivora.app.ui.components.AivoraSheetAction
+import com.aivora.app.ui.components.AivoraSheetActionGrid
 import com.aivora.app.ui.components.SearchField
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
@@ -76,21 +94,21 @@ fun HelpFeedbackScreen(
             Spacer(Modifier.height(16.dp))
             SettingsMutedGroup {
                 HelpActionRow(
-                    icon = Icons.Default.HelpOutline,
+                    iconRes = AivoraIcons.Help,
                     title = "Help Center",
                     subtitle = "Answers to common questions",
                     onClick = { onNavigate(Routes.HelpCenter) },
                 )
                 HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
                 HelpActionRow(
-                    icon = Icons.AutoMirrored.Filled.Chat,
+                    iconRes = AivoraIcons.Chat,
                     title = "Contact us",
                     subtitle = "Get help or send feedback",
                     onClick = { },
                 )
                 HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
                 HelpActionRow(
-                    icon = Icons.Default.Info,
+                    icon = AppIcons.Info,
                     title = "App info",
                     subtitle = "About Aivora",
                     onClick = { },
@@ -185,6 +203,11 @@ fun InviteFriendScreen(
     onNavigate: (String) -> Unit = {},
 ) {
     var query by remember { mutableStateOf("") }
+    var showShare by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val inviteLink = "aivora.app/invite"
+    val inviteBody =
+        "Join me on Aivora! Let’s stay connected with messages, voice and video calls.\n$inviteLink"
     val contacts = listOf(
         "Amrit Singh" to "+91 98765 43210",
         "Navjot Singh" to "+91 98765 43211",
@@ -198,6 +221,127 @@ fun InviteFriendScreen(
             it.second.contains(query, ignoreCase = true)
     }
 
+    if (showShare) {
+        AivoraBottomSheet(
+            onDismiss = { showShare = false },
+            title = "Share invitation",
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(AivoraColors.SoftMint)
+                    .padding(16.dp),
+            ) {
+                Text("Aivora", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AivoraColors.Ink)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Join me on Aivora! Let’s stay connected with messages, voice and video calls.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AivoraColors.InkMuted,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(inviteLink, color = AivoraColors.Primary, fontWeight = FontWeight.Medium)
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Suggested contacts",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                listOf("Gurpreet", "Amrit", "Harleen", "Jaspreet").forEach { name ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(AivoraColors.SoftMint),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(AppIcons.Person, null, tint = AivoraColors.Primary)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(name, fontSize = 12.sp, color = AivoraColors.InkMuted)
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            AivoraSheetActionGrid(
+                columns = 3,
+                actions = listOf(
+                    AivoraSheetAction("Messages", AppIcons.Chat) {
+                        showShare = false
+                        context.startActivity(
+                            Intent.createChooser(
+                                Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, inviteBody)
+                                },
+                                "Share invitation",
+                            ),
+                        )
+                    },
+                    AivoraSheetAction("Mail", AppIcons.Email) {
+                        showShare = false
+                        context.startActivity(
+                            Intent.createChooser(
+                                Intent(Intent.ACTION_SEND).apply {
+                                    type = "message/rfc822"
+                                    putExtra(Intent.EXTRA_SUBJECT, "Join me on Aivora")
+                                    putExtra(Intent.EXTRA_TEXT, inviteBody)
+                                },
+                                "Share invitation",
+                            ),
+                        )
+                    },
+                    AivoraSheetAction("More", AppIcons.MoreHoriz) {
+                        showShare = false
+                        context.startActivity(
+                            Intent.createChooser(
+                                Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, inviteBody)
+                                },
+                                "Share invitation",
+                            ),
+                        )
+                    },
+                ),
+            )
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AivoraColors.SurfaceMuted)
+                    .clickable {
+                        val clipboard =
+                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Aivora invite", inviteLink))
+                        showShare = false
+                    }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(AppIcons.ContentCopy, null, tint = AivoraColors.Primary)
+                Spacer(Modifier.width(12.dp))
+                Text("Copy link", modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
+                Text("›", color = AivoraColors.TextSecondary, fontSize = 20.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+
     AivoraScaffold(title = "Invite a friend", onBack = onBack) {
         Column(modifier = Modifier.fillMaxSize()) {
             Text(
@@ -208,10 +352,10 @@ fun InviteFriendScreen(
             )
             SettingsMutedGroup {
                 HelpActionRow(
-                    icon = Icons.Default.Share,
+                    icon = AppIcons.Share,
                     title = "Share invitation link",
                     subtitle = null,
-                    onClick = { },
+                    onClick = { showShare = true },
                 )
             }
             SearchField(
@@ -225,37 +369,33 @@ fun InviteFriendScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
             )
-            LazyColumn(
+            AivoraScrollColumn(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = AivoraDimens.CardHorizontal),
             ) {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
-                            .background(AivoraColors.SurfaceMuted),
-                    ) {
-                        contacts.forEachIndexed { index, (name, phone) ->
-                            InviteContactRow(name = name, phone = phone, onInvite = { })
-                            if (index < contacts.lastIndex) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(start = 66.dp),
-                                    color = AivoraColors.Divider,
-                                )
-                            }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                        .background(AivoraColors.SurfaceMuted),
+                ) {
+                    contacts.forEachIndexed { index, (name, phone) ->
+                        InviteContactRow(name = name, phone = phone, onInvite = { })
+                        if (index < contacts.lastIndex) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 66.dp),
+                                color = AivoraColors.Divider,
+                            )
                         }
                     }
                 }
-                item {
-                    Text(
-                        "Invitations are sent through your phone’s messaging app. Standard SMS charges may apply.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AivoraColors.TextSecondary,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp),
-                    )
-                }
+                Text(
+                    "Invitations are sent through your phone’s messaging app. Standard SMS charges may apply.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AivoraColors.TextSecondary,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp),
+                )
             }
         }
     }
@@ -276,10 +416,11 @@ private fun SettingsMutedGroup(content: @Composable () -> Unit) {
 
 @Composable
 private fun HelpActionRow(
-    icon: ImageVector,
     title: String,
     subtitle: String?,
     onClick: () -> Unit,
+    icon: ImageVector? = null,
+    @androidx.annotation.DrawableRes iconRes: Int? = null,
 ) {
     Row(
         modifier = Modifier
@@ -288,7 +429,15 @@ private fun HelpActionRow(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = AivoraColors.Ink, modifier = Modifier.size(24.dp))
+        when {
+            iconRes != null -> Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = AivoraColors.Ink,
+                modifier = Modifier.size(24.dp),
+            )
+            icon != null -> Icon(icon, contentDescription = null, tint = AivoraColors.Ink, modifier = Modifier.size(24.dp))
+        }
         Spacer(Modifier.size(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
@@ -328,7 +477,7 @@ private fun InviteContactRow(
                 .background(AivoraColors.BubbleMine),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Default.Person, contentDescription = null, tint = AivoraColors.Primary)
+            Icon(AppIcons.Person, contentDescription = null, tint = AivoraColors.Primary)
         }
         Spacer(Modifier.size(12.dp))
         Column(modifier = Modifier.weight(1f)) {

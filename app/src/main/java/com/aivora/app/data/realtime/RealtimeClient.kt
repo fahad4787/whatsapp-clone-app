@@ -33,6 +33,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -43,13 +44,18 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.random.Random
 
 /**
  * Shared OkHttp WebSocket client for Wave 5 realtime.
  * Connect: wss://…/ws?token=…
  */
 object RealtimeClient {
+    private const val RECONNECT_BASE_MS = 1_000L
+    private const val RECONNECT_MAX_MS = 30_000L
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val socketRef = AtomicReference<WebSocket?>(null)
     private var reconnectJob: Job? = null
@@ -59,6 +65,8 @@ object RealtimeClient {
     @Volatile private var suppressReconnect = false
     /** Token used for the open (or in-flight) socket — avoid thrashing reconnects on cold start. */
     @Volatile private var socketToken: String? = null
+    /** Consecutive failed reconnects — reset on [WebSocketListener.onOpen]. */
+    private val reconnectAttempt = AtomicInteger(0)
 
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
@@ -78,10 +86,17 @@ object RealtimeClient {
     val roomOnline: StateFlow<Map<String, Set<String>>> = _roomOnline.asStateFlow()
 
     private val joinedRooms = mutableSetOf<String>()
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .pingInterval(25, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.MILLISECONDS)
-        .build()
+    /** WS timeouts/ping differ from HTTP; share dispatcher + pool with [NetworkModule]. */
+    private val client: OkHttpClient by lazy {
+        val shared = NetworkModule.okHttp()
+        OkHttpClient.Builder()
+            .dispatcher(shared.dispatcher)
+            .connectionPool(shared.connectionPool)
+            .pingInterval(25, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.MILLISECONDS)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
 
     fun start(tokenProvider: () -> String?, myUserIdProvider: () -> String?) {
         this.tokenProvider = tokenProvider
@@ -102,6 +117,7 @@ object RealtimeClient {
         suppressReconnect = true
         reconnectJob?.cancel()
         reconnectJob = null
+        reconnectAttempt.set(0)
         socketToken = null
         socketRef.getAndSet(null)?.close(1000, "stop")
         _connected.value = false
@@ -167,6 +183,7 @@ object RealtimeClient {
                     override fun onOpen(webSocket: WebSocket, response: Response) {
                         if (socketRef.get() !== webSocket) return
                         socketToken = token
+                        reconnectAttempt.set(0)
                         _connected.value = true
                         // Re-join rooms after reconnect
                         val rooms = synchronized(joinedRooms) { joinedRooms.toList() }
@@ -204,11 +221,16 @@ object RealtimeClient {
         )
     }
 
+    /** PERF M8: exponential backoff + jitter (1s → 30s cap) instead of fixed 1s storms. */
     private fun scheduleReconnect() {
         if (suppressReconnect) return
         if (reconnectJob?.isActive == true) return
         reconnectJob = scope.launch {
-            delay(1_000)
+            val attempt = reconnectAttempt.getAndIncrement()
+            val exp = attempt.coerceAtMost(5) // 1,2,4,8,16,32s raw
+            val base = (RECONNECT_BASE_MS shl exp).coerceAtMost(RECONNECT_MAX_MS)
+            val jitter = Random.nextLong(0, (base / 4).coerceAtLeast(1))
+            delay(base + jitter)
             if (isActive && !suppressReconnect && tokenProvider?.invoke()?.isNotBlank() == true) {
                 connectIfNeeded()
             }
@@ -378,12 +400,24 @@ object RealtimeClient {
                 val uid = myUserIdProvider?.invoke()
                 com.aivora.app.data.local.InMemoryStatusStore.mergeRow(row, uid)
                 val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
-                if (app != null) {
-                    com.aivora.app.data.local.StatusCache.save(
-                        app,
-                        com.aivora.app.data.local.InMemoryStatusStore.statuses.value,
-                    )
-                }
+                if (app != null) com.aivora.app.data.local.InMemoryStatusStore.persist(app)
+            }
+            "status.viewed" -> {
+                val data = frame.data ?: return
+                val statusId = data.jsonObject["status_id"]?.jsonPrimitive?.contentOrNull
+                    ?: return
+                val count = data.jsonObject["view_count"]?.jsonPrimitive?.intOrNull ?: return
+                com.aivora.app.data.local.InMemoryStatusStore.setViewCount(statusId, count)
+                val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
+                if (app != null) com.aivora.app.data.local.InMemoryStatusStore.persist(app)
+            }
+            "status.deleted" -> {
+                val data = frame.data ?: return
+                val statusId = data.jsonObject["status_id"]?.jsonPrimitive?.contentOrNull
+                    ?: return
+                com.aivora.app.data.local.InMemoryStatusStore.remove(statusId)
+                val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
+                if (app != null) com.aivora.app.data.local.InMemoryStatusStore.persist(app)
             }
         }
     }
@@ -416,7 +450,9 @@ object RealtimeClient {
         scope.launch {
             runCatching {
                 val api = NetworkModule.api(NetworkModule.okHttp { token })
-                api.postMessagesDelivered(mapOf("message_ids" to messageIds))
+                api.postMessagesDelivered(
+                    com.aivora.app.data.model.DeliveredBody(messageIds = messageIds),
+                )
             }
         }
     }

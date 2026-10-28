@@ -1,5 +1,6 @@
 package com.aivora.app.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -8,6 +9,7 @@ data class CallHistoryListDto(
     @SerialName("items") val items: List<CallHistoryItemDto> = emptyList(),
 )
 
+@Immutable
 @Serializable
 data class CallHistoryItemDto(
     @SerialName("id") val id: String? = null,

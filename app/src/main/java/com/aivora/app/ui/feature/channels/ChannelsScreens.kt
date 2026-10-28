@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.channels
 
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,9 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.key
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
@@ -54,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraScaffold
+import com.aivora.app.ui.components.AivoraScrollColumn
 import com.aivora.app.ui.components.EmptyState
 import com.aivora.app.ui.components.InfoBanner
 import com.aivora.app.ui.components.LinkButton
@@ -100,16 +102,29 @@ fun ChannelsScreen(
         onBack = onBack,
         fab = {
             FloatingActionButton(onClick = { onNavigate(Routes.ChannelSlug.replace("{slug}", "new")) }, containerColor = AivoraColors.Primary, contentColor = AivoraColors.OnPrimary) {
-                Icon(Icons.Default.Add, null)
+                Icon(AppIcons.Add, null)
             }
         },
     ) {
         InfoBanner("Find channels")
         SearchField(query, { query = it }, "Search channels")
         if (channels.isEmpty()) EmptyState("No channels match.", "Try a different search.")
-        LazyColumn {
-            items(channels) { (n, s) ->
-                PersonRow(n, s, onClick = { onNavigate(Routes.ChannelSlug.replace("{slug}", n.lowercase().replace(" ", "-"))) })
+        AivoraScrollColumn(modifier = Modifier.fillMaxSize()) {
+            channels.forEach { (n, s) ->
+                key(n) {
+                    PersonRow(
+                        n,
+                        s,
+                        onClick = {
+                            onNavigate(
+                                Routes.ChannelSlug.replace(
+                                    "{slug}",
+                                    n.lowercase().replace(" ", "-"),
+                                ),
+                            )
+                        },
+                    )
+                }
             }
         }
     }

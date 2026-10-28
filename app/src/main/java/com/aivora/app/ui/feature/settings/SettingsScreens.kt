@@ -1,5 +1,8 @@
 package com.aivora.app.ui.feature.settings
 
+import com.aivora.app.ui.icons.AppIcons
+
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -83,9 +86,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.Avatar
+import com.aivora.app.ui.components.AivoraNoOverscroll
 import com.aivora.app.ui.components.AivoraScaffold
+import com.aivora.app.ui.components.AivoraScrollColumn
 import com.aivora.app.ui.components.EmptyState
 import com.aivora.app.ui.components.InfoBanner
 import com.aivora.app.ui.components.LinkButton
@@ -96,6 +102,8 @@ import com.aivora.app.ui.components.SearchField
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
 import com.aivora.app.ui.components.SettingsRow
+import com.aivora.app.ui.icons.AivoraIconChrome
+import com.aivora.app.ui.icons.AivoraIconSlot
 import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
@@ -143,8 +151,9 @@ private fun SettingsToggleBlock(
 @Composable
 private fun SettingsGreenActionRow(
     title: String,
-    icon: ImageVector,
     onClick: () -> Unit,
+    icon: ImageVector? = null,
+    @DrawableRes iconRes: Int? = null,
 ) {
     Row(
         modifier = Modifier
@@ -153,7 +162,12 @@ private fun SettingsGreenActionRow(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = AivoraColors.Primary, modifier = Modifier.size(22.dp))
+        AivoraIconSlot(
+            chrome = AivoraIconChrome.List,
+            painterRes = iconRes,
+            imageVector = icon,
+            tint = AivoraColors.Primary,
+        )
         Spacer(Modifier.size(14.dp))
         Text(
             title,
@@ -193,12 +207,17 @@ private fun SettingsFootnote(text: String) {
 
 @Composable
 private fun SettingsHeroIntro(
-    icon: ImageVector,
     title: String,
     body: String,
+    icon: ImageVector? = null,
+    @DrawableRes iconRes: Int? = null,
 ) {
     Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
-        Icon(icon, contentDescription = null, tint = AivoraColors.Ink, modifier = Modifier.size(40.dp))
+        AivoraIconSlot(
+            chrome = AivoraIconChrome.Hero,
+            painterRes = iconRes,
+            imageVector = icon,
+        )
         Spacer(Modifier.height(16.dp))
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
@@ -216,23 +235,23 @@ fun SettingsProfileScreen(
     var notify by remember { mutableStateOf(true) }
     val sections = listOf(
         null to listOf(
-            SettingsItem("Edit profile", "Name, about, avatar, username", Icons.Default.Person, onClick = { onNavigate(Routes.YourDetails) }),
-            SettingsItem("Account", "Security, email, passkeys, number", Icons.Default.AccountCircle, onClick = { onNavigate(Routes.SettingsAccount) }),
-            SettingsItem("Privacy", "Last seen, profile photo, calls, locks", Icons.Default.Lock, onClick = { onNavigate(Routes.SettingsPrivacy) }),
-            SettingsItem("Chats", "Theme, backup, history, transfer", Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsChats) }),
-            SettingsItem("Lists", "Filter chats into custom lists", Icons.Default.Menu, onClick = { onNavigate(Routes.SettingsListsNew) }),
-            SettingsItem("Reorder lists", "Change list order", Icons.Default.Menu, onClick = { onNavigate(Routes.SettingsListsReorder) }),
-            SettingsItem("Notifications", "Message and call alerts", Icons.Default.Notifications, toggle = notify, onToggle = { notify = it }),
-            SettingsItem("Storage and data", "Network usage, download, clear", Icons.Default.Storage, onClick = { onNavigate(Routes.SettingsStorage) }),
-            SettingsItem("Linked devices", "Use Aivora on other devices", Icons.Default.Devices, onClick = { onNavigate(Routes.SettingsDevices) }),
-            SettingsItem("Starred messages", null, Icons.Default.Star, onClick = { onNavigate(Routes.SettingsStarred) }),
-            SettingsItem("Communities", null, Icons.Default.Groups, onClick = { onNavigate(Routes.SettingsCommunities) }),
-            SettingsItem("QR code", "My QR code", Icons.Default.QrCode, onClick = { onNavigate(Routes.SettingsQr) }),
-            SettingsItem("Permissions", "Camera, mic, contacts, location", Icons.Default.Security, onClick = { onNavigate(Routes.SettingsPermissions) }),
-            SettingsItem("Two-step verification", null, Icons.Default.VpnKey, onClick = { onNavigate(Routes.SettingsTwoStep) }),
-            SettingsItem("Blocked contacts", null, Icons.Default.Block, onClick = { onNavigate(Routes.SettingsBlocked) }),
-            SettingsItem("Add account", "Add a second account", Icons.Default.PersonAdd, onClick = { onNavigate(Routes.SettingsAccountAdd) }),
-            SettingsItem("Delete account", null, Icons.Default.Delete, danger = true, onClick = { onNavigate(Routes.SettingsDeleteAccount) }),
+            SettingsItem("Edit profile", "Name, about, avatar, username", AppIcons.Person, onClick = { onNavigate(Routes.YourDetails) }),
+            SettingsItem("Account", "Security, email, passkeys, number", AppIcons.AccountCircle, onClick = { onNavigate(Routes.SettingsAccount) }),
+            SettingsItem("Privacy", "Last seen, profile photo, calls, locks", iconRes = AivoraIcons.Lock, onClick = { onNavigate(Routes.SettingsPrivacy) }),
+            SettingsItem("Chats", "Theme, backup, history, transfer", iconRes = AivoraIcons.Chat, onClick = { onNavigate(Routes.SettingsChats) }),
+            SettingsItem("Lists", "Filter chats into custom lists", AppIcons.Menu, onClick = { onNavigate(Routes.SettingsListsNew) }),
+            SettingsItem("Reorder lists", "Change list order", AppIcons.Menu, onClick = { onNavigate(Routes.SettingsListsReorder) }),
+            SettingsItem("Notifications", "Message and call alerts", iconRes = AivoraIcons.Notifications, toggle = notify, onToggle = { notify = it }),
+            SettingsItem("Storage and data", "Network usage, download, clear", iconRes = AivoraIcons.Storage, onClick = { onNavigate(Routes.SettingsStorage) }),
+            SettingsItem("Linked devices", "Use Aivora on other devices", AppIcons.Devices, onClick = { onNavigate(Routes.SettingsDevices) }),
+            SettingsItem("Starred messages", null, iconRes = AivoraIcons.Star, onClick = { onNavigate(Routes.SettingsStarred) }),
+            SettingsItem("Communities", null, iconRes = AivoraIcons.Group, onClick = { onNavigate(Routes.SettingsCommunities) }),
+            SettingsItem("QR code", "My QR code", iconRes = AivoraIcons.Qr, onClick = { onNavigate(Routes.SettingsQr) }),
+            SettingsItem("Permissions", "Camera, mic, contacts, location", AppIcons.Security, onClick = { onNavigate(Routes.SettingsPermissions) }),
+            SettingsItem("Two-step verification", null, iconRes = AivoraIcons.Key, onClick = { onNavigate(Routes.SettingsTwoStep) }),
+            SettingsItem("Blocked contacts", null, AppIcons.Block, onClick = { onNavigate(Routes.SettingsBlocked) }),
+            SettingsItem("Add account", "Add a second account", AppIcons.PersonAdd, onClick = { onNavigate(Routes.SettingsAccountAdd) }),
+            SettingsItem("Delete account", null, AppIcons.Delete, danger = true, onClick = { onNavigate(Routes.SettingsDeleteAccount) }),
         ),
     )
 
@@ -371,12 +390,22 @@ fun SettingsPrivacyLastSeenScreen(
     val useRemote = !com.aivora.app.data.local.SessionStore.accessToken(context).isNullOrBlank()
     val lastSeenKeys = listOf("everyone", "contacts", "nobody")
     val onlineKeys = listOf("everyone", "same_as_last_seen", "nobody")
-    var lastSeen by remember { mutableIntStateOf(1) }
-    var online by remember { mutableIntStateOf(1) }
+    val cachedPrivacy = remember { com.aivora.app.data.local.InMemoryPrivacyStore.dto }
+    var lastSeen by remember {
+        mutableIntStateOf(
+            cachedPrivacy?.let { lastSeenKeys.indexOf(it.lastSeen).takeIf { i -> i >= 0 } } ?: 1,
+        )
+    }
+    var online by remember {
+        mutableIntStateOf(
+            cachedPrivacy?.let { onlineKeys.indexOf(it.online).takeIf { i -> i >= 0 } } ?: 1,
+        )
+    }
     androidx.compose.runtime.LaunchedEffect(useRemote) {
         if (!useRemote) return@LaunchedEffect
         runCatching { api.getMePrivacy() }
             .onSuccess {
+                com.aivora.app.data.local.InMemoryPrivacyStore.replace(it)
                 lastSeenKeys.indexOf(it.lastSeen).takeIf { i -> i >= 0 }?.let { i -> lastSeen = i }
                 onlineKeys.indexOf(it.online).takeIf { i -> i >= 0 }?.let { i -> online = i }
             }
@@ -387,10 +416,23 @@ fun SettingsPrivacyLastSeenScreen(
     fun savePrivacy(body: com.aivora.app.data.model.PrivacySettingsBody, revert: () -> Unit) {
         if (!useRemote) return
         scope.launch {
-            runCatching { api.putMePrivacy(body) }.onFailure {
-                revert()
-                android.widget.Toast.makeText(context, "Could not update privacy", android.widget.Toast.LENGTH_SHORT).show()
-            }
+            runCatching { api.putMePrivacy(body) }
+                .onSuccess {
+                    com.aivora.app.data.local.InMemoryPrivacyStore.dto?.let { prev ->
+                        com.aivora.app.data.local.InMemoryPrivacyStore.replace(
+                            prev.copy(
+                                lastSeen = body.lastSeen ?: prev.lastSeen,
+                                online = body.online ?: prev.online,
+                                status = body.status ?: prev.status,
+                                statusIds = body.statusIds ?: prev.statusIds,
+                            ),
+                        )
+                    }
+                }
+                .onFailure {
+                    revert()
+                    android.widget.Toast.makeText(context, "Could not update privacy", android.widget.Toast.LENGTH_SHORT).show()
+                }
         }
     }
     AivoraScaffold(title = "Last seen and online", onBack = onBack) {
@@ -497,10 +539,19 @@ fun SettingsPrivacyStatusScreen(
         )
     }
     val keys = listOf("everyone", "contacts", "contacts_except", "only_share")
-    var selected by remember { mutableIntStateOf(1) }
-    var statusIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val cachedPrivacy = remember { com.aivora.app.data.local.InMemoryPrivacyStore.dto }
+    var selected by remember {
+        mutableIntStateOf(
+            cachedPrivacy?.let { keys.indexOf(it.status).takeIf { i -> i >= 0 } } ?: 1,
+        )
+    }
+    var statusIds by remember {
+        mutableStateOf(cachedPrivacy?.statusIds?.toSet().orEmpty())
+    }
     var pickMode by remember { mutableStateOf(false) }
-    var people by remember { mutableStateOf<List<com.aivora.app.data.model.UserDto>>(emptyList()) }
+    var people by remember {
+        mutableStateOf(com.aivora.app.data.local.InMemoryPeopleStore.directory.value)
+    }
 
     fun save(modeIndex: Int, ids: Set<String> = statusIds) {
         if (!useRemote) return
@@ -512,6 +563,12 @@ fun SettingsPrivacyStatusScreen(
                         statusIds = ids.toList(),
                     ),
                 )
+            }.onSuccess {
+                com.aivora.app.data.local.InMemoryPrivacyStore.dto?.let { prev ->
+                    com.aivora.app.data.local.InMemoryPrivacyStore.replace(
+                        prev.copy(status = keys[modeIndex], statusIds = ids.toList()),
+                    )
+                }
             }.onFailure {
                 android.widget.Toast.makeText(context, "Could not save", android.widget.Toast.LENGTH_SHORT).show()
             }
@@ -521,10 +578,14 @@ fun SettingsPrivacyStatusScreen(
     LaunchedEffect(useRemote) {
         if (!useRemote) return@LaunchedEffect
         runCatching { api.getMePrivacy() }.onSuccess { dto ->
+            com.aivora.app.data.local.InMemoryPrivacyStore.replace(dto)
             selected = keys.indexOf(dto.status).takeIf { it >= 0 } ?: 1
             statusIds = dto.statusIds.toSet()
         }
-        runCatching { api.getPeopleSearch(q = null, limit = 100).items }.onSuccess { people = it }
+        runCatching { api.getPeopleSearch(q = null, limit = 100).items }.onSuccess {
+            com.aivora.app.data.local.InMemoryPeopleStore.put("", it)
+            people = it
+        }
     }
 
     AivoraScaffold(title = "Status", onBack = onBack) {
@@ -679,9 +740,9 @@ fun SettingsQrScreen(
     var showPhoto by remember { mutableStateOf(true) }
     val sections = listOf(
         null to listOf(
-            SettingsItem("My QR code", "Show my name and photo on my QR page", Icons.Default.QrCode, onClick = { }),
-            SettingsItem("Scan QR code", null, Icons.Default.CameraAlt, onClick = { }),
-            SettingsItem("Show name and photo on QR page", null, Icons.Default.Visibility, toggle = showPhoto, onToggle = { showPhoto = it }),
+            SettingsItem("My QR code", "Show my name and photo on my QR page", iconRes = AivoraIcons.Qr, onClick = { }),
+            SettingsItem("Scan QR code", null, iconRes = AivoraIcons.Camera, onClick = { }),
+            SettingsItem("Show name and photo on QR page", null, AppIcons.Visibility, toggle = showPhoto, onToggle = { showPhoto = it }),
         ),
     )
 
@@ -706,8 +767,14 @@ fun SettingsStarredScreen(
         )
     }
     val useRemote = !com.aivora.app.data.local.SessionStore.accessToken(context).isNullOrBlank()
-    var starred by remember { mutableStateOf<List<com.aivora.app.data.local.LocalMessage>>(emptyList()) }
-    var loading by remember { mutableStateOf(useRemote) }
+    var starred by remember {
+        mutableStateOf(com.aivora.app.data.local.InMemoryStarredStore.items.value)
+    }
+    var loading by remember {
+        mutableStateOf(
+            useRemote && com.aivora.app.data.local.InMemoryStarredStore.items.value.isEmpty(),
+        )
+    }
     val myUserId = remember {
         com.aivora.app.data.local.SessionStore.userId(context).orEmpty()
     }
@@ -717,15 +784,25 @@ fun SettingsStarredScreen(
             loading = false
             return@LaunchedEffect
         }
-        loading = true
+        val warm = com.aivora.app.data.local.InMemoryStarredStore.items.value
+        if (warm.isNotEmpty()) {
+            starred = warm
+            loading = false
+        } else {
+            loading = true
+        }
         runCatching { api.getMeStarred() }
             .onSuccess { list ->
                 val uid = myUserId.ifBlank {
                     runCatching { api.getMe().id }.getOrNull().orEmpty()
                 }
-                starred = list.items.map { it.toLocalMessage(uid) }
+                val mapped = list.items.map { it.toLocalMessage(uid) }
+                com.aivora.app.data.local.InMemoryStarredStore.replace(mapped)
+                starred = mapped
             }
-            .onFailure { starred = emptyList() }
+            .onFailure {
+                if (starred.isEmpty()) starred = emptyList()
+            }
         loading = false
     }
 
@@ -742,18 +819,19 @@ fun SettingsStarredScreen(
                 EmptyState(
                     title = "No starred messages",
                     body = "Press and hold a message in chat, then choose Star.",
-                    icon = Icons.Default.StarBorder,
+                    icon = AppIcons.StarBorder,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxSize(),
                 )
             }
             else -> {
+                AivoraNoOverscroll {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
-                    items(starred, key = { it.id }) { msg ->
+                    items(starred, key = { it.id }, contentType = { "star" }) { msg ->
                         val chatId = msg.conversationId
                         Row(
                             modifier = Modifier
@@ -767,7 +845,7 @@ fun SettingsStarredScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
-                                Icons.Default.Star,
+                                painter = painterResource(AivoraIcons.Star),
                                 contentDescription = null,
                                 tint = AivoraColors.Primary,
                                 modifier = Modifier.size(22.dp),
@@ -789,6 +867,7 @@ fun SettingsStarredScreen(
                         }
                         HorizontalDivider(color = AivoraColors.Divider)
                     }
+                }
                 }
             }
         }
@@ -848,6 +927,7 @@ fun SettingsManageStorageScreen(
         "Family" to "120 MB",
     )
     AivoraScaffold(title = "Manage storage", onBack = onBack) {
+        AivoraNoOverscroll {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 24.dp),
@@ -906,7 +986,7 @@ fun SettingsManageStorageScreen(
                         SettingsItem(
                             "Larger than 5 MB",
                             subtitle = "200 MB · 6 items",
-                            icon = Icons.Default.Folder,
+                            icon = AppIcons.Folder,
                             onClick = { },
                         ),
                     )
@@ -915,7 +995,7 @@ fun SettingsManageStorageScreen(
                         SettingsItem(
                             "Forwarded many times",
                             subtitle = "72 MB · 3 items",
-                            icon = Icons.Default.Reply,
+                            icon = AppIcons.Reply,
                             onClick = { },
                         ),
                     )
@@ -945,13 +1025,16 @@ fun SettingsManageStorageScreen(
                     )
                 }
             }
-            items(chats.filter { it.first.contains(query, ignoreCase = true) }) { (name, size) ->
+            items(
+                items = chats.filter { it.first.contains(query, ignoreCase = true) },
+                key = { it.first },
+            ) { (name, size) ->
                 PersonRow(
                     name = name,
                     onClick = { },
                     trailing = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(size, color = AivoraColors.TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                            Text(size, color = AivoraColors.TextSecondary, fontSize = 13.sp)
                             Spacer(Modifier.width(8.dp))
                             Icon(
                                 painter = painterResource(AivoraIcons.ChevronRight),
@@ -963,6 +1046,7 @@ fun SettingsManageStorageScreen(
                     },
                 )
             }
+        }
         }
     }
 }
@@ -995,7 +1079,7 @@ fun SettingsTwoStepScreen(
 ) {
     AivoraScaffold(title = "Two-step verification", onBack = onBack) {
         SettingsHeroIntro(
-            icon = Icons.Default.Lock,
+            iconRes = AivoraIcons.Lock,
             title = "Two-step verification is enabled",
             body = "Your six-digit account PIN adds a verification step when you register your phone number again.",
         )
@@ -1005,24 +1089,24 @@ fun SettingsTwoStepScreen(
                     SettingsItem(
                         "Recovery email",
                         subtitle = "leslie@example.com",
-                        icon = Icons.Default.Email,
+                        icon = AppIcons.Email,
                         onClick = { onNavigate(Routes.SettingsAccountEmail) },
                     ),
                 ),
                 null to listOf(
                     SettingsItem(
                         "Change PIN",
-                        icon = Icons.Default.Edit,
+                        iconRes = AivoraIcons.Edit,
                         onClick = { onNavigate(Routes.SettingsAccountTwoStepNewPin) },
                     ),
                     SettingsItem(
                         "Change email",
-                        icon = Icons.Default.Email,
+                        icon = AppIcons.Email,
                         onClick = { onNavigate(Routes.SettingsAccountEmail) },
                     ),
                     SettingsItem(
                         "Disable",
-                        icon = Icons.Default.Lock,
+                        iconRes = AivoraIcons.Lock,
                         danger = true,
                         onClick = { },
                     ),
@@ -1048,17 +1132,31 @@ fun SettingsBlockedScreen(
         )
     }
     val useRemote = !com.aivora.app.data.local.SessionStore.accessToken(context).isNullOrBlank()
-    var blocked by remember { mutableStateOf<List<com.aivora.app.data.model.BlockItemDto>>(emptyList()) }
-    var loading by remember { mutableStateOf(useRemote) }
+    var blocked by remember {
+        mutableStateOf(com.aivora.app.data.local.InMemoryBlockedStore.items.value)
+    }
+    var loading by remember {
+        mutableStateOf(
+            useRemote && com.aivora.app.data.local.InMemoryBlockedStore.items.value.isEmpty(),
+        )
+    }
 
-    fun reload() {
+    fun reload(forceLoading: Boolean = false) {
         if (!useRemote) {
             loading = false
             return
         }
         scope.launch {
-            loading = true
-            blocked = runCatching { api.getBlocks().items }.getOrDefault(emptyList())
+            val warm = com.aivora.app.data.local.InMemoryBlockedStore.items.value
+            if (warm.isNotEmpty()) {
+                blocked = warm
+                loading = forceLoading && warm.isEmpty()
+            } else {
+                loading = true
+            }
+            val fresh = runCatching { api.getBlocks().items }.getOrDefault(warm)
+            com.aivora.app.data.local.InMemoryBlockedStore.replace(fresh)
+            blocked = fresh
             loading = false
         }
     }
@@ -1079,7 +1177,7 @@ fun SettingsBlockedScreen(
                 EmptyState(
                     title = "No blocked contacts",
                     body = "Block someone from a chat menu. They can’t message you until you unblock.",
-                    icon = Icons.Default.Block,
+                    icon = AppIcons.Block,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxSize(),
@@ -1087,7 +1185,10 @@ fun SettingsBlockedScreen(
             }
             else -> {
                 LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(blocked, key = { it.id.orEmpty() }) { item ->
+                    items(
+                        items = blocked.filter { !it.id.isNullOrBlank() },
+                        key = { it.id!! },
+                    ) { item ->
                         val name = item.user?.displayName
                             ?: item.user?.phoneDisplay
                             ?: item.user?.phone
@@ -1099,7 +1200,11 @@ fun SettingsBlockedScreen(
                                 val id = item.id ?: return@PersonRow
                                 scope.launch {
                                     runCatching { api.deleteBlocksId(id) }
-                                        .onSuccess { reload() }
+                                        .onSuccess {
+                                            com.aivora.app.data.local.InMemoryBlockedStore.removeId(id)
+                                            blocked =
+                                                com.aivora.app.data.local.InMemoryBlockedStore.items.value
+                                        }
                                 }
                             },
                         )
@@ -1126,7 +1231,7 @@ fun SettingsDevicesScreen(
                     SettingsItem(
                         "Link a device",
                         "Scan the code on Aivora Web",
-                        Icons.Default.QrCode,
+                        iconRes = AivoraIcons.Qr,
                         onClick = { onNavigate(Routes.SettingsDevicesLink) },
                     ),
                 ),
@@ -1135,9 +1240,9 @@ fun SettingsDevicesScreen(
         SettingsList(
             listOf(
                 null to listOf(
-                    SettingsItem("V2440", "android · last active now · this device", Icons.Default.Phone, onClick = { }),
-                    SettingsItem("Chrome on macOS", "web · last active Yesterday", Icons.Default.Devices, trailing = "Sign out", onClick = { }),
-                    SettingsItem("V2440", "android · last active Mon", Icons.Default.Phone, trailing = "Sign out", onClick = { }),
+                    SettingsItem("V2440", "android · last active now · this device", iconRes = AivoraIcons.Call, onClick = { }),
+                    SettingsItem("Chrome on macOS", "web · last active Yesterday", AppIcons.Devices, trailing = "Sign out", onClick = { }),
+                    SettingsItem("V2440", "android · last active Mon", iconRes = AivoraIcons.Call, trailing = "Sign out", onClick = { }),
                 ),
             ),
         )
@@ -1153,8 +1258,8 @@ fun SettingsDevicesLinkScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Scan QR code", "Point camera at the code", Icons.Default.QrCode, onClick = { }),
-            SettingsItem("Link with phone number", null, Icons.Default.Phone, onClick = { }),
+            SettingsItem("Scan QR code", "Point camera at the code", iconRes = AivoraIcons.Qr, onClick = { }),
+            SettingsItem("Link with phone number", null, iconRes = AivoraIcons.Call, onClick = { }),
         ),
     )
 
@@ -1179,12 +1284,12 @@ fun SettingsPermissionsScreen(
     var photos by remember { mutableStateOf(true) }
     val sections = listOf(
         null to listOf(
-            SettingsItem("Camera", "Allow camera", Icons.Default.Photo, toggle = cam, onToggle = { cam = it }),
-            SettingsItem("Microphone", "Allow the microphone", Icons.Default.Mic, toggle = mic, onToggle = { mic = it }),
-            SettingsItem("Contacts", "Allow contacts", Icons.Default.Person, toggle = contacts, onToggle = { contacts = it }),
-            SettingsItem("Location", "Allow location access?", Icons.Default.LocationOn, toggle = loc, onToggle = { loc = it }),
-            SettingsItem("Notifications", "Message and call alerts", Icons.Default.Notifications, toggle = notif, onToggle = { notif = it }),
-            SettingsItem("Photos and videos", "Allow access to Photos", Icons.Default.Photo, toggle = photos, onToggle = { photos = it }),
+            SettingsItem("Camera", "Allow camera", AppIcons.Photo, toggle = cam, onToggle = { cam = it }),
+            SettingsItem("Microphone", "Allow the microphone", iconRes = AivoraIcons.Mic, toggle = mic, onToggle = { mic = it }),
+            SettingsItem("Contacts", "Allow contacts", AppIcons.Person, toggle = contacts, onToggle = { contacts = it }),
+            SettingsItem("Location", "Allow location access?", AppIcons.LocationOn, toggle = loc, onToggle = { loc = it }),
+            SettingsItem("Notifications", "Message and call alerts", iconRes = AivoraIcons.Notifications, toggle = notif, onToggle = { notif = it }),
+            SettingsItem("Photos and videos", "Allow access to Photos", AppIcons.Photo, toggle = photos, onToggle = { photos = it }),
         ),
     )
 
@@ -1203,8 +1308,8 @@ fun SettingsCommunitiesScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Create community", null, Icons.Default.Groups, onClick = { onNavigate(Routes.NewGroup) }),
-            SettingsItem("Your communities", "Everyone in the community", Icons.Default.Groups, onClick = { onNavigate(Routes.CommunityId.replace("{id}", "1")) }),
+            SettingsItem("Create community", null, iconRes = AivoraIcons.Group, onClick = { onNavigate(Routes.NewGroup) }),
+            SettingsItem("Your communities", "Everyone in the community", iconRes = AivoraIcons.Group, onClick = { onNavigate(Routes.CommunityId.replace("{id}", "1")) }),
         ),
     )
 
@@ -1242,11 +1347,11 @@ fun SettingsDeleteAccountScreen(
             )
             Spacer(Modifier.height(12.dp))
             SettingsMutedCard {
-                SettingsRow(SettingsItem("Delete your Aivora account", icon = Icons.Default.Person))
+                SettingsRow(SettingsItem("Delete your Aivora account", icon = AppIcons.Person))
                 HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
-                SettingsRow(SettingsItem("Remove you from your groups", icon = Icons.Default.Groups))
+                SettingsRow(SettingsItem("Remove you from your groups", iconRes = AivoraIcons.Group))
                 HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
-                SettingsRow(SettingsItem("Delete your app data and chat history", icon = Icons.Default.Chat))
+                SettingsRow(SettingsItem("Delete your app data and chat history", iconRes = AivoraIcons.Chat))
             }
             SettingsFootnote("Messages other people already have in their chats won’t be removed.")
             SettingsSectionLabel("Confirm your phone number")
@@ -1289,7 +1394,7 @@ fun SettingsDeleteAccountScreen(
                     SettingsItem(
                         "Change number instead",
                         subtitle = "Keep your account with a new number",
-                        icon = Icons.Default.Sync,
+                        icon = AppIcons.Sync,
                         onClick = { onNavigate(Routes.SettingsAccountChangeNumber) },
                     ),
                 )
@@ -1314,9 +1419,9 @@ fun SettingsAccountAddScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Continue with phone number", null, Icons.Default.Phone, onClick = { onNavigate(Routes.Login) }),
-            SettingsItem("Sign in with a passkey", null, Icons.Default.Fingerprint, onClick = { onNavigate(Routes.SettingsAccountPasskeys) }),
-            SettingsItem("Email sign-in", null, Icons.Default.Email, onClick = { onNavigate(Routes.SettingsAccountEmail) }),
+            SettingsItem("Continue with phone number", null, iconRes = AivoraIcons.Call, onClick = { onNavigate(Routes.Login) }),
+            SettingsItem("Sign in with a passkey", null, AppIcons.Fingerprint, onClick = { onNavigate(Routes.SettingsAccountPasskeys) }),
+            SettingsItem("Email sign-in", null, AppIcons.Email, onClick = { onNavigate(Routes.SettingsAccountEmail) }),
         ),
     )
 
@@ -1334,7 +1439,7 @@ fun SettingsAccountChangeNumberScreen(
 ) {
     AivoraScaffold(title = "Change number", onBack = onBack) {
         SettingsHeroIntro(
-            icon = Icons.Default.Sync,
+            icon = AppIcons.Sync,
             title = "Move to a new phone number",
             body = "Changing your number moves your account information, profile, groups and settings to your new number.\n\nBefore you continue, make sure your new number can receive SMS messages or calls.\n\nYour old number must be the one currently registered with Aivora.",
         )
@@ -1356,7 +1461,7 @@ fun SettingsAccountDeletedScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Create new account", null, Icons.Default.Person, onClick = { onNavigate(Routes.Login) }),
+            SettingsItem("Create new account", null, AppIcons.Person, onClick = { onNavigate(Routes.Login) }),
         ),
     )
 
@@ -1435,7 +1540,7 @@ fun SettingsAccountPasskeysScreen(
 ) {
     AivoraScaffold(title = "Passkeys", onBack = onBack) {
         SettingsHeroIntro(
-            icon = Icons.Default.Key,
+            iconRes = AivoraIcons.Key,
             title = "Sign in with a passkey",
             body = "Use your face, fingerprint or device passcode to verify it’s you when signing in to Aivora.\n\nCreate a passkey using your device’s authentication. Other sign-in verification methods remain available.",
         )
@@ -1457,7 +1562,7 @@ fun SettingsAccountRequestInfoScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Request report", "Account information report", Icons.Default.Info, onClick = { }),
+            SettingsItem("Request report", "Account information report", AppIcons.Info, onClick = { }),
         ),
     )
 
@@ -1476,7 +1581,7 @@ fun SettingsAccountSecurityNotificationsScreen(
     var show by remember { mutableStateOf(true) }
     AivoraScaffold(title = "Security notifications", onBack = onBack) {
         SettingsHeroIntro(
-            icon = Icons.Default.Security,
+            icon = AppIcons.Security,
             title = "Your chats are end-to-end encrypted",
             body = "End-to-end encryption keeps your personal messages and calls between you and the people you choose. Not even Aivora can read or listen to them.",
         )
@@ -1510,7 +1615,7 @@ fun SettingsAccountTwoStepNewPinScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Save PIN", "This account has two-step verification on.", Icons.Default.VpnKey, onClick = { onNavigate(Routes.SettingsTwoStep) }),
+            SettingsItem("Save PIN", "This account has two-step verification on.", iconRes = AivoraIcons.Key, onClick = { onNavigate(Routes.SettingsTwoStep) }),
         ),
     )
 
@@ -1530,8 +1635,8 @@ fun SettingsChatsArchivedScreen(
     var keep by remember { mutableStateOf(true) }
     val sections = listOf(
         null to listOf(
-            SettingsItem("Keep chats archived", "New messages stay archived.", Icons.Default.Chat, toggle = keep, onToggle = { keep = it }),
-            SettingsItem("Archive all chats", null, Icons.Default.Chat, onClick = { }),
+            SettingsItem("Keep chats archived", "New messages stay archived.", iconRes = AivoraIcons.Chat, toggle = keep, onToggle = { keep = it }),
+            SettingsItem("Archive all chats", null, iconRes = AivoraIcons.Chat, onClick = { }),
         ),
     )
 
@@ -1551,7 +1656,7 @@ fun SettingsChatsBackupScreen(
     var wifiOnly by remember { mutableStateOf(true) }
     AivoraScaffold(title = "Chat backup", onBack = onBack) {
         SettingsHeroIntro(
-            icon = Icons.Default.CloudUpload,
+            icon = AppIcons.CloudUpload,
             title = "Chat backup",
             body = "Back up your chats and media to your cloud account so you can restore them on a new phone.",
         )
@@ -1630,7 +1735,7 @@ fun SettingsChatsBackupScreen(
                 SettingsItem(
                     "End-to-end encrypted backup",
                     subtitle = "Off",
-                    icon = Icons.Default.Lock,
+                    iconRes = AivoraIcons.Lock,
                     onClick = { onNavigate(Routes.SettingsChatsBackupEncrypted) },
                 ),
             )
@@ -1648,8 +1753,8 @@ fun SettingsChatsBackupEncryptedScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Create password", "Backup password", Icons.Default.Lock, onClick = { }),
-            SettingsItem("Turn on encrypted backup", null, Icons.Default.Security, onClick = { }),
+            SettingsItem("Create password", "Backup password", iconRes = AivoraIcons.Lock, onClick = { }),
+            SettingsItem("Turn on encrypted backup", null, AppIcons.Security, onClick = { }),
         ),
     )
 
@@ -1668,10 +1773,10 @@ fun SettingsChatsBackupFrequencyScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Daily", null, Icons.Default.Timer, onClick = { }),
-            SettingsItem("Weekly", null, Icons.Default.Timer, onClick = { }),
-            SettingsItem("Monthly", null, Icons.Default.Timer, onClick = { }),
-            SettingsItem("Off", null, Icons.Default.Timer, onClick = { }),
+            SettingsItem("Daily", null, AppIcons.Timer, onClick = { }),
+            SettingsItem("Weekly", null, AppIcons.Timer, onClick = { }),
+            SettingsItem("Monthly", null, AppIcons.Timer, onClick = { }),
+            SettingsItem("Off", null, AppIcons.Timer, onClick = { }),
         ),
     )
 
@@ -1690,9 +1795,9 @@ fun SettingsChatsBackupLocationScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Internal storage", null, Icons.Default.Storage, onClick = { }),
-            SettingsItem("Memory card or USB storage", null, Icons.Default.Storage, onClick = { }),
-            SettingsItem("Another app's storage", null, Icons.Default.Folder, onClick = { }),
+            SettingsItem("Internal storage", null, iconRes = AivoraIcons.Storage, onClick = { }),
+            SettingsItem("Memory card or USB storage", null, iconRes = AivoraIcons.Storage, onClick = { }),
+            SettingsItem("Another app's storage", null, AppIcons.Folder, onClick = { }),
         ),
     )
 
@@ -1711,7 +1816,7 @@ fun SettingsChatsBackupOpenScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Restore from backup", "Aivora backup.zip", Icons.Default.Folder, onClick = { }),
+            SettingsItem("Restore from backup", "Aivora backup.zip", AppIcons.Folder, onClick = { }),
         ),
     )
 
@@ -1771,7 +1876,7 @@ fun SettingsChatsExportScreen(
                     SettingsItem(
                         chat.title,
                         subtitle = if (chat.isGroup) "Group" else "Chat",
-                        icon = if (chat.isGroup) Icons.Default.Groups else Icons.Default.Chat,
+                        iconRes = if (chat.isGroup) AivoraIcons.Group else AivoraIcons.Chat,
                         onClick = { selectedId = chat.id },
                     )
                 },
@@ -1794,13 +1899,13 @@ fun SettingsChatsExportScreen(
             SettingsItem(
                 "Without media",
                 subtitle = if (busy) "Exporting…" else "Text file (.txt)",
-                icon = Icons.Default.Chat,
+                iconRes = AivoraIcons.Chat,
                 onClick = { runExport(false) },
             ),
             SettingsItem(
                 "Include media",
                 subtitle = if (busy) "Exporting…" else "Zip with attachments",
-                icon = Icons.Default.Photo,
+                icon = AppIcons.Photo,
                 onClick = { runExport(true) },
             ),
         ),
@@ -1824,9 +1929,9 @@ fun SettingsChatsFontSizeScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Small", null, Icons.Default.Chat, onClick = { }),
-            SettingsItem("Medium", null, Icons.Default.Chat, selected = true, onClick = { }),
-            SettingsItem("Large", null, Icons.Default.Chat, onClick = { }),
+            SettingsItem("Small", null, iconRes = AivoraIcons.Chat, onClick = { }),
+            SettingsItem("Medium", null, iconRes = AivoraIcons.Chat, selected = true, onClick = { }),
+            SettingsItem("Large", null, iconRes = AivoraIcons.Chat, onClick = { }),
         ),
     )
 
@@ -1845,10 +1950,10 @@ fun SettingsChatsHistoryScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Export chat", null, Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsChatsExport) }),
-            SettingsItem("Archive all chats", null, Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsChatsArchived) }),
-            SettingsItem("Clear all chats", null, Icons.Default.Delete, onClick = { }),
-            SettingsItem("Delete all chats", null, Icons.Default.Delete, danger = true, onClick = { }),
+            SettingsItem("Export chat", null, iconRes = AivoraIcons.Chat, onClick = { onNavigate(Routes.SettingsChatsExport) }),
+            SettingsItem("Archive all chats", null, iconRes = AivoraIcons.Chat, onClick = { onNavigate(Routes.SettingsChatsArchived) }),
+            SettingsItem("Clear all chats", null, AppIcons.Delete, onClick = { }),
+            SettingsItem("Delete all chats", null, AppIcons.Delete, danger = true, onClick = { }),
         ),
     )
 
@@ -1867,7 +1972,7 @@ fun SettingsChatsTranscriptsScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Generate transcripts", null, Icons.Default.Chat, onClick = { }),
+            SettingsItem("Generate transcripts", null, iconRes = AivoraIcons.Chat, onClick = { }),
         ),
     )
 
@@ -1885,7 +1990,7 @@ fun SettingsChatsTransferScreen(
 ) {
     AivoraScaffold(title = "Transfer chats", onBack = onBack) {
         SettingsHeroIntro(
-            icon = Icons.Default.PhoneForwarded,
+            icon = AppIcons.PhoneForwarded,
             title = "Move chats to a new phone",
             body = "Transfer your chats and media locally to a new phone using the same phone number.",
         )
@@ -1894,7 +1999,7 @@ fun SettingsChatsTransferScreen(
                 SettingsItem(
                     "Use the same phone number",
                     subtitle = "Register that number on your new phone",
-                    icon = Icons.Default.Person,
+                    icon = AppIcons.Person,
                 ),
             )
             HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
@@ -1902,7 +2007,7 @@ fun SettingsChatsTransferScreen(
                 SettingsItem(
                     "Keep both phones nearby",
                     subtitle = "Leave both phones unlocked during the transfer",
-                    icon = Icons.Default.PhoneForwarded,
+                    icon = AppIcons.PhoneForwarded,
                 ),
             )
             HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
@@ -1910,7 +2015,7 @@ fun SettingsChatsTransferScreen(
                 SettingsItem(
                     "Make sure both have enough power",
                     subtitle = "Connect them to power if needed",
-                    icon = Icons.Default.Info,
+                    icon = AppIcons.Info,
                 ),
             )
         }
@@ -1933,9 +2038,9 @@ fun SettingsListsNewScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("List name", "Favourites, Work, Family…", Icons.Default.Menu, onClick = { }),
-            SettingsItem("Add people or groups", null, Icons.Default.Groups, onClick = { onNavigate(Routes.NewChat) }),
-            SettingsItem("Reorder lists", null, Icons.Default.Menu, onClick = { onNavigate(Routes.SettingsListsReorder) }),
+            SettingsItem("List name", "Favourites, Work, Family…", AppIcons.Menu, onClick = { }),
+            SettingsItem("Add people or groups", null, iconRes = AivoraIcons.Group, onClick = { onNavigate(Routes.NewChat) }),
+            SettingsItem("Reorder lists", null, AppIcons.Menu, onClick = { onNavigate(Routes.SettingsListsReorder) }),
         ),
     )
 
@@ -1955,9 +2060,9 @@ fun SettingsListsEditIdScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Rename list", null, Icons.Default.Edit, onClick = { }),
-            SettingsItem("Add chats", null, Icons.Default.Chat, onClick = { onNavigate(Routes.NewChat) }),
-            SettingsItem("Delete list", "Deleting this list does not delete any chats.", Icons.Default.Delete, danger = true, onClick = { }),
+            SettingsItem("Rename list", null, iconRes = AivoraIcons.Edit, onClick = { }),
+            SettingsItem("Add chats", null, iconRes = AivoraIcons.Chat, onClick = { onNavigate(Routes.NewChat) }),
+            SettingsItem("Delete list", "Deleting this list does not delete any chats.", AppIcons.Delete, danger = true, onClick = { }),
         ),
     )
 
@@ -1976,10 +2081,10 @@ fun SettingsListsReorderScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Favourites", null, Icons.Default.Star, onClick = { }),
-            SettingsItem("Unread", null, Icons.Default.Chat, onClick = { }),
-            SettingsItem("Groups", null, Icons.Default.Groups, onClick = { }),
-            SettingsItem("Custom lists aren't available yet.", null, Icons.Default.Menu, onClick = { }),
+            SettingsItem("Favourites", null, iconRes = AivoraIcons.Star, onClick = { }),
+            SettingsItem("Unread", null, iconRes = AivoraIcons.Chat, onClick = { }),
+            SettingsItem("Groups", null, iconRes = AivoraIcons.Group, onClick = { }),
+            SettingsItem("Custom lists aren't available yet.", null, AppIcons.Menu, onClick = { }),
         ),
     )
 
@@ -2061,7 +2166,7 @@ fun SettingsPrivacyChatLockScreen(
             HorizontalDivider(modifier = Modifier.padding(start = 16.dp), color = AivoraColors.Divider)
             SettingsGreenActionRow(
                 title = "Set secret code",
-                icon = Icons.Default.Lock,
+                iconRes = AivoraIcons.Lock,
                 onClick = { onNavigate(Routes.SettingsPrivacyChatLockSecretCode) },
             )
         }
@@ -2080,9 +2185,9 @@ fun SettingsPrivacyChatLockSecretCodeScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Enter secret code", null, Icons.Default.VpnKey, onClick = { }),
-            SettingsItem("Confirm secret code", null, Icons.Default.VpnKey, onClick = { }),
-            SettingsItem("Save", null, Icons.Default.Check, onClick = { onNavigate(Routes.SettingsPrivacyChatLock) }),
+            SettingsItem("Enter secret code", null, iconRes = AivoraIcons.Key, onClick = { }),
+            SettingsItem("Confirm secret code", null, iconRes = AivoraIcons.Key, onClick = { }),
+            SettingsItem("Save", null, AppIcons.Check, onClick = { onNavigate(Routes.SettingsPrivacyChatLock) }),
         ),
     )
 
@@ -2101,10 +2206,10 @@ fun SettingsPrivacyCheckupScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Personal info", "Last seen, photo, about", Icons.Default.Person, onClick = { onNavigate(Routes.SettingsPrivacyLastSeen) }),
-            SettingsItem("Status privacy", null, Icons.Default.Chat, onClick = { onNavigate(Routes.SettingsPrivacyStatus) }),
-            SettingsItem("Groups and calls", null, Icons.Default.Groups, onClick = { onNavigate(Routes.SettingsPrivacyGroups) }),
-            SettingsItem("App lock", null, Icons.Default.Lock, onClick = { onNavigate(Routes.SettingsPrivacyAppLock) }),
+            SettingsItem("Personal info", "Last seen, photo, about", AppIcons.Person, onClick = { onNavigate(Routes.SettingsPrivacyLastSeen) }),
+            SettingsItem("Status privacy", null, iconRes = AivoraIcons.Chat, onClick = { onNavigate(Routes.SettingsPrivacyStatus) }),
+            SettingsItem("Groups and calls", null, iconRes = AivoraIcons.Group, onClick = { onNavigate(Routes.SettingsPrivacyGroups) }),
+            SettingsItem("App lock", null, iconRes = AivoraIcons.Lock, onClick = { onNavigate(Routes.SettingsPrivacyAppLock) }),
         ),
     )
 
@@ -2123,8 +2228,8 @@ fun SettingsPrivacyLiveLocationScreen(
 
     val sections = listOf(
         null to listOf(
-            SettingsItem("Stop all live locations", "Live location ended", Icons.Default.LocationOn, onClick = { }),
-            SettingsItem("Live location · from another device", null, Icons.Default.Devices, onClick = { }),
+            SettingsItem("Stop all live locations", "Live location ended", AppIcons.LocationOn, onClick = { }),
+            SettingsItem("Live location · from another device", null, AppIcons.Devices, onClick = { }),
         ),
     )
 

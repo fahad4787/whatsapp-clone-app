@@ -1,5 +1,7 @@
 package com.aivora.app.ui.components
 
+import com.aivora.app.ui.icons.AppIcons
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,8 +21,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ripple
@@ -62,6 +62,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aivora.app.ui.icons.AivoraIconChrome
+import com.aivora.app.ui.icons.AivoraIconSlot
 import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.motion.pressScale
 import com.aivora.app.ui.theme.AivoraColors
@@ -111,7 +113,11 @@ fun AivoraScaffold(
                 navigationIcon = {
                     if (onBack != null) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(
+                                painter = painterResource(AivoraIcons.Back),
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.onBackground,
+                            )
                         }
                     }
                 },
@@ -158,28 +164,14 @@ fun SettingsRow(item: SettingsItem) {
             .padding(horizontal = AivoraDimens.Space4),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        when {
-            item.iconRes != null -> {
-                Icon(
-                    painter = painterResource(item.iconRes),
-                    contentDescription = null,
-                    tint = AivoraColors.Ink,
-                    modifier = Modifier.size(24.dp),
-                )
-                Spacer(Modifier.width(14.dp))
-            }
-            item.icon != null -> {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(AivoraColors.Primary.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(item.icon, contentDescription = null, tint = AivoraColors.Primary, modifier = Modifier.size(22.dp))
-                }
-                Spacer(Modifier.width(14.dp))
-            }
+        // Figma Settings “Action icon”: 24×24, no plate, Ink — same chrome for Material or drawable.
+        if (item.iconRes != null || item.icon != null) {
+            AivoraIconSlot(
+                chrome = if (item.danger) AivoraIconChrome.Danger else AivoraIconChrome.List,
+                painterRes = item.iconRes,
+                imageVector = item.icon,
+            )
+            Spacer(Modifier.width(14.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -227,7 +219,7 @@ fun SettingsRow(item: SettingsItem) {
                     uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
                 ),
             )
-            item.selected -> Icon(Icons.Default.Check, contentDescription = null, tint = AivoraColors.Primary)
+            item.selected -> Icon(AppIcons.Check, contentDescription = null, tint = AivoraColors.Primary)
             item.trailing != null -> Text(item.trailing, color = MaterialTheme.colorScheme.onSurfaceVariant)
             click != null -> Icon(
                 painter = painterResource(AivoraIcons.ChevronRight),
@@ -283,48 +275,48 @@ fun SettingsList(
     sections: List<Pair<String?, List<SettingsItem>>>,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            horizontal = AivoraDimens.CardHorizontal,
-            vertical = AivoraDimens.Space2,
-        ),
+    // Settings sections are short — Column scroll (F11) beats LazyColumn recycle on Mate.
+    AivoraScrollColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(
+                horizontal = AivoraDimens.CardHorizontal,
+                vertical = AivoraDimens.Space2,
+            ),
         verticalArrangement = Arrangement.spacedBy(AivoraDimens.Space2),
     ) {
         sections.forEach { (header, items) ->
-            item {
-                Column {
-                    if (header != null) {
-                        Text(
-                            header,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
-                        )
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
-                            .background(AivoraColors.SurfaceMuted),
-                    ) {
-                        items.forEachIndexed { index, row ->
-                            SettingsRow(row)
-                            if (index < items.lastIndex) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(
-                                        start = if (row.iconRes != null || row.icon != null) 54.dp else 16.dp,
-                                    ),
-                                    color = AivoraColors.Divider,
-                                )
-                            }
+            Column {
+                if (header != null) {
+                    Text(
+                        header,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                        .background(AivoraColors.SurfaceMuted),
+                ) {
+                    items.forEachIndexed { index, row ->
+                        SettingsRow(row)
+                        if (index < items.lastIndex) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(
+                                    start = if (row.iconRes != null || row.icon != null) 54.dp else 16.dp,
+                                ),
+                                color = AivoraColors.Divider,
+                            )
                         }
                     }
                 }
             }
         }
-        item { Spacer(Modifier.height(24.dp)) }
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -492,7 +484,7 @@ fun SearchField(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         placeholder = { Text(placeholder) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        leadingIcon = { Icon(AppIcons.Search, contentDescription = null) },
         singleLine = true,
         shape = RoundedCornerShape(24.dp),
     )
@@ -526,7 +518,7 @@ fun Avatar(
         contentAlignment = Alignment.Center,
     ) {
         if (name.isBlank()) {
-            Icon(Icons.Default.Person, contentDescription = null, tint = Color.White)
+            Icon(AppIcons.Person, contentDescription = null, tint = Color.White)
         } else {
             Text(
                 name.trim().first().uppercaseChar().toString(),

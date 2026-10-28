@@ -50,26 +50,45 @@ object ActiveCallSession {
             peerName = peerName,
             asCaller = asCaller,
         )
+        CallLog.i(
+            "active callId=$callId media=${media.lowercase()} peer=$peerName " +
+                "role=${if (asCaller) "caller" else "callee"}",
+        )
     }
 
     fun markAnswered() {
+        if (!_answered.value) {
+            CallLog.i("answered callId=${_session.value?.callId}")
+        }
         _answered.value = true
     }
 
     fun clear() {
+        val id = _session.value?.callId
         _session.value = null
         _answered.value = false
+        if (id != null) CallLog.d("cleared session callId=$id")
     }
 
     fun setIncoming(call: CallDto?) {
         _incoming.value = call
+        if (call != null) {
+            CallLog.i(
+                "incoming callId=${call.id} media=${call.media} " +
+                    "group=${call.groupTitle} from=${call.caller?.name}",
+            )
+        }
     }
 
     fun clearIncoming() {
+        val id = _incoming.value?.id
         _incoming.value = null
+        if (id != null) CallLog.d("cleared incoming callId=$id")
     }
 
     fun markEnded(reason: String) {
+        val id = _session.value?.callId ?: _incoming.value?.id
+        CallLog.i("ended callId=$id reason=$reason")
         _endedReason.value = reason
         _incoming.value = null
         _session.value = null

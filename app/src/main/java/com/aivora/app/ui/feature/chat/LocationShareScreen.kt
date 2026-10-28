@@ -1,5 +1,7 @@
 package com.aivora.app.ui.feature.chat
 
+import com.aivora.app.ui.icons.AppIcons
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
@@ -208,7 +210,7 @@ fun LocationShareScreen(
             navigationIcon = {
                 if (onBack != null) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(AppIcons.ArrowBack, contentDescription = "Back")
                     }
                 }
             },
@@ -253,7 +255,7 @@ fun LocationShareScreen(
                             .background(AivoraColors.Primary.copy(alpha = 0.22f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Default.MyLocation, contentDescription = null, tint = AivoraColors.Primary)
+                        Icon(AppIcons.MyLocation, contentDescription = null, tint = AivoraColors.Primary)
                     }
                 }
                 Text(
@@ -282,7 +284,7 @@ fun LocationShareScreen(
                         if (locating || sending) "Getting location…" else "Send current location",
                         subtitle = preview?.address
                             ?: "Uses GPS on this device",
-                        icon = Icons.Default.NearMe,
+                        icon = AppIcons.NearMe,
                         onClick = { if (!locating && !sending) requestOrSend() },
                     ),
                 )
@@ -298,7 +300,7 @@ fun LocationShareScreen(
                     SettingsItem(
                         "Share live location",
                         subtitle = "Let $peer see your location for a while",
-                        icon = Icons.Default.ShareLocation,
+                        icon = AppIcons.ShareLocation,
                         onClick = {
                             Toast.makeText(context, "Live location coming in a later wave", Toast.LENGTH_SHORT).show()
                         },

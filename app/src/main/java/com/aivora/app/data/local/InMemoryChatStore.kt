@@ -6,9 +6,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -20,7 +23,10 @@ import java.util.concurrent.atomic.AtomicInteger
  * Disk snapshots via [ChatListCache] / [MessageCache] for instant reopen.
  */
 object InMemoryChatStore {
-    /** Keep memory lean for Mate-class devices (WhatsApp pages older history). */
+    /**
+     * Scroll window — large enough for history; LazyColumn + slim bubbles keep fling ok (F12).
+     * Disk [MessageCache.MAX_MESSAGES] can stay larger for reopen paint.
+     */
     private const val MAX_IN_MEMORY_MESSAGES = 60
 
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -81,7 +87,8 @@ object InMemoryChatStore {
         if (cached.isEmpty()) return
         val flow = messageFlow(chatId)
         if (flow.value.isNotEmpty()) return
-        flow.value = cached
+        // distinctBy keep last — duplicate ids crash LazyColumn keys.
+        flow.value = cached.distinctBy { it.id }
     }
 
     fun persistMessages(context: Context, chatId: String) {
@@ -95,18 +102,47 @@ object InMemoryChatStore {
         }
     }
 
-    fun upsertChat(chat: LocalChat) {
-        _chats.update { listOf(chat) + it.filterNot { c -> c.id == chat.id } }
+    /**
+     * @param promote when true (new activity), move row to top. Open-chat refresh must pass
+     * false — otherwise the 2nd chat jumps to #1 under the transition for a second.
+     */
+    fun upsertChat(chat: LocalChat, promote: Boolean = true) {
+        _chats.update { list ->
+            if (promote) {
+                listOf(chat) + list.filterNot { c -> c.id == chat.id }
+            } else {
+                var found = false
+                val mapped = list.map { c ->
+                    if (c.id == chat.id) {
+                        found = true
+                        chat
+                    } else {
+                        c
+                    }
+                }
+                if (found) mapped else list + chat
+            }
+        }
         messageFlows.getOrPut(chat.id) { MutableStateFlow(emptyList()) }
     }
 
-    fun messages(chatId: String): StateFlow<List<LocalMessage>> =
-        messageFlow(chatId).asStateFlow()
+    /** Stable per-chat flow — do not wrap in a new asStateFlow() each call (breaks collect). */
+    fun messages(chatId: String): StateFlow<List<LocalMessage>> = messageFlow(chatId)
 
     fun chat(chatId: String): LocalChat =
         _chats.value.find { it.id == chatId }
             ?: if (usingRemote) LocalChat(chatId, "Chat", "Say hello", "Now")
             else SeedData.chat(chatId)
+
+    /** Emits only when this chat's row changes — avoids full-list recomposition of open chat. */
+    fun chatFlow(chatId: String): Flow<LocalChat> =
+        _chats
+            .map { list ->
+                list.find { it.id == chatId }
+                    ?: if (usingRemote) LocalChat(chatId, "Chat", "Say hello", "Now")
+                    else SeedData.chat(chatId)
+            }
+            .distinctUntilChanged()
 
     fun sendText(
         chatId: String,
@@ -274,7 +310,9 @@ object InMemoryChatStore {
             added = unique.size
             if (unique.isEmpty()) return@update current
             val merged = unique + current
-            val softMax = MAX_IN_MEMORY_MESSAGES * 2
+            // Soft cap while paging older — never 2× window (that killed low-end fling).
+            // Keep headroom so scroll-up history is not immediately trimmed away.
+            val softMax = MAX_IN_MEMORY_MESSAGES + 40
             if (merged.size > softMax) merged.takeLast(softMax) else merged
         }
         return added
@@ -289,31 +327,58 @@ object InMemoryChatStore {
         if (expectedEpoch != null && expectedEpoch != messageEpoch(chatId)) return
         val flow = messageFlow(chatId)
         // Skip identical snapshots — avoids janky full recomposition while scrolling.
-        val capped = if (messages.size > MAX_IN_MEMORY_MESSAGES) {
-            messages.takeLast(MAX_IN_MEMORY_MESSAGES)
+        val deduped = messages.distinctBy { it.id }
+        val capped = if (deduped.size > MAX_IN_MEMORY_MESSAGES) {
+            deduped.takeLast(MAX_IN_MEMORY_MESSAGES)
         } else {
-            messages
+            deduped
         }
         if (sameMessageSnapshot(flow.value, capped)) return
         flow.value = capped
-        val last = capped.lastOrNull()
-        if (last != null) {
-            _chats.update { list ->
-                val current = list.find { it.id == chatId }
-                    ?: LocalChat(chatId, "Chat", last.body, last.time)
-                if (current.preview == last.body && current.time == last.time && current.unread == 0 &&
-                    list.firstOrNull()?.id == chatId
-                ) {
-                    return@update list
-                }
-                listOf(
-                    current.copy(preview = last.body, time = last.time, unread = 0),
-                ) + list.filterNot { it.id == chatId }
-            }
+        publishPreview(chatId, capped.lastOrNull())
+    }
+
+    /**
+     * Apply a latest-page remote fetch without wiping older in-memory rows
+     * (scroll-up history) or reshuffling a already-painted LazyColumn.
+     * Remote wins on id conflicts; local-only older messages are kept.
+     */
+    fun applyRemotePage(chatId: String, remote: List<LocalMessage>, expectedEpoch: Int? = null) {
+        if (expectedEpoch != null && expectedEpoch != messageEpoch(chatId)) return
+        val flow = messageFlow(chatId)
+        val local = flow.value
+        val dedupedRemote = remote.distinctBy { it.id }
+        if (local.isEmpty()) {
+            replaceMessages(chatId, dedupedRemote, expectedEpoch = null)
+            return
+        }
+        if (dedupedRemote.isEmpty()) return
+
+        val remoteById = LinkedHashMap<String, LocalMessage>(dedupedRemote.size)
+        dedupedRemote.forEach { remoteById[it.id] = it }
+
+        // Preserve local-only rows (older pages / optimistic sends not yet on server page).
+        val localOnly = local.filter { it.id !in remoteById }
+        val merged = (localOnly + dedupedRemote).distinctBy { it.id }
+        val capped = if (merged.size > MAX_IN_MEMORY_MESSAGES) {
+            merged.takeLast(MAX_IN_MEMORY_MESSAGES)
         } else {
-            _chats.update { list ->
-                list.map {
-                    if (it.id == chatId) it.copy(preview = "No messages", unread = 0) else it
+            merged
+        }
+        if (sameMessageSnapshot(local, capped)) return
+        flow.value = capped
+        publishPreview(chatId, capped.lastOrNull())
+    }
+
+    private fun publishPreview(chatId: String, last: LocalMessage?) {
+        // In-place preview update only — do not promote to top (that flash on open).
+        _chats.update { list ->
+            list.map { c ->
+                if (c.id != chatId) c
+                else if (last != null) {
+                    c.copy(preview = last.body, time = last.time, unread = 0)
+                } else {
+                    c.copy(preview = "No messages", unread = 0)
                 }
             }
         }
@@ -327,7 +392,9 @@ object InMemoryChatStore {
             if (x.id != y.id || x.status != y.status || x.body != y.body ||
                 x.starred != y.starred || x.deletedForEveryone != y.deletedForEveryone ||
                 x.reactions != y.reactions || x.editedAtIso != y.editedAtIso ||
-                x.mediaUri != y.mediaUri
+                x.mediaUri != y.mediaUri || x.system != y.system || x.disappeared != y.disappeared ||
+                x.poll != y.poll || x.contact != y.contact || x.location != y.location ||
+                x.event != y.event || x.viewOnce != y.viewOnce
             ) {
                 return false
             }

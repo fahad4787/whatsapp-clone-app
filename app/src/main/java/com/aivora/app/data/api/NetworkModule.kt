@@ -48,10 +48,7 @@ object NetworkModule {
     }
 
     private fun buildOkHttp(): OkHttpClient {
-        val log = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
-        }
-        return OkHttpClient.Builder()
+        val builder = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .addInterceptor { chain ->
@@ -65,8 +62,13 @@ object NetworkModule {
                 chain.proceed(req)
             }
             .authenticator(TokenAuthenticator)
-            .addInterceptor(log)
-            .build()
+        // PERF H2: never attach BASIC logging in release — CPU + log I/O on every call.
+        if (BuildConfig.DEBUG) {
+            builder.addInterceptor(
+                HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC },
+            )
+        }
+        return builder.build()
     }
 
     /** Shared OkHttp client (token from [SessionStore]). Extra arg kept for call-site compat. */
