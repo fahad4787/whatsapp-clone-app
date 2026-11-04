@@ -21,9 +21,10 @@ android {
         buildConfigField("String", "WS_BASE_URL", "\"wss://whatsapp-clone-backend-hep1.onrender.com/ws/\"")
         // OTP stays for release / final; debug auto-verifies with 000000 (server OTP_DEV_BYPASS).
         buildConfigField("boolean", "DEV_AUTO_OTP", "false")
-        // LiveKit/WebRTC .so dominate APK; ship device ABIs only (Mate/Vivo). Emulator x86 needs a local override.
+        // Wave 23: arm64-only sideload (Mate/Vivo). Dropping armeabi-v7a saves ~8MB WebRTC.
+        // Emulator x86 / 32-bit: local override — abiFilters += "x86_64" or "armeabi-v7a".
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+            abiFilters += listOf("arm64-v8a")
         }
     }
 
@@ -71,6 +72,8 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    // Wave 23: extended kept — material-icons-core lacks Mic/Videocam/etc. (~50 glyphs).
+    // Release R8 strips unused; debug DEX cost documented in WAVE23_APK_SIZE.md.
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.fragment:fragment-ktx:1.8.5")

@@ -29,6 +29,8 @@ class AivoraApp : Application(), SingletonImageLoader.Factory {
         val lowRam = am?.isLowRamDevice == true || (am?.memoryClass ?: 256) <= 256
         val memPercent = if (lowRam) 0.08 else 0.15
         val diskBytes = if (lowRam) 24L * 1024 * 1024 else 48L * 1024 * 1024
+        // Coil lazy-loads as RecyclerView binds; Android decodes WebP natively.
+        // Prefer modern formats when origin negotiates (CDN / static hosts).
         return ImageLoader.Builder(context)
             .crossfade(false)
             .memoryCache {

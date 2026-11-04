@@ -1,13 +1,20 @@
 package com.aivora.app.data.call
 
+import android.app.ActivityManager
 import android.content.Context
 import android.media.AudioManager
 import io.livekit.android.LiveKit
+import io.livekit.android.RoomOptions
 import io.livekit.android.events.RoomEvent
 import io.livekit.android.events.collect
+import io.livekit.android.renderer.TextureViewRenderer
 import io.livekit.android.room.Room
+import io.livekit.android.room.participant.VideoTrackPublishDefaults
 import io.livekit.android.room.track.CameraPosition
 import io.livekit.android.room.track.LocalVideoTrack
+import io.livekit.android.room.track.LocalVideoTrackOptions
+import io.livekit.android.room.track.Track
+import io.livekit.android.room.track.VideoPreset169
 import io.livekit.android.room.track.VideoTrack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,9 +25,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import livekit.org.webrtc.RendererCommon
 
 /** Thin LiveKit room wrapper for Wave 16.1 in-call screens. */
 object LiveKitCallController {
+    private const val RENDERER_ROOM_TAG = 0x0A17_0001
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var room: Room? = null
     private var eventsJob: Job? = null
@@ -54,7 +64,28 @@ object LiveKitCallController {
     val speakerOn: StateFlow<Boolean> = _speakerOn.asStateFlow()
 
     /**
-     * @param waitForPeer when true (caller), keep mic/camera unpublished until [enableMedia] / remote joins.
+     * Bind a TextureViewRenderer to this room's EGL (required — own EglBase = blank frames).
+     * Idempotent: skip if this view was already initialized for the current room.
+     */
+    fun initRenderer(view: TextureViewRenderer, fill: Boolean = true) {
+        val r = room
+        if (r == null) {
+            CallLog.w("initRenderer before room ready")
+            return
+        }
+        if (view.getTag(RENDERER_ROOM_TAG) !== r) {
+            r.initVideoRenderer(view)
+            view.setTag(RENDERER_ROOM_TAG, r)
+        }
+        view.setScalingType(
+            if (fill) RendererCommon.ScalingType.SCALE_ASPECT_FILL
+            else RendererCommon.ScalingType.SCALE_ASPECT_FIT,
+        )
+        view.setEnableHardwareScaler(true)
+    }
+
+    /**
+     * @param waitForPeer when true (audio caller), keep mic unpublished until peer joins.
      */
     suspend fun connect(
         context: Context,
@@ -68,13 +99,29 @@ object LiveKitCallController {
         val appCtx = context.applicationContext
         appContext = appCtx
         CallLog.i("livekit connect video=$enableVideo waitForPeer=$waitForPeer gen=$gen")
-        val created = LiveKit.create(appCtx)
+
+        val preset = videoPresetForDevice(appCtx)
+        val created = LiveKit.create(
+            appCtx,
+            options = RoomOptions(
+                // Subscribe only needed layers — cuts decode cost on Mate-class devices.
+                adaptiveStream = true,
+                dynacast = true,
+                videoTrackCaptureDefaults = LocalVideoTrackOptions(
+                    position = CameraPosition.FRONT,
+                    captureParams = preset.capture,
+                ),
+                videoTrackPublishDefaults = VideoTrackPublishDefaults(
+                    videoEncoding = preset.encoding,
+                    simulcast = true,
+                ),
+            ),
+        )
         room = created
         eventsJob = scope.launch {
             created.events.collect { event ->
                 when (event) {
                     is RoomEvent.Connected -> {
-                        // Publisher PC is ready — flush any enable that arrived during connect.
                         pendingEnableVideo?.let { pending ->
                             pendingEnableVideo = null
                             scope.launch { publishMedia(pending) }
@@ -101,6 +148,20 @@ object LiveKitCallController {
                             _remoteVideo.value = null
                         }
                     }
+                    is RoomEvent.TrackPublished -> {
+                        if (event.participant == created.localParticipant &&
+                            event.publication.kind == Track.Kind.VIDEO
+                        ) {
+                            refreshLocalVideo()
+                        }
+                    }
+                    is RoomEvent.TrackUnpublished -> {
+                        if (event.participant == created.localParticipant &&
+                            event.publication.kind == Track.Kind.VIDEO
+                        ) {
+                            refreshLocalVideo()
+                        }
+                    }
                     is RoomEvent.Disconnected -> {
                         _roomConnected.value = false
                         _remoteJoined.value = false
@@ -119,18 +180,17 @@ object LiveKitCallController {
         pendingEnableVideo = null
         when {
             pending != null -> publishMedia(pending)
+            // Video: publish camera while ringing so self-preview works.
+            enableVideo -> publishMedia(true)
             waitForPeer && !_remoteJoined.value -> {
-                // Ringing: joined for fast connect; tracks stay unpublished (no publish API).
                 _muted.value = false
-                _cameraOff.value = !enableVideo
+                _cameraOff.value = true
             }
-            else -> publishMedia(enableVideo)
+            else -> publishMedia(false)
         }
-        // Voice → earpiece; video → speaker. Same for caller and callee.
         setSpeaker(appCtx, enableVideo)
     }
 
-    /** Unmute / publish after callee accepts (or remote appears). */
     fun enableMedia(enableVideo: Boolean) {
         scope.launch {
             if (!_roomConnected.value || room == null) {
@@ -155,7 +215,12 @@ object LiveKitCallController {
         scope.launch {
             runCatching {
                 room?.localParticipant?.setCameraEnabled(!off)
-                if (!off) refreshLocalVideo() else _localVideo.value = null
+                if (!off) {
+                    delay(80)
+                    refreshLocalVideo()
+                } else {
+                    _localVideo.value = null
+                }
             }.onFailure { CallLog.w("setCameraOff failed", it) }
         }
     }
@@ -204,7 +269,6 @@ object LiveKitCallController {
     }
 
     private suspend fun publishMedia(enableVideo: Boolean) {
-        // Slow devices (Xsmart Mate 10): connect() can return before engine.publisher exists.
         repeat(8) { attempt ->
             val lp = room?.localParticipant
             if (lp == null || !_roomConnected.value) {
@@ -215,7 +279,6 @@ object LiveKitCallController {
                 lp.setMicrophoneEnabled(true)
                 if (enableVideo) {
                     lp.setCameraEnabled(true)
-                    refreshLocalVideo()
                 } else {
                     lp.setCameraEnabled(false)
                 }
@@ -223,6 +286,16 @@ object LiveKitCallController {
             if (result.isSuccess) {
                 _muted.value = false
                 _cameraOff.value = !enableVideo
+                if (enableVideo) {
+                    // Publication can lag a frame after setCameraEnabled.
+                    repeat(6) {
+                        refreshLocalVideo()
+                        if (_localVideo.value != null) return
+                        delay(80)
+                    }
+                } else {
+                    _localVideo.value = null
+                }
                 return
             }
             val err = result.exceptionOrNull()
@@ -236,7 +309,6 @@ object LiveKitCallController {
             CallLog.w("publisher not ready, retry ${attempt + 1}")
             delay(150L * (attempt + 1))
         }
-        // Keep trying once Connected fires.
         pendingEnableVideo = enableVideo
         CallLog.e("publishMedia exhausted retries; queued pending enable")
     }
@@ -246,12 +318,38 @@ object LiveKitCallController {
     }
 
     private fun refreshLocalVideo() {
-        room?.localParticipant?.videoTrackPublications?.forEach { (_, track) ->
-            if (track is LocalVideoTrack) {
-                _localVideo.value = track
-            } else if (track is VideoTrack) {
-                _localVideo.value = track
+        val lp = room?.localParticipant ?: return
+        // Prefer camera source publication.
+        val cameraPub = lp.getTrackPublication(Track.Source.CAMERA)
+        val cameraTrack = cameraPub?.track
+        if (cameraTrack is LocalVideoTrack) {
+            _localVideo.value = cameraTrack
+            return
+        }
+        if (cameraTrack is VideoTrack) {
+            _localVideo.value = cameraTrack
+            return
+        }
+        // List is Pair<TrackPublication, Track?>
+        for ((pub, track) in lp.videoTrackPublications) {
+            val t = track ?: pub.track
+            if (t is LocalVideoTrack || t is VideoTrack) {
+                _localVideo.value = t as VideoTrack
+                return
             }
+        }
+        if (_cameraOff.value) _localVideo.value = null
+    }
+
+    /** Mate-class: H360 keeps encode cheap; mid/high: H540 for clearer WA-like video. */
+    private fun videoPresetForDevice(context: Context): VideoPreset169 {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val lowRam = am?.isLowRamDevice == true
+        val heapMb = (Runtime.getRuntime().maxMemory() / (1024L * 1024L)).toInt()
+        return when {
+            lowRam || heapMb <= 192 -> VideoPreset169.H360
+            heapMb <= 384 -> VideoPreset169.H540
+            else -> VideoPreset169.H720
         }
     }
 }

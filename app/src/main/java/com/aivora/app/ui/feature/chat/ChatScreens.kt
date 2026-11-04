@@ -144,6 +144,7 @@ import com.aivora.app.data.local.LocalMediaKind
 import com.aivora.app.data.local.LocalMessage
 import com.aivora.app.data.local.LocalReplyPreview
 import com.aivora.app.data.local.MessageDeliveryStatus
+import com.aivora.app.data.local.PendingChatMedia
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.EditMessageBody
 import com.aivora.app.data.model.EmptyRequestBody
@@ -227,12 +228,16 @@ fun ChatIdScreen(
     var editTarget by remember { mutableStateOf<LocalMessage?>(null) }
     var editText by remember { mutableStateOf("") }
     var showWallpaper by remember { mutableStateOf(false) }
-    // Message + url currently shown in the one-time viewer.
-    var viewOnceShown by remember { mutableStateOf<Pair<LocalMessage, String>?>(null) }
+    // Full-screen in-app photo viewer (normal image or view-once).
+    var mediaViewer by remember {
+        mutableStateOf<Triple<String, String?, LocalMessage?>?>(null)
+    } // url, caption, viewOnceMsg?
+    // Gallery / camera compose preview (caption + view once) before send.
+    var mediaCompose by remember { mutableStateOf<Pair<Uri, Boolean>?>(null) }
     var replyTo by remember(chatId) { mutableStateOf<LocalMessage?>(null) }
     var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
     val wallpaper = chatWallpaperColor(chat.wallpaper, dark)
-    fun uploadPickedUri(uri: Uri, viewOnce: Boolean = false) {
+    fun sendPickedMedia(uri: Uri, caption: String, viewOnce: Boolean) {
         haptics.confirm()
         val mime = context.contentResolver.getType(uri).orEmpty()
         val kind = when {
@@ -241,17 +246,32 @@ fun ChatIdScreen(
             mime.startsWith("image/") -> LocalMediaKind.Image
             else -> LocalMediaKind.File
         }
+        val bodyCaption = caption.ifBlank {
+            if (viewOnce) "View once photo" else when (kind) {
+                LocalMediaKind.Image -> "Photo"
+                LocalMediaKind.Video -> "Video"
+                else -> "Document"
+            }
+        }
         if (useRemote) {
             scope.launch {
                 try {
                     val sent = when (kind) {
-                        LocalMediaKind.Image -> api.sendImageMessage(context, chatId, uri, viewOnce = viewOnce)
+                        LocalMediaKind.Image -> api.sendImageMessage(
+                            context,
+                            chatId,
+                            uri,
+                            caption = caption.takeIf { it.isNotBlank() },
+                            viewOnce = viewOnce,
+                        )
                         else -> api.sendAttachmentMessage(
                             context = context,
                             conversationId = chatId,
                             uri = uri,
+                            caption = caption.takeIf { it.isNotBlank() },
                             defaultName = if (kind == LocalMediaKind.Video) "video.mp4" else "document.bin",
                             defaultMime = mime.ifBlank { "application/octet-stream" },
+                            viewOnce = viewOnce,
                         )
                     }
                     val uid = myUserId ?: SessionStore.userId(context)
@@ -262,22 +282,72 @@ fun ChatIdScreen(
                         )
                     }
                 } catch (_: Exception) {
-                    InMemoryChatStore.sendMedia(chatId, uri.toString(), kind = kind)
+                    InMemoryChatStore.sendMedia(
+                        chatId,
+                        uri.toString(),
+                        caption = bodyCaption,
+                        kind = kind,
+                        viewOnce = viewOnce,
+                    )
                 }
             }
         } else {
-            InMemoryChatStore.sendMedia(chatId, uri.toString(), kind = kind)
+            InMemoryChatStore.sendMedia(
+                chatId,
+                uri.toString(),
+                caption = bodyCaption,
+                kind = kind,
+                viewOnce = viewOnce,
+            )
+            peerTyping = true
+        }
+    }
+    fun uploadDocument(uri: Uri) {
+        haptics.confirm()
+        val mime = context.contentResolver.getType(uri).orEmpty()
+        if (useRemote) {
+            scope.launch {
+                try {
+                    val sent = api.sendAttachmentMessage(
+                        context = context,
+                        conversationId = chatId,
+                        uri = uri,
+                        defaultName = "document.bin",
+                        defaultMime = mime.ifBlank { "application/octet-stream" },
+                    )
+                    val uid = myUserId ?: SessionStore.userId(context)
+                    if (uid != null) {
+                        InMemoryChatStore.upsertMessage(
+                            chatId,
+                            sent.toLocalMessage(uid).copy(mediaUri = uri.toString()),
+                        )
+                    }
+                } catch (_: Exception) {
+                    InMemoryChatStore.sendMedia(chatId, uri.toString(), kind = LocalMediaKind.File)
+                }
+            }
+        } else {
+            InMemoryChatStore.sendMedia(chatId, uri.toString(), kind = LocalMediaKind.File)
             peerTyping = true
         }
     }
     val media = rememberMediaActions(
         context = context,
-        onDocument = { uri -> uploadPickedUri(uri) },
-        onImage = { uri -> uploadPickedUri(uri) },
+        onDocument = { uri -> uploadDocument(uri) },
+        onImage = { uri -> mediaCompose = uri to false },
     )
-    val pickViewOnce = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia(),
-    ) { uri -> if (uri != null) uploadPickedUri(uri, viewOnce = true) }
+    // Resume after system camera / attach camera route: open compose preview.
+    DisposableEffect(chatId, lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                PendingChatMedia.consume(chatId)?.let { pending ->
+                    mediaCompose = Uri.parse(pending.uri) to pending.preferViewOnce
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
     val voiceRecorder = remember { VoiceRecorder(context) }
     var recordingVoice by remember { mutableStateOf(false) }
     DisposableEffect(Unit) {
@@ -433,6 +503,7 @@ fun ChatIdScreen(
         InMemoryChatStore.sendText(chatId, "Got it 👍", mine = false)
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -615,7 +686,37 @@ fun ChatIdScreen(
                     haptics.tick()
                     actionTarget = msg
                 },
-                onViewOnceShown = { msg, url -> viewOnceShown = msg to url },
+                onOpenImage = { msg ->
+                    val url = msg.mediaUri ?: return@ChatMessageList
+                    mediaViewer = Triple(url, mediaCaptionOf(msg.body), null)
+                },
+                onViewOnceShown = { msg, url ->
+                    mediaViewer = Triple(url, mediaCaptionOf(msg.body), msg)
+                    // Acknowledge open so sender's bubble flips to "Opened".
+                    if (useRemote && !msg.id.startsWith("local-")) {
+                        scope.launch {
+                            runCatching {
+                                api.postMessagesIdViewOnce(
+                                    msg.id,
+                                    EmptyRequestBody(),
+                                )
+                            }.onSuccess { dto ->
+                                val uid = myUserId ?: SessionStore.userId(context)
+                                if (uid != null) {
+                                    // Strip media for opener; viewer keeps [url] until dismiss.
+                                    // Realtime pushes "Opened" to the sender.
+                                    InMemoryChatStore.upsertMessage(
+                                        chatId,
+                                        dto.toLocalMessage(uid).copy(
+                                            mediaUri = null,
+                                            body = "Opened",
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
             )
         }
 
@@ -690,7 +791,11 @@ fun ChatIdScreen(
                     keyboard?.hide()
                     showAttach = true
                 },
-                onCamera = { onNavigate(Routes.camera("chat:$chatId")) },
+                onCamera = {
+                    focusManager.clearFocus(force = true)
+                    keyboard?.hide()
+                    media.takePhoto()
+                },
                 onSendText = { body ->
                     haptics.confirm()
                     val quoting = replyTo
@@ -754,17 +859,9 @@ fun ChatIdScreen(
                         showAttach = false
                         media.pickGallery()
                     },
-                    AivoraSheetAction("View once photo", AppIcons.Visibility) {
-                        showAttach = false
-                        pickViewOnce.launch(
-                            androidx.activity.result.PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageOnly,
-                            ),
-                        )
-                    },
                     AivoraSheetAction("Camera", AppIcons.CameraAlt) {
                         showAttach = false
-                        onNavigate(Routes.camera("chat:$chatId"))
+                        media.takePhoto()
                     },
                     AivoraSheetAction("Document", AppIcons.Description) {
                         showAttach = false
@@ -1166,41 +1263,44 @@ fun ChatIdScreen(
         )
     }
 
-    viewOnceShown?.let { (target, url) ->
+    mediaCompose?.let { (uri, preferViewOnce) ->
+        // In-activity overlay (not Dialog) — Vivo nav insets work here.
+        MediaSendPreview(
+            uri = uri,
+            initialViewOnce = preferViewOnce,
+            onDismiss = { mediaCompose = null },
+            onSend = { caption, viewOnce ->
+                mediaCompose = null
+                sendPickedMedia(uri, caption, viewOnce)
+            },
+        )
+    }
+
+    mediaViewer?.let { (url, caption, viewOnceMsg) ->
         val closeViewer = {
-            viewOnceShown = null
-            InMemoryChatStore.upsertMessage(chatId, target.copy(mediaUri = null, body = "Opened"))
-        }
-        Dialog(
-            onDismissRequest = closeViewer,
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-                    .clickable(onClick = closeViewer),
-                contentAlignment = Alignment.Center,
-            ) {
-                AsyncImage(
-                    model = rememberBubbleImageModel(url, width = 720.dp, height = 1280.dp),
-                    contentDescription = "View once photo",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
-                )
-                Text(
-                    "View once · tap to close",
-                    color = Color.White.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(top = 12.dp),
+            val msg = viewOnceMsg
+            mediaViewer = null
+            if (msg != null) {
+                InMemoryChatStore.upsertMessage(
+                    chatId,
+                    msg.copy(mediaUri = null, body = "Opened"),
                 )
             }
         }
+        ChatImageViewer(
+            url = url,
+            caption = caption,
+            title = if (viewOnceMsg != null) "View once photo" else "Photo",
+            subtitle = if (viewOnceMsg != null) {
+                "Tap close · won’t open again"
+            } else {
+                null
+            },
+            onDismiss = closeViewer,
+        )
     }
 
+    } // Box root — hosts media compose overlay above chat chrome
 }
 
 /**
@@ -1224,6 +1324,7 @@ private fun ChatMessageList(
     api: AivoraApi,
     coverHeightPx: Int = 0,
     onLongPress: (LocalMessage) -> Unit,
+    onOpenImage: (LocalMessage) -> Unit = {},
     onViewOnceShown: (LocalMessage, String) -> Unit,
 ) {
     val context = LocalContext.current
@@ -1303,6 +1404,12 @@ private fun ChatMessageList(
         )
     }
     adapter.onLongPress = stableLongPress
+    val onViewOnceState = rememberUpdatedState(onViewOnceShown)
+    val onOpenImageState = rememberUpdatedState(onOpenImage)
+    adapter.onViewOnce = { msg ->
+        msg.mediaUri?.let { url -> onViewOnceState.value(msg, url) }
+    }
+    adapter.onOpenImage = { msg -> onOpenImageState.value(msg) }
     adapter.peerTitle = peerTitle
     adapter.peerAvatarUrl = peerAvatarUrl
     // Chronological adapter first; loader prepended at visual top while paging older (WA spinner).
@@ -2099,24 +2206,41 @@ private fun canEditMessage(m: LocalMessage): Boolean {
 private fun ViewOnceBubble(opened: Boolean, onClick: (() -> Unit)?) {
     Row(
         modifier = Modifier
+            .widthIn(min = 168.dp)
             .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
             .background(AivoraColors.PrimarySoft)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(
-            if (opened) AppIcons.VisibilityOff else AppIcons.Visibility,
-            contentDescription = null,
-            tint = AivoraColors.Primary,
-        )
-        Text(
-            if (opened) "Opened" else "View once photo",
-            color = AivoraColors.Ink,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-        )
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(AivoraColors.Primary.copy(alpha = if (opened) 0.35f else 1f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            ViewOnceEyeIcon(
+                active = !opened,
+                opened = opened,
+                size = 22.dp,
+                tint = Color.White,
+            )
+        }
+        Column {
+            Text(
+                if (opened) "Opened" else "Photo",
+                color = AivoraColors.Ink,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                if (opened) "View once · opened" else "View once photo",
+                color = AivoraColors.TextSecondary,
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
     }
 }
 

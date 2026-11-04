@@ -1,7 +1,7 @@
 # Waves 17+ — What’s left after Calls
 
-Date: 2026-10-27  
-Status: Waves **17–18 done**; 19+ planned
+Date: 2026-10-27 (updated 2026-10-28)  
+Status: Waves **17–20 + 23 done**; 21 deferred; 22 planned
 
 ## Done so far (short)
 
@@ -26,7 +26,7 @@ Status: Waves **17–18 done**; 19+ planned
 | **Settings chrome** | Many screens (font size, storage numbers, two-step, backup, clear-all) are local UI only | Medium |
 | **Channels / communities** | Nav + API stubs; no backend | Lower |
 | **Stickers / live location / passkeys** | Client stubs; deferred in BACKEND_PLAN | Lower |
-| **APK size** | ~75MB vs Bolta ~30MB (LiveKit + native) | Medium (PERF) |
+| **APK size** | Was ~75MB; Wave 23 → release **~18MB** arm64 — [WAVE23_APK_SIZE.md](WAVE23_APK_SIZE.md) | Done |
 | **Real SMS OTP** | Dev OTP + admin codes only | Later (production identity) |
 
 ### Admin
@@ -96,28 +96,13 @@ Defer if Status + Export are more urgent.
 
 ---
 
-### Wave 22 — Account & identity
-**Goal:** Production-ready account surfaces.
-
-| # | Slice | Exit |
-|---|-------|------|
-| 22.1 | Real SMS OTP provider (Twilio/etc.) + kill switch | Dev OTP still for staging |
-| 22.2 | Two-step PIN (API stubs exist) | Enforce on login |
-| 22.3 | Linked devices list (me/devices already partial) | Revoke works |
-| 22.4 | Passkeys (optional) | Login without OTP |
-| 22.5 | Change number / delete account real flows | Not toast-only |
+### Wave 22 — Account & identity — **DONE**
+See [WAVE22_IDENTITY.md](WAVE22_IDENTITY.md). Devices revoke, two-step PIN + login enforce, delete/change number, Twilio SMS behind env + `sms_enabled`. Passkeys remain Wave 24.
 
 ---
 
-### Wave 23 — Perf & APK size
-**Goal:** Closer to Bolta install footprint and low-end feel.
-
-| # | Slice | Exit |
-|---|-------|------|
-| 23.1 | Measure APK breakdown (LiveKit, Coil, icons) | Report MB by module |
-| 23.2 | Trim unused resources / icon set; ABI splits | Smaller download |
-| 23.3 | Optional: dynamic feature or thinner call module | Tradeoff documented |
-| 23.4 | Keep F8 discipline (no debug R8 minify) | Mate/Vivo jank OK |
+### Wave 23 — Perf & APK size — **DONE**
+See [WAVE23_APK_SIZE.md](WAVE23_APK_SIZE.md). Release **~18MB** arm64-only; LiveKit DF deferred; F8 kept.
 
 ---
 
@@ -129,15 +114,9 @@ Stickers store, live location, multi-account, chat backup to cloud, E2EE, full f
 ## Suggested order
 
 ```
-17 Export chat  →  18 Status/Updates  →  19 Call links
-→  20 Admin ops  →  23 APK size (anytime parallel)
-→  21 Channels   →  22 Identity/SMS
+17 → 18 → 19 → 20 → 23 APK → 22 Identity (done)
+→  21 Channels (deferred)  →  24 park
 ```
-
-**Fastest user-visible wins:** 17 then 18 (parity + main tab).  
-**Finish calls product:** 19.  
-**Ops:** 20.  
-**Ship store-ready:** 22 + 23.
 
 ---
 

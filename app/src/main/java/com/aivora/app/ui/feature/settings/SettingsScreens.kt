@@ -265,12 +265,26 @@ fun SettingsAccountScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val api = remember {
+        com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
+        )
+    }
+    var twoStepTrailing by remember { mutableStateOf("…") }
+    LaunchedEffect(Unit) {
+        runCatching { api.getMeTwoStep() }
+            .onSuccess { twoStepTrailing = if (it.enabled) "On" else "Off" }
+            .onFailure { twoStepTrailing = "Off" }
+    }
     val sections = listOf(
         "Security" to listOf(
             SettingsItem("Security notifications", onClick = { onNavigate(Routes.SettingsAccountSecurityNotifications) }),
             SettingsItem("Passkeys", onClick = { onNavigate(Routes.SettingsAccountPasskeys) }),
             SettingsItem("Email address", trailing = "Not added", onClick = { onNavigate(Routes.SettingsAccountEmail) }),
-            SettingsItem("Two-step verification", trailing = "Off", onClick = { onNavigate(Routes.SettingsTwoStep) }),
+            SettingsItem("Two-step verification", trailing = twoStepTrailing, onClick = { onNavigate(Routes.SettingsTwoStep) }),
         ),
         "Account" to listOf(
             SettingsItem("Change number", onClick = { onNavigate(Routes.SettingsAccountChangeNumber) }),
@@ -1077,42 +1091,129 @@ fun SettingsTwoStepScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val api = remember {
+        com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
+        )
+    }
+    var enabled by remember { mutableStateOf(false) }
+    var email by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(true) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var pinPrompt by remember { mutableStateOf(false) }
+    var pin by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        loading = true
+        runCatching { api.getMeTwoStep() }
+            .onSuccess {
+                enabled = it.enabled
+                email = it.email
+            }
+            .onFailure { error = it.message }
+        loading = false
+    }
+
+    if (pinPrompt) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pinPrompt = false; pin = "" },
+            title = { Text("Enter PIN") },
+            text = {
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { pin = it.filter { c -> c.isDigit() }.take(6) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        if (pin.length != 6 || busy) return@TextButton
+                        busy = true
+                        scope.launch {
+                            runCatching {
+                                api.postMeTwoStepOff(
+                                    com.aivora.app.data.model.TwoStepPinBody(pin = pin),
+                                )
+                            }.onSuccess {
+                                enabled = false
+                                pinPrompt = false
+                                pin = ""
+                            }.onFailure { error = it.message ?: "Could not disable" }
+                            busy = false
+                        }
+                    },
+                ) { Text(if (busy) "…" else "Disable") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { pinPrompt = false; pin = "" }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
     AivoraScaffold(title = "Two-step verification", onBack = onBack) {
         SettingsHeroIntro(
             iconRes = AivoraIcons.Lock,
-            title = "Two-step verification is enabled",
-            body = "Your six-digit account PIN adds a verification step when you register your phone number again.",
+            title = when {
+                loading -> "Loading…"
+                enabled -> "Two-step verification is enabled"
+                else -> "Protect your account"
+            },
+            body = if (enabled) {
+                "Your six-digit account PIN adds a verification step when you register your phone number again."
+            } else {
+                "Create a 6-digit PIN that you’ll enter after SMS verification when signing in on a new device."
+            },
         )
-        SettingsList(
-            listOf(
-                null to listOf(
-                    SettingsItem(
-                        "Recovery email",
-                        subtitle = "leslie@example.com",
-                        icon = AppIcons.Email,
-                        onClick = { onNavigate(Routes.SettingsAccountEmail) },
+        if (error != null) {
+            Text(
+                error!!,
+                color = AivoraColors.Danger,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+            )
+        }
+        if (!enabled && !loading) {
+            PrimaryButton(
+                text = "Turn on",
+                onClick = { onNavigate(Routes.SettingsAccountTwoStepNewPin) },
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+        } else if (enabled) {
+            SettingsList(
+                listOf(
+                    null to listOf(
+                        SettingsItem(
+                            "Recovery email",
+                            subtitle = email?.takeIf { it.isNotBlank() } ?: "Not added",
+                            icon = AppIcons.Email,
+                            onClick = { onNavigate(Routes.SettingsAccountEmail) },
+                        ),
+                    ),
+                    null to listOf(
+                        SettingsItem(
+                            "Change PIN",
+                            iconRes = AivoraIcons.Edit,
+                            onClick = { onNavigate(Routes.SettingsAccountTwoStepNewPin) },
+                        ),
+                        SettingsItem(
+                            "Disable",
+                            iconRes = AivoraIcons.Lock,
+                            danger = true,
+                            onClick = { pinPrompt = true },
+                        ),
                     ),
                 ),
-                null to listOf(
-                    SettingsItem(
-                        "Change PIN",
-                        iconRes = AivoraIcons.Edit,
-                        onClick = { onNavigate(Routes.SettingsAccountTwoStepNewPin) },
-                    ),
-                    SettingsItem(
-                        "Change email",
-                        icon = AppIcons.Email,
-                        onClick = { onNavigate(Routes.SettingsAccountEmail) },
-                    ),
-                    SettingsItem(
-                        "Disable",
-                        iconRes = AivoraIcons.Lock,
-                        danger = true,
-                        onClick = { },
-                    ),
-                ),
-            ),
-        )
+            )
+        }
     }
 }
 
@@ -1224,6 +1325,34 @@ fun SettingsDevicesScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val api = remember {
+        com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
+        )
+    }
+    var devices by remember { mutableStateOf<List<com.aivora.app.data.model.DeviceDto>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    fun reload() {
+        scope.launch {
+            loading = devices.isEmpty()
+            runCatching { api.getMeDevices().items }
+                .onSuccess {
+                    devices = it
+                    error = null
+                }
+                .onFailure { error = it.message ?: "Could not load devices" }
+            loading = false
+        }
+    }
+
+    LaunchedEffect(Unit) { reload() }
+
     AivoraScaffold(title = "Linked devices", onBack = onBack) {
         SettingsList(
             listOf(
@@ -1237,15 +1366,53 @@ fun SettingsDevicesScreen(
                 ),
             ),
         )
-        SettingsList(
-            listOf(
-                null to listOf(
-                    SettingsItem("V2440", "android · last active now · this device", iconRes = AivoraIcons.Call, onClick = { }),
-                    SettingsItem("Chrome on macOS", "web · last active Yesterday", AppIcons.Devices, trailing = "Sign out", onClick = { }),
-                    SettingsItem("V2440", "android · last active Mon", iconRes = AivoraIcons.Call, trailing = "Sign out", onClick = { }),
-                ),
-            ),
-        )
+        when {
+            loading -> Text(
+                "Loading…",
+                color = AivoraColors.TextSecondary,
+                modifier = Modifier.padding(24.dp),
+            )
+            error != null && devices.isEmpty() -> Text(
+                error!!,
+                color = AivoraColors.Danger,
+                modifier = Modifier.padding(24.dp),
+            )
+            devices.isEmpty() -> Text(
+                "No devices yet. Sign in on another phone to see it here.",
+                color = AivoraColors.TextSecondary,
+                modifier = Modifier.padding(24.dp),
+            )
+            else -> {
+                val items = devices.map { d ->
+                    val name = d.deviceName?.takeIf { it.isNotBlank() }
+                        ?: d.platform?.replaceFirstChar { it.uppercase() }
+                        ?: "Device"
+                    val whenActive = d.lastActiveAt?.take(16)?.replace('T', ' ') ?: "unknown"
+                    val subtitle = buildString {
+                        append(d.platform ?: "device")
+                        append(" · last active ")
+                        append(whenActive)
+                        if (d.isCurrent) append(" · this device")
+                    }
+                    SettingsItem(
+                        title = name,
+                        subtitle = subtitle,
+                        icon = AppIcons.Devices,
+                        trailing = if (d.isCurrent) null else "Sign out",
+                        onClick = {
+                            val id = d.id ?: return@SettingsItem
+                            if (d.isCurrent) return@SettingsItem
+                            scope.launch {
+                                runCatching { api.deleteMeDevicesId(id) }
+                                    .onSuccess { reload() }
+                                    .onFailure { error = it.message ?: "Revoke failed" }
+                            }
+                        },
+                    )
+                }
+                SettingsList(listOf(null to items))
+            }
+        }
     }
 }
 
@@ -1325,8 +1492,33 @@ fun SettingsDeleteAccountScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    var phone by remember { mutableStateOf("") }
-    val canDelete = phone.length >= 8
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val api = remember {
+        com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
+        )
+    }
+    val storedPhone = remember { com.aivora.app.data.local.SessionStore.phone(context).orEmpty() }
+    var dial by remember {
+        mutableStateOf(
+            when {
+                storedPhone.startsWith("+92") -> "+92"
+                storedPhone.startsWith("+") && storedPhone.length > 3 -> storedPhone.take(3)
+                else -> "+92"
+            },
+        )
+    }
+    var phone by remember {
+        mutableStateOf(
+            storedPhone.removePrefix(dial).filter { it.isDigit() },
+        )
+    }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val canDelete = phone.length >= 7 && !busy
     AivoraScaffold(title = "Delete account", onBack = onBack) {
         Column(
             modifier = Modifier
@@ -1356,25 +1548,20 @@ fun SettingsDeleteAccountScreen(
             SettingsFootnote("Messages other people already have in their chats won’t be removed.")
             SettingsSectionLabel("Confirm your phone number")
             SettingsMutedCard {
-                SettingsRow(
-                    SettingsItem(
-                        "India",
-                        subtitle = "Country / region",
-                        onClick = { },
-                    ),
-                )
-                HorizontalDivider(color = AivoraColors.Divider)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("+91", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(dial, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.width(12.dp))
                     OutlinedTextField(
                         value = phone,
-                        onValueChange = { phone = it.filter { c -> c.isDigit() } },
+                        onValueChange = {
+                            phone = it.filter { c -> c.isDigit() }
+                            error = null
+                        },
                         placeholder = { Text("Phone number") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -1389,6 +1576,13 @@ fun SettingsDeleteAccountScreen(
                 }
             }
             SettingsFootnote("Enter the number registered to this account.")
+            if (error != null) {
+                Text(
+                    error!!,
+                    color = AivoraColors.Danger,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                )
+            }
             SettingsMutedCard {
                 SettingsRow(
                     SettingsItem(
@@ -1402,8 +1596,32 @@ fun SettingsDeleteAccountScreen(
             Spacer(Modifier.height(16.dp))
         }
         PrimaryButton(
-            text = "Delete my account",
-            onClick = { onNavigate(Routes.SettingsAccountDeleted) },
+            text = if (busy) "Deleting…" else "Delete my account",
+            onClick = {
+                busy = true
+                error = null
+                scope.launch {
+                    runCatching {
+                        api.postMeDelete(
+                            mapOf(
+                                "country" to dial.filter { it.isDigit() },
+                                "national_number" to phone,
+                            ),
+                        )
+                    }.onSuccess { res ->
+                        if (res.isSuccessful || res.code() == 204) {
+                            com.aivora.app.data.local.SessionStore.clear(context)
+                            onNavigate(Routes.SettingsAccountDeleted)
+                        } else {
+                            error = when (res.code()) {
+                                400 -> "Phone number doesn’t match"
+                                else -> "Delete failed (${res.code()})"
+                            }
+                        }
+                    }.onFailure { error = it.message ?: "Delete failed" }
+                    busy = false
+                }
+            },
             enabled = canDelete,
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
         )
@@ -1437,18 +1655,155 @@ fun SettingsAccountChangeNumberScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val api = remember {
+        com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
+        )
+    }
+    var step by remember { mutableIntStateOf(0) }
+    var dial by remember { mutableStateOf("+92") }
+    var phone by remember { mutableStateOf("") }
+    var otp by remember { mutableStateOf("") }
+    var e164 by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var devHint by remember { mutableStateOf(false) }
+
     AivoraScaffold(title = "Change number", onBack = onBack) {
-        SettingsHeroIntro(
-            icon = AppIcons.Sync,
-            title = "Move to a new phone number",
-            body = "Changing your number moves your account information, profile, groups and settings to your new number.\n\nBefore you continue, make sure your new number can receive SMS messages or calls.\n\nYour old number must be the one currently registered with Aivora.",
-        )
-        Spacer(Modifier.weight(1f))
-        PrimaryButton(
-            text = "Next",
-            onClick = { onNavigate(Routes.Login) },
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-        )
+        if (step == 0) {
+            SettingsHeroIntro(
+                icon = AppIcons.Sync,
+                title = "Move to a new phone number",
+                body = "Changing your number moves your account information, profile, groups and settings to your new number.\n\nBefore you continue, make sure your new number can receive SMS messages or calls.",
+            )
+            SettingsMutedCard {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(dial, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.width(12.dp))
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = {
+                            phone = it.filter { c -> c.isDigit() }.take(12)
+                            error = null
+                        },
+                        placeholder = { Text("New phone number") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedBorderColor = Color.Transparent,
+                        ),
+                    )
+                }
+            }
+            if (error != null) {
+                Text(
+                    error!!,
+                    color = AivoraColors.Danger,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            PrimaryButton(
+                text = if (busy) "Sending…" else "Send code",
+                enabled = phone.length >= 7 && !busy,
+                onClick = {
+                    busy = true
+                    error = null
+                    scope.launch {
+                        runCatching {
+                            api.postMeChangeNumberRequest(
+                                com.aivora.app.data.model.OtpRequestBody(
+                                    country = dial.filter { it.isDigit() },
+                                    nationalNumber = phone,
+                                ),
+                            )
+                        }.onSuccess { res ->
+                            e164 = res.phone ?: "+${dial.filter { it.isDigit() }}$phone"
+                            devHint = res.otpDevBypass
+                            step = 1
+                        }.onFailure { error = it.message ?: "Could not send code" }
+                        busy = false
+                    }
+                },
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+            )
+        } else {
+            SettingsHeroIntro(
+                icon = AppIcons.Sync,
+                title = "Enter the code",
+                body = "Sent to ${e164 ?: "$dial $phone"}",
+            )
+            if (devHint) {
+                InfoBanner("Dev: use 000000 or the code from the server/admin OTP log.")
+            }
+            SettingsMutedCard {
+                OutlinedTextField(
+                    value = otp,
+                    onValueChange = {
+                        otp = it.filter { c -> c.isDigit() }.take(6)
+                        error = null
+                    },
+                    placeholder = { Text("6-digit code") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                )
+            }
+            if (error != null) {
+                Text(
+                    error!!,
+                    color = AivoraColors.Danger,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            PrimaryButton(
+                text = if (busy) "Verifying…" else "Verify",
+                enabled = otp.length == 6 && !busy,
+                onClick = {
+                    val target = e164 ?: return@PrimaryButton
+                    busy = true
+                    error = null
+                    scope.launch {
+                        runCatching {
+                            api.postMeChangeNumberVerify(
+                                mapOf("phone" to target, "code" to otp),
+                            )
+                        }.onSuccess { user ->
+                            val newPhone = user.phone ?: target
+                            val access = com.aivora.app.data.local.SessionStore.accessToken(context)
+                            val refresh = com.aivora.app.data.local.SessionStore.refreshToken(context)
+                            if (access != null && refresh != null) {
+                                com.aivora.app.data.local.SessionStore.save(
+                                    context,
+                                    access,
+                                    refresh,
+                                    newPhone,
+                                )
+                            }
+                            onBack?.invoke()
+                        }.onFailure { error = it.message ?: "Invalid code" }
+                        busy = false
+                    }
+                },
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+            )
+        }
     }
 }
 
@@ -1612,16 +1967,92 @@ fun SettingsAccountTwoStepNewPinScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val api = remember {
+        com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
+        )
+    }
+    var pin by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var current by remember { mutableStateOf("") }
+    var alreadyOn by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
 
-    val sections = listOf(
-        null to listOf(
-            SettingsItem("Save PIN", "This account has two-step verification on.", iconRes = AivoraIcons.Key, onClick = { onNavigate(Routes.SettingsTwoStep) }),
-        ),
-    )
+    LaunchedEffect(Unit) {
+        runCatching { api.getMeTwoStep() }.onSuccess { alreadyOn = it.enabled }
+    }
 
     AivoraScaffold(title = "New PIN", onBack = onBack) {
         InfoBanner("Enter a 6-digit PIN for two-step verification.")
-        SettingsList(sections)
+        Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+            if (alreadyOn) {
+                Text("Current PIN", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = current,
+                    onValueChange = { current = it.filter { c -> c.isDigit() }.take(6) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+            Text("New PIN", style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(6.dp))
+            OutlinedTextField(
+                value = pin,
+                onValueChange = { pin = it.filter { c -> c.isDigit() }.take(6) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(12.dp))
+            Text("Confirm PIN", style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(6.dp))
+            OutlinedTextField(
+                value = confirm,
+                onValueChange = { confirm = it.filter { c -> c.isDigit() }.take(6) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (error != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(error!!, color = AivoraColors.Danger)
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        PrimaryButton(
+            text = if (busy) "Saving…" else "Save PIN",
+            enabled = pin.length == 6 && confirm == pin && (!alreadyOn || current.length == 6) && !busy,
+            onClick = {
+                if (pin != confirm) {
+                    error = "PINs don’t match"
+                    return@PrimaryButton
+                }
+                busy = true
+                error = null
+                scope.launch {
+                    runCatching {
+                        api.patchMeTwoStep(
+                            com.aivora.app.data.model.TwoStepEnableBody(
+                                pin = pin,
+                                current = current.takeIf { alreadyOn },
+                            ),
+                        )
+                    }.onSuccess {
+                        onNavigate(Routes.SettingsTwoStep)
+                    }.onFailure { error = it.message ?: "Could not save PIN" }
+                    busy = false
+                }
+            },
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+        )
     }
 }
 

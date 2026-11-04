@@ -107,6 +107,9 @@ fun LoginScreen(
     }
     var e164Phone by remember { mutableStateOf(SessionStore.phone(context)) }
     var otp by remember { mutableStateOf("") }
+    var pin by remember { mutableStateOf("") }
+    var twoStepChallenge by remember { mutableStateOf<String?>(null) }
+    var otpDevBypass by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
 
@@ -121,6 +124,7 @@ fun LoginScreen(
                 country = match.name ?: country
                 dial = match.dial?.takeIf { it.isNotBlank() } ?: dial
             }
+            otpDevBypass = cfg.otpDevBypass
             if (BuildConfig.VERSION_CODE < cfg.minAndroidVersionCode) {
                 forceUpdateUrl = cfg.downloadUrl
             }
@@ -163,6 +167,16 @@ fun LoginScreen(
         )
     }
 
+    suspend fun finishLogin(access: String, refresh: String, targetPhone: String): String? {
+        SessionStore.save(context, access, refresh, targetPhone)
+        try {
+            val me = api.getMe()
+            me.id?.let { SessionStore.saveUserId(context, it) }
+        } catch (_: Exception) { /* optional */ }
+        com.aivora.app.data.push.PushRegistrar.refresh(context)
+        return null
+    }
+
     suspend fun completeVerify(targetPhone: String, code: String): String? {
         val tokens = api.postAuthOtpVerify(
             OtpVerifyBody(
@@ -175,18 +189,40 @@ fun LoginScreen(
                 ),
             ),
         )
+        if (tokens.twoStepRequired && !tokens.challenge.isNullOrBlank()) {
+            twoStepChallenge = tokens.challenge
+            pin = ""
+            step = 2
+            return null
+        }
         val access = tokens.access
         val refresh = tokens.refresh
         if (access.isNullOrBlank() || refresh.isNullOrBlank()) {
             return "Invalid server response"
         }
-        SessionStore.save(context, access, refresh, targetPhone)
-        try {
-            val me = api.getMe()
-            me.id?.let { SessionStore.saveUserId(context, it) }
-        } catch (_: Exception) { /* optional */ }
-        com.aivora.app.data.push.PushRegistrar.refresh(context)
-        return null
+        return finishLogin(access, refresh, targetPhone)
+    }
+
+    suspend fun completeTwoStep(targetPhone: String, pinCode: String): String? {
+        val challenge = twoStepChallenge ?: return "Missing two-step challenge"
+        val tokens = api.postAuthTwoStep(
+            com.aivora.app.data.model.TwoStepBody(
+                challenge = challenge,
+                pin = pinCode,
+                device = DeviceInfo(
+                    platform = "android",
+                    deviceName = android.os.Build.MODEL,
+                    appVersion = BuildConfig.VERSION_NAME,
+                ),
+            ),
+        )
+        val access = tokens.access
+        val refresh = tokens.refresh
+        if (access.isNullOrBlank() || refresh.isNullOrBlank()) {
+            return "Invalid PIN"
+        }
+        twoStepChallenge = null
+        return finishLogin(access, refresh, targetPhone)
     }
 
     Box(
@@ -347,13 +383,14 @@ fun LoginScreen(
                                             ?: "+${dial.filter { it.isDigit() }}$phone"
                                         e164Phone = verifiedPhone
                                         otp = ""
+                                        otpDevBypass = result.otpDevBypass || otpDevBypass
                                         if (BuildConfig.DEV_AUTO_OTP) {
                                             // Server OTP_DEV_BYPASS accepts 000000; OTP flow stays for release.
                                             val fail = completeVerify(verifiedPhone, "000000")
                                             if (fail != null) {
                                                 error = fail
                                                 step = 1
-                                            } else {
+                                            } else if (twoStepChallenge == null) {
                                                 onVerified()
                                             }
                                         } else {
@@ -375,7 +412,7 @@ fun LoginScreen(
                         AuthTextLink("Use email instead") {
                             onNavigate(Routes.SettingsAccountEmail)
                         }
-                    } else {
+                    } else if (current == 1) {
                         Text(
                             "Enter the code",
                             fontWeight = FontWeight.SemiBold,
@@ -388,12 +425,14 @@ fun LoginScreen(
                             fontSize = 14.sp,
                             color = AivoraColors.TextSecondary,
                         )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Dev: copy code from admin OTP log, or use 000000",
-                            fontSize = 12.sp,
-                            color = AivoraColors.TextTertiary,
-                        )
+                        if (otpDevBypass) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Dev: copy code from admin OTP log, or use 000000",
+                                fontSize = 12.sp,
+                                color = AivoraColors.TextTertiary,
+                            )
+                        }
                         Spacer(Modifier.height(20.dp))
 
                         AuthFieldLabel("Verification code")
@@ -427,7 +466,7 @@ fun LoginScreen(
                                     try {
                                         val fail = completeVerify(targetPhone, otp)
                                         if (fail != null) error = fail
-                                        else onVerified()
+                                        else if (twoStepChallenge == null) onVerified()
                                     } catch (e: Exception) {
                                         error = e.message ?: "Invalid code"
                                     } finally {
@@ -450,6 +489,7 @@ fun LoginScreen(
                                         ),
                                     )
                                     e164Phone = result.phone
+                                    otpDevBypass = result.otpDevBypass || otpDevBypass
                                     otp = ""
                                 } catch (e: Exception) {
                                     error = e.message ?: "Could not resend"
@@ -459,6 +499,55 @@ fun LoginScreen(
                             }
                         }
                         AuthTextLink("Wrong number?") { step = 0; error = null }
+                    } else {
+                        Text(
+                            "Two-step verification",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp,
+                            color = AivoraColors.Ink,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Enter your 6-digit account PIN to finish signing in.",
+                            fontSize = 14.sp,
+                            color = AivoraColors.TextSecondary,
+                            lineHeight = 18.sp,
+                        )
+                        Spacer(Modifier.height(20.dp))
+                        AuthFieldLabel("PIN")
+                        OtpField(
+                            value = pin,
+                            onValueChange = {
+                                pin = it.filter { ch -> ch.isDigit() }.take(6)
+                                error = null
+                            },
+                        )
+                        if (error != null) {
+                            Spacer(Modifier.height(10.dp))
+                            Text(error!!, color = AivoraColors.Danger, fontSize = 13.sp)
+                        }
+                        Spacer(Modifier.height(22.dp))
+                        PrimaryButton(
+                            text = if (busy) "Checking…" else "Continue",
+                            enabled = pin.length == 6 && !busy,
+                            onClick = {
+                                val targetPhone = e164Phone
+                                    ?: "+${dial.filter { it.isDigit() }}$phone"
+                                busy = true
+                                error = null
+                                scope.launch {
+                                    try {
+                                        val fail = completeTwoStep(targetPhone, pin)
+                                        if (fail != null) error = fail
+                                        else onVerified()
+                                    } catch (e: Exception) {
+                                        error = e.message ?: "Invalid PIN"
+                                    } finally {
+                                        busy = false
+                                    }
+                                }
+                            },
+                        )
                     }
                 }
             }

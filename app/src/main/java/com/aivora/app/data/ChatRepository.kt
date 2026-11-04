@@ -7,11 +7,14 @@ import com.aivora.app.data.local.ChatListCache
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.MessageCache
 import com.aivora.app.data.local.SessionStore
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
@@ -22,13 +25,30 @@ import kotlinx.coroutines.withContext
 object ChatRepository {
     fun api(): AivoraApi = NetworkModule.api()
 
-    suspend fun refreshConversations(context: Context): Boolean {
-        return runCatching {
-            val remote = api().getConversations().items.map { it.toLocalChat() }
-            InMemoryChatStore.replaceFromRemote(remote)
-            ChatListCache.save(context, remote)
-            true
-        }.getOrDefault(false)
+    private val refreshConvMutex = Mutex()
+    private var refreshConvInFlight: Deferred<Boolean>? = null
+
+    /** Coalesce concurrent refreshConversations (home poll + open + resume). */
+    suspend fun refreshConversations(context: Context): Boolean = coroutineScope {
+        val existing = refreshConvMutex.withLock { refreshConvInFlight }
+        if (existing != null) return@coroutineScope existing.await()
+        val appCtx = context.applicationContext
+        val deferred = async(Dispatchers.IO) {
+            runCatching {
+                val remote = api().getConversations().items.map { it.toLocalChat() }
+                InMemoryChatStore.replaceFromRemote(remote)
+                ChatListCache.save(appCtx, remote)
+                true
+            }.getOrDefault(false)
+        }
+        refreshConvMutex.withLock { refreshConvInFlight = deferred }
+        try {
+            deferred.await()
+        } finally {
+            refreshConvMutex.withLock {
+                if (refreshConvInFlight === deferred) refreshConvInFlight = null
+            }
+        }
     }
 
     /** Fetch thread into memory + disk. Does not mark read (safe for background warm). */

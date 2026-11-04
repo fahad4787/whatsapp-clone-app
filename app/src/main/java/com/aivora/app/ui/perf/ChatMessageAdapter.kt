@@ -49,6 +49,10 @@ class ChatMessageAdapter(
 ) : ListAdapter<LocalMessage, RecyclerView.ViewHolder>(DIFF) {
 
     var onLongPress: (LocalMessage) -> Unit = {}
+    /** Open unopened view-once photo (receiver). */
+    var onViewOnce: (LocalMessage) -> Unit = {}
+    /** Open normal image / video in the in-app viewer (not the browser). */
+    var onOpenImage: (LocalMessage) -> Unit = {}
     /** 1:1 peer display name / avatar — letter fallback when URL null. */
     var peerTitle: String = ""
     var peerAvatarUrl: String? = null
@@ -100,6 +104,8 @@ class ChatMessageAdapter(
                 peerTitle = peerTitle,
                 peerAvatarUrl = peerAvatarUrl,
                 onLongPress = onLongPress,
+                onViewOnce = onViewOnce,
+                onOpenImage = onOpenImage,
             )
             is SystemHolder -> holder.bind(msg.body)
         }
@@ -143,6 +149,10 @@ class ChatMessageAdapter(
         private val voiceTime: TextView,
         private val voiceTicks: TextView,
         private val meta: LinearLayout,
+        private val viewOnceRow: LinearLayout,
+        private val viewOnceIcon: ImageView,
+        private val viewOnceTitle: TextView,
+        private val viewOnceSub: TextView,
         private val fileRow: LinearLayout,
         private val fileName: TextView,
         private val mapBlock: LinearLayout,
@@ -209,6 +219,8 @@ class ChatMessageAdapter(
             peerTitle: String,
             peerAvatarUrl: String?,
             onLongPress: (LocalMessage) -> Unit,
+            onViewOnce: (LocalMessage) -> Unit,
+            onOpenImage: (LocalMessage) -> Unit,
         ) {
             if (boundId != msg.id) stopVoice()
             boundId = msg.id
@@ -282,11 +294,13 @@ class ChatMessageAdapter(
             mediaFrame.visibility = View.GONE
             playOverlay.visibility = View.GONE
             voiceBlock.visibility = View.GONE
+            viewOnceRow.visibility = View.GONE
             fileRow.visibility = View.GONE
             mapBlock.visibility = View.GONE
             linkBlock.visibility = View.GONE
             body.visibility = View.GONE
             mediaImage.setImageDrawable(null)
+            viewOnceRow.setOnClickListener(null)
             // Default bubble pad; voice overrides to Figma 12, photo to 8.
             bubble.setPadding(dp(10), dp(8), dp(10), dp(8))
 
@@ -306,9 +320,32 @@ class ChatMessageAdapter(
                     body.setTypeface(body.typeface, Typeface.ITALIC)
                 }
                 msg.viewOnce -> {
-                    body.visibility = View.VISIBLE
-                    body.setTypeface(null, Typeface.NORMAL)
-                    body.text = if (msg.mediaUri == null) "Photo · Opened" else "View once photo"
+                    val opened = msg.mediaUri == null ||
+                        msg.body.equals("Opened", ignoreCase = true)
+                    viewOnceRow.visibility = View.VISIBLE
+                    viewOnceIcon.background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(
+                            if (opened) 0x5900BE3C.toInt() else NativeColors.Primary,
+                        )
+                    }
+                    val eye = ContextCompat.getDrawable(
+                        itemView.context,
+                        if (opened) {
+                            com.aivora.app.R.drawable.ic_view_once_opened
+                        } else {
+                            com.aivora.app.R.drawable.ic_view_once
+                        },
+                    )?.mutate()
+                    if (eye != null) {
+                        DrawableCompat.setTint(eye, NativeColors.White)
+                        viewOnceIcon.setImageDrawable(eye)
+                    }
+                    viewOnceTitle.text = if (opened) "Opened" else "Photo"
+                    viewOnceSub.text = if (opened) "View once · opened" else "View once photo"
+                    if (!msg.mine && !opened && !msg.mediaUri.isNullOrBlank()) {
+                        viewOnceRow.setOnClickListener { onViewOnce(msg) }
+                    }
                 }
                 msg.location != null -> {
                     val loc = msg.location!!
@@ -378,6 +415,7 @@ class ChatMessageAdapter(
                     playOverlay.visibility = View.VISIBLE
                     loadImage(msg.mediaUri!!)
                     mediaFrame.setOnClickListener {
+                        // Videos still open externally; images use in-app viewer.
                         runCatching {
                             itemView.context.startActivity(
                                 Intent(Intent.ACTION_VIEW, Uri.parse(msg.mediaUri)),
@@ -397,13 +435,7 @@ class ChatMessageAdapter(
                     bubble.setPadding(dp(8), dp(8), dp(8), dp(8))
                     mediaFrame.visibility = View.VISIBLE
                     loadImage(msg.mediaUri!!)
-                    mediaFrame.setOnClickListener {
-                        runCatching {
-                            itemView.context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(msg.mediaUri)),
-                            )
-                        }
-                    }
+                    mediaFrame.setOnClickListener { onOpenImage(msg) }
                     if (msg.body.isNotBlank() && msg.body != "Photo") {
                         body.visibility = View.VISIBLE
                         body.setTypeface(null, Typeface.NORMAL)
@@ -757,6 +789,37 @@ class ChatMessageAdapter(
                     addView(audioDetails)
                 }
 
+                val viewOnceIcon = ImageView(ctx).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+                    scaleType = ImageView.ScaleType.CENTER_INSIDE
+                    setPadding(dp(8), dp(8), dp(8), dp(8))
+                }
+                val viewOnceTitle = TextView(ctx).apply {
+                    setTextColor(NativeColors.Ink)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    typeface = Typeface.DEFAULT_BOLD
+                }
+                val viewOnceSub = TextView(ctx).apply {
+                    setTextColor(NativeColors.TextSecondary)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                }
+                val viewOnceTextCol = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                        .also { it.marginStart = dp(12) }
+                    addView(viewOnceTitle)
+                    addView(viewOnceSub)
+                }
+                val viewOnceRow = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    visibility = View.GONE
+                    minimumWidth = dp(168)
+                    setPadding(dp(4), dp(2), dp(4), dp(2))
+                    addView(viewOnceIcon)
+                    addView(viewOnceTextCol)
+                }
+
                 val fileIcon = ImageView(ctx).apply {
                     layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
                     background = GradientDrawable().apply {
@@ -879,6 +942,7 @@ class ChatMessageAdapter(
                 bubble.addView(reply)
                 bubble.addView(mediaFrame)
                 bubble.addView(voiceBlock)
+                bubble.addView(viewOnceRow)
                 bubble.addView(fileRow)
                 bubble.addView(mapBlock)
                 bubble.addView(linkBlock)
@@ -890,6 +954,7 @@ class ChatMessageAdapter(
                     row, avatarFrame, avatarLetter, avatarImage, bubble, sender, reply,
                     mediaFrame, mediaImage, playOverlay,
                     voiceBlock, voicePlay, waveform, voiceDur, voiceSpeed, voiceTime, voiceTicks, meta,
+                    viewOnceRow, viewOnceIcon, viewOnceTitle, viewOnceSub,
                     fileRow, fileNameTv, mapBlock, mapPreview, mapTitle, mapSub,
                     linkBlock, linkTitle, linkSite, body, time, ticks,
                 )

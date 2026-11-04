@@ -163,7 +163,7 @@ interface AivoraApi {
     ): com.aivora.app.data.model.MessageDto
 
     @GET("api/me/two-step")
-    suspend fun getMeTwoStep(): okhttp3.ResponseBody
+    suspend fun getMeTwoStep(): com.aivora.app.data.model.TwoStepStatusDto
 
     @POST("api/conversations/{id}/clear")
     suspend fun postConversationsIdClear(
@@ -283,7 +283,7 @@ interface AivoraApi {
     @DELETE("api/me/devices/{id}")
     suspend fun deleteMeDevicesId(
         @Path("id") id: String,
-    ): okhttp3.ResponseBody
+    ): retrofit2.Response<okhttp3.ResponseBody>
 
     @GET("api/me/live-locations")
     suspend fun getMeLiveLocations(): okhttp3.ResponseBody
@@ -415,7 +415,7 @@ interface AivoraApi {
     @POST("api/me/delete")
     suspend fun postMeDelete(
         @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+    ): retrofit2.Response<okhttp3.ResponseBody>
 
     @POST("api/channels/{slug}/follow")
     suspend fun postChannelsSlugFollow(
@@ -436,8 +436,8 @@ interface AivoraApi {
 
     @PATCH("api/me/two-step")
     suspend fun patchMeTwoStep(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.TwoStepEnableBody,
+    ): com.aivora.app.data.model.TwoStepStatusDto
 
     @DELETE("api/conversations/{id}/members/{userId}")
     suspend fun deleteConversationsIdMembersUserId(
@@ -553,8 +553,8 @@ interface AivoraApi {
 
     @POST("api/me/two-step/off")
     suspend fun postMeTwoStepOff(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.TwoStepPinBody,
+    ): com.aivora.app.data.model.TwoStepStatusDto
 
     @GET("api/me/passkeys")
     suspend fun getMePasskeys(): okhttp3.ResponseBody
@@ -719,8 +719,18 @@ interface AivoraApi {
 
     @POST("api/auth/two-step")
     suspend fun postAuthTwoStep(
+        @Body body: com.aivora.app.data.model.TwoStepBody,
+    ): com.aivora.app.data.model.RefreshResult
+
+    @POST("api/me/change-number/request")
+    suspend fun postMeChangeNumberRequest(
+        @Body body: com.aivora.app.data.model.OtpRequestBody,
+    ): com.aivora.app.data.model.OtpRequestResult
+
+    @POST("api/me/change-number/verify")
+    suspend fun postMeChangeNumberVerify(
         @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.UserDto
 
     @GET("api/me")
     suspend fun getMe(): com.aivora.app.data.model.UserDto

@@ -173,13 +173,16 @@ object InMemoryChatStore {
         kind: LocalMediaKind = LocalMediaKind.Image,
         fileName: String? = null,
         durationSec: Int? = null,
+        viewOnce: Boolean = false,
     ) {
         val body = caption.ifBlank {
-            when (kind) {
-                LocalMediaKind.Image -> "Photo"
-                LocalMediaKind.Video -> "Video"
-                LocalMediaKind.File -> fileName ?: "Document"
-                LocalMediaKind.Audio -> "Voice message"
+            when {
+                viewOnce && kind == LocalMediaKind.Image -> "View once photo"
+                kind == LocalMediaKind.Image -> "Photo"
+                kind == LocalMediaKind.Video -> "Video"
+                kind == LocalMediaKind.File -> fileName ?: "Document"
+                kind == LocalMediaKind.Audio -> "Voice message"
+                else -> "Photo"
             }
         }
         append(
@@ -193,8 +196,9 @@ object InMemoryChatStore {
                 mediaKind = kind,
                 fileName = fileName,
                 voiceDurationSec = if (kind == LocalMediaKind.Audio) durationSec?.coerceAtLeast(1) else null,
+                viewOnce = viewOnce,
             ),
-            preview = body,
+            preview = if (viewOnce) "View once photo" else body,
         )
     }
 

@@ -117,6 +117,7 @@ import com.aivora.app.ui.components.CreateCallLinkDialog
 import com.aivora.app.ui.components.OverflowMenuItem
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
+import com.aivora.app.ui.components.SkeletonChatList
 import com.aivora.app.ui.components.StatusRingAvatar
 import com.aivora.app.ui.feature.chat.ChatControls
 import com.aivora.app.ui.icons.AivoraIcons
@@ -446,7 +447,7 @@ fun HomeScreen(
 
 @Composable
 private fun HomeFab(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
-    FloatingActionButton(
+                FloatingActionButton(
         onClick = onClick,
         containerColor = AivoraColors.Primary,
         contentColor = AivoraColors.OnPrimary,
@@ -469,16 +470,16 @@ private fun HomeFabRes(
 ) {
     FloatingActionButton(
         onClick = onClick,
-        containerColor = AivoraColors.Primary,
-        contentColor = AivoraColors.OnPrimary,
+                    containerColor = AivoraColors.Primary,
+                    contentColor = AivoraColors.OnPrimary,
         elevation = FloatingActionButtonDefaults.elevation(
             defaultElevation = 4.dp,
             pressedElevation = 8.dp,
         ),
         modifier = Modifier.size(AivoraDimens.FabSize),
         shape = CircleShape,
-    ) {
-        Icon(
+                ) {
+                    Icon(
             painter = painterResource(iconRes),
             contentDescription = contentDescription,
             tint = AivoraColors.OnPrimary,
@@ -513,8 +514,31 @@ private fun ChatsTab(
         if (!selected) return@LaunchedEffect
         InMemoryChatStore.chats.collect { allChats = it }
     }
+    // Debounce search filter (typing stays snappy; list filter waits 250ms).
+    var debouncedQuery by remember { mutableStateOf(query) }
+    LaunchedEffect(query) {
+        delay(250)
+        debouncedQuery = query
+    }
+    // Cold open: skeleton until first chat rows or timeout (avoid empty flash).
+    var showSkeleton by remember {
+        mutableStateOf(useRemote && InMemoryChatStore.chats.value.isEmpty())
+    }
+    LaunchedEffect(allChats) {
+        if (allChats.isNotEmpty()) showSkeleton = false
+    }
+    LaunchedEffect(useRemote) {
+        if (!useRemote) {
+            showSkeleton = false
+            return@LaunchedEffect
+        }
+        if (showSkeleton) {
+            delay(6_000)
+            showSkeleton = false
+        }
+    }
 
-    val chats = remember(allChats, query, filter) {
+    val chats = remember(allChats, debouncedQuery, filter) {
         allChats
             .asSequence()
             .filter { chat ->
@@ -527,9 +551,9 @@ private fun ChatsTab(
                 }
             }
             .filter {
-                query.isBlank() ||
-                    it.title.contains(query, ignoreCase = true) ||
-                    it.preview.contains(query, ignoreCase = true)
+                debouncedQuery.isBlank() ||
+                    it.title.contains(debouncedQuery, ignoreCase = true) ||
+                    it.preview.contains(debouncedQuery, ignoreCase = true)
             }
             .sortedWith(
                 compareByDescending<LocalChat> { it.pinned }
@@ -581,26 +605,32 @@ private fun ChatsTab(
         }
         lockedFooter.visible = filter == ChatFilter.All
         val homeConcat = remember { ConcatAdapter(chatAdapter, lockedFooter) }
-        if (chats.isEmpty() && filter != ChatFilter.All) {
-            Text(
-                "No chats here",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-                color = AivoraColors.TextSecondary,
-            )
-        } else {
-            RecyclerHost(
-                modifier = Modifier.fillMaxSize(),
-                onRecyclerReady = { rv ->
-                    rv.adapter = homeConcat
-                    val d = rv.resources.displayMetrics.density
-                    rv.setPadding(0, (2 * d).toInt(), 0, (8 * d).toInt())
-                },
-                update = { rv ->
-                    if (rv.adapter !== homeConcat) rv.adapter = homeConcat
-                    lockedFooter.visible = filter == ChatFilter.All
-                    chatAdapter.submitList(chats)
-                },
-            )
+        when {
+            showSkeleton && chats.isEmpty() -> {
+                SkeletonChatList(modifier = Modifier.fillMaxSize())
+            }
+            chats.isEmpty() && filter != ChatFilter.All -> {
+                Text(
+                    "No chats here",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                    color = AivoraColors.TextSecondary,
+                )
+            }
+            else -> {
+                RecyclerHost(
+                    modifier = Modifier.fillMaxSize(),
+                    onRecyclerReady = { rv ->
+                        rv.adapter = homeConcat
+                        val d = rv.resources.displayMetrics.density
+                        rv.setPadding(0, (2 * d).toInt(), 0, (8 * d).toInt())
+                    },
+                    update = { rv ->
+                        if (rv.adapter !== homeConcat) rv.adapter = homeConcat
+                        lockedFooter.visible = filter == ChatFilter.All
+                        chatAdapter.submitList(chats)
+                    },
+                )
+            }
         }
     }
 
@@ -665,8 +695,8 @@ private fun HomeSearchBar(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier
-            .fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
             .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space1)
             .height(AivoraDimens.SearchHeight),
         placeholder = { Text(placeholder, fontSize = 14.sp) },
@@ -709,25 +739,25 @@ private fun HomeChatRow(
 ) {
     val open by rememberUpdatedState(onOpen)
     val longPress by rememberUpdatedState(onLongPress)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
             .pointerInput(chat.id) {
                 detectTapGestures(
                     onTap = { open() },
                     onLongPress = { longPress() },
                 )
             }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
         Avatar(chat.title, size = 52)
         Spacer(modifier = Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
+                            Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    chat.title,
-                    fontWeight = FontWeight.SemiBold,
+                                Text(
+                                    chat.title,
+                                    fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -754,8 +784,8 @@ private fun HomeChatRow(
                 }
             }
             Spacer(Modifier.height(2.dp))
-            Text(
-                chat.preview,
+                                Text(
+                                    chat.preview,
                 fontSize = 14.sp,
                 color = AivoraColors.TextSecondary,
                 maxLines = 1,
@@ -763,16 +793,16 @@ private fun HomeChatRow(
             )
         }
         Spacer(Modifier.width(10.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                chat.time,
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    chat.time,
                 fontSize = 12.sp,
                 color = if (chat.unread > 0) AivoraColors.Primary else AivoraColors.TextSecondary,
-            )
-            if (chat.unread > 0) {
+                                )
+                                if (chat.unread > 0) {
                 Spacer(modifier = Modifier.height(6.dp))
-                UnreadBadge(chat.unread)
-            }
+                                    UnreadBadge(chat.unread)
+                                }
         }
     }
 }
@@ -832,17 +862,22 @@ private fun StatusTab(
         if (!selected) return@LaunchedEffect
         InMemoryStatusStore.statuses.collect { statuses = it }
     }
+    var debouncedQuery by remember { mutableStateOf(query) }
+    LaunchedEffect(query) {
+        delay(250)
+        debouncedQuery = query
+    }
     val mine = remember(statuses) { InMemoryStatusStore.myStatuses() }
     // One row per author (WhatsApp-style), not one row per status item.
-    val recent = remember(statuses, query) {
+    val recent = remember(statuses, debouncedQuery) {
         InMemoryStatusStore.recent()
-            .filter { query.isBlank() || it.authorName.contains(query, ignoreCase = true) }
+            .filter { debouncedQuery.isBlank() || it.authorName.contains(debouncedQuery, ignoreCase = true) }
             .groupBy { it.authorId }
             .map { (_, items) -> items.first() }
     }
-    val viewed = remember(statuses, query) {
+    val viewed = remember(statuses, debouncedQuery, recent) {
         InMemoryStatusStore.viewed()
-            .filter { query.isBlank() || it.authorName.contains(query, ignoreCase = true) }
+            .filter { debouncedQuery.isBlank() || it.authorName.contains(debouncedQuery, ignoreCase = true) }
             .groupBy { it.authorId }
             .map { (_, items) -> items.first() }
             .filter { author -> recent.none { it.authorId == author.authorId } }
@@ -876,7 +911,7 @@ private fun StatusTab(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
+            Text(
                         "My status",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
@@ -956,7 +991,7 @@ private fun StatusTab(
             }
         }
         if (viewed.isNotEmpty()) {
-            item {
+        item {
                 Text(
                     "Viewed",
                     modifier = Modifier.padding(
@@ -981,7 +1016,7 @@ private fun StatusTab(
             }
         }
         item { Spacer(Modifier.height(24.dp)) }
-    }
+        }
     }
 }
 
@@ -1134,12 +1169,17 @@ private fun CallsTab(
         }
     }
 
-    val filtered = remember(rows, query, filter, callLogCleared) {
+    var debouncedQuery by remember { mutableStateOf(query) }
+    LaunchedEffect(query) {
+        delay(250)
+        debouncedQuery = query
+    }
+    val filtered = remember(rows, debouncedQuery, filter, callLogCleared) {
         if (callLogCleared) emptyList()
         else rows.filter { row ->
-            val matchesQuery = query.isBlank() ||
-                row.name.contains(query, ignoreCase = true) ||
-                row.detail.contains(query, ignoreCase = true)
+            val matchesQuery = debouncedQuery.isBlank() ||
+                row.name.contains(debouncedQuery, ignoreCase = true) ||
+                row.detail.contains(debouncedQuery, ignoreCase = true)
             val matchesFilter = when (filter) {
                 CallFilter.All -> true
                 CallFilter.Missed -> row.missed
