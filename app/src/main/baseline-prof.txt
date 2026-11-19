@@ -1,0 +1,8 @@
+# Hand-written baseline profile: precompile startup and scrolling hot paths on low-end devices.
+HSPLcom/aivora/app/**;->**(**)**
+HSPLandroidx/compose/runtime/**;->**(**)**
+HSPLandroidx/compose/ui/**;->**(**)**
+HSPLandroidx/compose/foundation/**;->**(**)**
+HSPLandroidx/compose/material3/**;->**(**)**
+HSPLandroidx/recyclerview/widget/**;->**(**)**
+HSPLcoil3/**;->**(**)**

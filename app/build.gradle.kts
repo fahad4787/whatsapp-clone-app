@@ -38,6 +38,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             buildConfigField("boolean", "DEV_AUTO_OTP", "false")
+            // Local perf testing only: no release keystore in the repo, so sign with the debug key.
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -115,5 +117,6 @@ dependencies {
     // Wave 16 — LiveKit Cloud calls
     implementation("io.livekit:livekit-android:2.29.1")
 
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
