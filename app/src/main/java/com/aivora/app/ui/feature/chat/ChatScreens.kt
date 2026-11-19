@@ -2732,7 +2732,7 @@ private fun ForwardToSheet(
         } else {
             AivoraSheetActionList(
                 actions = destinations.map { dest ->
-                    AivoraSheetAction(dest.title, AppIcons.Person) {
+                    AivoraSheetAction(dest.title, if (dest.isGroup) AppIcons.Groups else AppIcons.Person) {
                         onDismiss()
                         if (useRemote) {
                             scope.launch {

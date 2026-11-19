@@ -103,14 +103,38 @@ object ChatControls {
         }.isSuccess
     }
 
-    suspend fun toggleMute(api: AivoraApi, useRemote: Boolean, chat: LocalChat): Boolean {
+    /** WhatsApp-style duration picker; [onPick] gets seconds (Long.MAX_VALUE = always). */
+    fun pickMuteDuration(context: android.content.Context, onPick: (Long) -> Unit) {
+        val labels = arrayOf("8 hours", "1 week", "Always")
+        val secs = longArrayOf(8 * 3600L, 7 * 24 * 3600L, Long.MAX_VALUE)
+        android.app.AlertDialog.Builder(
+            context,
+            if (com.aivora.app.ui.theme.AivoraColors.isDark) {
+                android.R.style.Theme_DeviceDefault_Dialog_Alert
+            } else {
+                android.R.style.Theme_DeviceDefault_Light_Dialog_Alert
+            },
+        )
+            .setTitle("Mute notifications")
+            .setItems(labels) { _, i -> onPick(secs[i]) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** Mute (with [durationSec]) when currently unmuted, otherwise unmute. */
+    suspend fun toggleMute(
+        api: AivoraApi,
+        useRemote: Boolean,
+        chat: LocalChat,
+        durationSec: Long = 8 * 3600L,
+    ): Boolean {
         val nextMuted = !chat.isMuted
+        val until = java.time.Instant.now().plusSeconds(
+            if (durationSec == Long.MAX_VALUE) 100L * 365 * 24 * 3600 else durationSec,
+        ).toString()
         if (!useRemote) {
             if (nextMuted) {
-                mergeLocal(
-                    chat.id,
-                    mutedUntil = java.time.Instant.now().plusSeconds(8 * 3600).toString(),
-                )
+                mergeLocal(chat.id, mutedUntil = until)
             } else {
                 mergeLocal(chat.id, clearMute = true)
             }
@@ -119,7 +143,11 @@ object ChatControls {
         return runCatching {
             val res = api.putConversationsIdSettings(
                 chat.id,
-                ConversationSettingsBody(muted = nextMuted),
+                if (nextMuted) {
+                    ConversationSettingsBody(mutedUntil = until)
+                } else {
+                    ConversationSettingsBody(muted = false)
+                },
             )
             mergeLocal(
                 chat.id,
@@ -276,12 +304,15 @@ object ChatControls {
                 if (chat.isMuted) AppIcons.NotificationsActive else AppIcons.NotificationsOff,
             ) {
                 onDismiss()
-                scope.launch {
-                    val ok = toggleMute(api, useRemote, chat)
-                    if (!ok) {
-                        Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
+                val run = { d: Long ->
+                    scope.launch {
+                        val ok = toggleMute(api, useRemote, chat, d)
+                        if (!ok) {
+                            Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
+                if (chat.isMuted) run(0L) else pickMuteDuration(context) { run(it) }
             },
         )
         add(
@@ -444,12 +475,15 @@ object ChatControls {
                 if (chat.isMuted) AppIcons.NotificationsActive else AppIcons.NotificationsOff,
             ) {
                 onDismiss()
-                scope.launch {
-                    val ok = toggleMute(api, useRemote, chat)
-                    if (!ok) {
-                        Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
+                val run = { d: Long ->
+                    scope.launch {
+                        val ok = toggleMute(api, useRemote, chat, d)
+                        if (!ok) {
+                            Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
+                if (chat.isMuted) run(0L) else pickMuteDuration(context) { run(it) }
             },
         )
         add(

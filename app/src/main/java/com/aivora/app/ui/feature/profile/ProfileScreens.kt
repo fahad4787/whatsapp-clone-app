@@ -143,12 +143,15 @@ fun ProfileIdScreen(
                         null,
                         if (chat.isMuted) AppIcons.NotificationsActive else AppIcons.NotificationsOff,
                         onClick = {
-                            scope.launch {
-                                val ok = ChatControls.toggleMute(api, useRemote, chat)
-                                if (!ok) {
-                                    Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
+                            val run = { d: Long ->
+                                scope.launch {
+                                    val ok = ChatControls.toggleMute(api, useRemote, chat, d)
+                                    if (!ok) {
+                                        Toast.makeText(context, "Could not update mute", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
+                            if (chat.isMuted) run(0L) else ChatControls.pickMuteDuration(context) { run(it) }
                         },
                     ),
                     SettingsItem(
