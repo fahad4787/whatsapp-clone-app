@@ -125,6 +125,7 @@ object LiveKitCallController {
             created.events.collect { event ->
                 when (event) {
                     is RoomEvent.Connected -> {
+                        refreshRemoteJoined(created)
                         pendingEnableVideo?.let { pending ->
                             pendingEnableVideo = null
                             scope.launch { publishMedia(pending) }
@@ -141,6 +142,7 @@ object LiveKitCallController {
                         refreshRemoteJoined(created)
                     }
                     is RoomEvent.TrackSubscribed -> {
+                        refreshRemoteJoined(created)
                         val track = event.track
                         if (track is VideoTrack && event.participant != created.localParticipant) {
                             _remoteVideo.value = track
