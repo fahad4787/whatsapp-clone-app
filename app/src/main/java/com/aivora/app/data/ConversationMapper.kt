@@ -19,7 +19,7 @@ fun ConversationDto.toLocalChat(): LocalChat {
         id = id.orEmpty(),
         title = title,
         preview = preview,
-        time = "",
+        time = chatListTime(lastMessageAt ?: lastMessage?.createdAt ?: updatedAt),
         unread = unreadCount,
         isGroup = type.equals("group", ignoreCase = true),
         favorite = favorite,
@@ -43,3 +43,15 @@ fun ConversationDto.toLocalChat(): LocalChat {
         peerPresenceVisible = peer?.presenceVisible ?: true,
     )
 }
+
+/** Chat-list timestamp: HH:mm today, "Yesterday", otherwise dd/MM/yy (device timezone). */
+internal fun chatListTime(iso: String?): String = runCatching {
+    if (iso.isNullOrBlank()) return@runCatching ""
+    val z = java.time.Instant.parse(iso).atZone(java.time.ZoneId.systemDefault())
+    val today = java.time.LocalDate.now(z.zone)
+    when (z.toLocalDate()) {
+        today -> java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(z)
+        today.minusDays(1) -> "Yesterday"
+        else -> java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy").format(z)
+    }
+}.getOrDefault("")

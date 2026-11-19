@@ -66,9 +66,15 @@ class ChatListAdapter(
         val end = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.END
+            minimumWidth = dp(52)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
         }
         val time = TextView(ctx).apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            maxLines = 1
         }
         val badge = TextView(ctx).apply {
             setTextColor(NativeColors.White)
