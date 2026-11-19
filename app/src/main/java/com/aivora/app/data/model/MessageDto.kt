@@ -17,6 +17,7 @@ data class MessageDto(
     @SerialName("event") val event: EventDto? = null,
     @SerialName("contact") val contact: ContactCardDto? = null,
     @SerialName("location") val location: LocationBody? = null,
+    @SerialName("sticker") val sticker: StickerDto? = null,
     @SerialName("mentions") val mentions: List<String> = emptyList(),
     @SerialName("view_once") val viewOnce: Boolean = false,
     @SerialName("expires_at") val expiresAt: String? = null,

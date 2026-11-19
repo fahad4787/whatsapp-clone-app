@@ -3,6 +3,8 @@ package com.aivora.app.data.call
 import android.app.ActivityManager
 import android.content.Context
 import android.media.AudioManager
+import com.aivora.app.data.local.CallPrivacyPrefs
+import io.livekit.android.ConnectOptions
 import io.livekit.android.LiveKit
 import io.livekit.android.RoomOptions
 import io.livekit.android.events.RoomEvent
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import livekit.org.webrtc.PeerConnection
 import livekit.org.webrtc.RendererCommon
 
 /** Thin LiveKit room wrapper for Wave 16.1 in-call screens. */
@@ -170,7 +173,18 @@ object LiveKitCallController {
                 }
             }
         }
-        created.connect(url, token)
+        val protectIp = CallPrivacyPrefs.protectIpCalls()
+        val connectOpts = if (protectIp) {
+            // Empty iceServers → LiveKit merges server TURN/STUN; RELAY hides local IP.
+            val rtc = PeerConnection.RTCConfiguration(emptyList()).apply {
+                iceTransportsType = PeerConnection.IceTransportsType.RELAY
+            }
+            ConnectOptions(rtcConfig = rtc)
+        } else {
+            ConnectOptions()
+        }
+        CallLog.i("livekit connect protectIp=$protectIp forceRelay=$protectIp")
+        created.connect(url, token, connectOpts)
         if (gen != connectGeneration) return
 
         _roomConnected.value = true
@@ -346,6 +360,9 @@ object LiveKitCallController {
         val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         val lowRam = am?.isLowRamDevice == true
         val heapMb = (Runtime.getRuntime().maxMemory() / (1024L * 1024L)).toInt()
+        if (com.aivora.app.data.local.AutoDownloadPrefs.load(context).lessDataCalls) {
+            return VideoPreset169.H360
+        }
         return when {
             lowRam || heapMb <= 192 -> VideoPreset169.H360
             heapMb <= 384 -> VideoPreset169.H540

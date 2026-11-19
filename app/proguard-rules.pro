@@ -39,3 +39,10 @@
 # Keep Application entry
 -keep class com.aivora.app.AivoraApp { *; }
 -keep class com.aivora.app.ui.MainActivity { *; }
+
+# WorkManager (Wave 48)
+-keep class * extends androidx.work.Worker
+-keep class * extends androidx.work.CoroutineWorker
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context,androidx.work.WorkerParameters);
+}

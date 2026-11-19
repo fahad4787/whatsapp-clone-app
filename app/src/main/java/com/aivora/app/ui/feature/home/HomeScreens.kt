@@ -133,6 +133,7 @@ private enum class ChatFilter(val label: String) {
     Favourites("Favourites"),
     Groups("Groups"),
     Archived("Archived"),
+    Custom("Custom"),
 }
 
 @androidx.compose.runtime.Immutable
@@ -168,6 +169,7 @@ fun HomeScreen(
     val settled = pagerState.settledPage
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(ChatFilter.All) }
+    var customListId by remember { mutableStateOf<String?>(null) }
     var callFilter by remember { mutableStateOf(CallFilter.All) }
     var menuOpen by remember { mutableStateOf(false) }
     var showCreateCallLink by remember { mutableStateOf(false) }
@@ -203,8 +205,9 @@ fun HomeScreen(
         kotlinx.coroutines.delay(100)
         val api = ChatRepository.api()
         try {
-            if (SessionStore.userId(context) == null) {
-                runCatching { api.getMe().id?.let { SessionStore.saveUserId(context, it) } }
+            runCatching { api.getMe() }.getOrNull()?.let { me ->
+                me.id?.let { SessionStore.saveUserId(context, it) }
+                com.aivora.app.data.local.InMemoryMeStore.replace(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
             }
             ChatRepository.refreshConversations(context)
             ChatRepository.hydrateRecentFromDiskAsync(context)
@@ -288,6 +291,7 @@ fun HomeScreen(
                                             onNavigate(Routes.SettingsPrivacy)
                                         },
                                         OverflowMenuItem("Favourites", AppIcons.Star) {
+                                            customListId = null
                                             filter = ChatFilter.Favourites
                                             scope.launch {
                                                 pagerState.animateScrollToPage(0, animationSpec = pageSnap)
@@ -412,7 +416,11 @@ fun HomeScreen(
                     query = query,
                     onQueryChange = { query = it },
                     filter = filter,
-                    onFilterChange = { filter = it },
+                    customListId = customListId,
+                    onFilterChange = { next, listId ->
+                        filter = next
+                        customListId = listId
+                    },
                     onNavigate = onNavigate,
                     onOpenChat = { id ->
                         haptics.tick()
@@ -495,7 +503,8 @@ private fun ChatsTab(
     query: String,
     onQueryChange: (String) -> Unit,
     filter: ChatFilter,
-    onFilterChange: (ChatFilter) -> Unit,
+    customListId: String?,
+    onFilterChange: (ChatFilter, String?) -> Unit,
     onNavigate: (String) -> Unit,
     onOpenChat: (String) -> Unit,
     selected: Boolean = true,
@@ -508,11 +517,17 @@ private fun ChatsTab(
         NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
     }
     var menuChat by remember { mutableStateOf<LocalChat?>(null) }
+    val customLists by com.aivora.app.data.local.ChatListsStore.lists.collectAsState()
     // PERF M6: stop collecting chat list while another home tab is settled.
     var allChats by remember { mutableStateOf(InMemoryChatStore.chats.value) }
     LaunchedEffect(selected) {
         if (!selected) return@LaunchedEffect
         InMemoryChatStore.chats.collect { allChats = it }
+    }
+    LaunchedEffect(useRemote, selected) {
+        if (!selected || !useRemote) return@LaunchedEffect
+        runCatching { api.getMeLists() }
+            .onSuccess { com.aivora.app.data.local.ChatListsStore.replace(it.items) }
     }
     // Debounce search filter (typing stays snappy; list filter waits 250ms).
     var debouncedQuery by remember { mutableStateOf(query) }
@@ -538,16 +553,21 @@ private fun ChatsTab(
         }
     }
 
-    val chats = remember(allChats, debouncedQuery, filter) {
+    val customMemberIds = remember(customLists, customListId) {
+        customLists.find { it.id == customListId }?.conversationIds?.toSet().orEmpty()
+    }
+    val chats = remember(allChats, debouncedQuery, filter, customListId, customMemberIds) {
         allChats
             .asSequence()
             .filter { chat ->
                 when (filter) {
-                    ChatFilter.All -> !chat.archived
-                    ChatFilter.Unread -> !chat.archived && chat.unread > 0
-                    ChatFilter.Favourites -> !chat.archived && chat.favorite
-                    ChatFilter.Groups -> !chat.archived && chat.isGroup
-                    ChatFilter.Archived -> chat.archived
+                    ChatFilter.Custom ->
+                        !chat.archived && !chat.locked && chat.id in customMemberIds
+                    ChatFilter.All -> !chat.archived && !chat.locked
+                    ChatFilter.Unread -> !chat.archived && !chat.locked && chat.unread > 0
+                    ChatFilter.Favourites -> !chat.archived && !chat.locked && chat.favorite
+                    ChatFilter.Groups -> !chat.archived && !chat.locked && chat.isGroup
+                    ChatFilter.Archived -> chat.archived && !chat.locked
                 }
             }
             .filter {
@@ -561,14 +581,24 @@ private fun ChatsTab(
             )
             .toList()
     }
-    val barFilters = listOf(
-        ChatFilter.All,
-        ChatFilter.Unread,
-        ChatFilter.Groups,
-        ChatFilter.Archived,
-    )
-    val unreadBadge = remember(allChats) {
-        allChats.count { !it.archived && it.unread > 0 }
+    data class BarChip(val filter: ChatFilter, val listId: String?, val label: String, val badge: Int? = null)
+    val barChips = remember(customLists, allChats) {
+        val unreadCount = allChats.count { !it.archived && it.unread > 0 }
+        buildList {
+            add(BarChip(ChatFilter.All, null, "All"))
+            add(BarChip(ChatFilter.Unread, null, "Unread", unreadCount.takeIf { it > 0 }))
+            add(BarChip(ChatFilter.Groups, null, "Groups"))
+            add(BarChip(ChatFilter.Archived, null, "Archived"))
+            customLists.take(6).forEach { list ->
+                add(BarChip(ChatFilter.Custom, list.id, list.name))
+            }
+        }
+    }
+    val selectedBarIndex = remember(barChips, filter, customListId) {
+        barChips.indexOfFirst {
+            if (filter == ChatFilter.Custom) it.listId == customListId
+            else it.filter == filter && it.listId == null
+        }.coerceAtLeast(0)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -579,14 +609,12 @@ private fun ChatsTab(
         )
         Spacer(Modifier.height(6.dp))
         AivoraFilterBar(
-            options = listOf(
-                AivoraFilterOption("All"),
-                AivoraFilterOption("Unread", badge = unreadBadge.takeIf { it > 0 }),
-                AivoraFilterOption("Groups"),
-                AivoraFilterOption("Archived"),
-            ),
-            selectedIndex = barFilters.indexOf(filter).coerceAtLeast(0),
-            onSelect = { onFilterChange(barFilters[it]) },
+            options = barChips.map { AivoraFilterOption(it.label, badge = it.badge) },
+            selectedIndex = selectedBarIndex,
+            onSelect = { idx ->
+                val chip = barChips.getOrNull(idx) ?: return@AivoraFilterBar
+                onFilterChange(chip.filter, chip.listId)
+            },
         )
         Spacer(Modifier.height(4.dp))
         val openChatState = rememberUpdatedState(onOpenChat)
@@ -603,7 +631,7 @@ private fun ChatsTab(
         val lockedFooter = remember {
             LockedChatsFooterAdapter { navigateState.value(Routes.LockedChats) }
         }
-        lockedFooter.visible = filter == ChatFilter.All
+        lockedFooter.visible = filter == ChatFilter.All && customListId == null
         val homeConcat = remember { ConcatAdapter(chatAdapter, lockedFooter) }
         when {
             showSkeleton && chats.isEmpty() -> {
@@ -882,7 +910,7 @@ private fun StatusTab(
             .map { (_, items) -> items.first() }
             .filter { author -> recent.none { it.authorId == author.authorId } }
     }
-    val myName = "You"
+    val myName = com.aivora.app.data.local.InMemoryMeStore.me?.displayName?.takeIf { it.isNotBlank() } ?: "You"
 
     AivoraNoOverscroll {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -1320,6 +1348,19 @@ private fun ProfileTab(
     onQueryChange: (String) -> Unit,
     onNavigate: (String) -> Unit,
 ) {
+    val profileOwner = LocalLifecycleOwner.current
+    var profileName by remember { mutableStateOf("") }
+    var profileAvatar by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(profileOwner) {
+        // Re-fetch every time this tab is resumed so edits made in Edit profile show up.
+        profileOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            runCatching { ChatRepository.api().getMe() }.getOrNull()?.let { me ->
+                profileName = me.displayName?.takeIf { it.isNotBlank() } ?: profileName
+                com.aivora.app.data.local.InMemoryMeStore.replace(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
+                profileAvatar = me.avatarUrl
+            }
+        }
+    }
     val filteredSections = remember(query) {
         val all = listOf(
             null to listOf(
@@ -1463,10 +1504,21 @@ private fun ProfileTab(
                 .padding(vertical = AivoraDimens.Space4),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Avatar("Leslie", size = 96)
+            Box(contentAlignment = Alignment.Center) {
+                // Initials underneath so a slow/failed photo never leaves a blank gap.
+                Avatar(profileName.ifBlank { "You" }, size = 96)
+                if (!profileAvatar.isNullOrBlank()) {
+                    coil3.compose.AsyncImage(
+                        model = profileAvatar,
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.size(96.dp).clip(CircleShape),
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                "Leslie",
+                profileName.ifBlank { " " },
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = AivoraColors.Ink,

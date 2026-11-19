@@ -34,15 +34,11 @@
 
 ## Exit checks
 
-- [ ] Enable two-step → sign out → OTP → PIN → home
-- [ ] Devices list shows this phone; revoke another device
-- [ ] Change number updates SessionStore phone
-- [ ] Delete account signs out permanently
-- [ ] With Twilio + `sms_enabled`, no OTP in logs / no `000000`
+Use the unified list: [TEST_CHECKLIST.md](TEST_CHECKLIST.md) (Waves 16–26).
 
 ## Parked → Wave 24
 
-Passkeys, email recovery reset, companion link, backup chrome.
+Passkeys, QR camera link. (Companion code link → Wave 31; email → Wave 30; backup → Wave 29.)
 
 ## Graphify
 

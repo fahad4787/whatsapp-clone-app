@@ -169,8 +169,12 @@ internal fun LocationBubble(location: LocalLocation) {
             )
         }
         Text(
-            location.name?.takeIf { it.isNotBlank() } ?: "Location",
-            color = AivoraColors.Ink,
+            when {
+                location.live -> "Live location"
+                location.ended -> location.name?.takeIf { it.isNotBlank() } ?: "Live location ended"
+                else -> location.name?.takeIf { it.isNotBlank() } ?: "Location"
+            },
+            color = if (location.live) AivoraColors.Primary else AivoraColors.Ink,
             fontWeight = FontWeight.SemiBold,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = 6.dp),

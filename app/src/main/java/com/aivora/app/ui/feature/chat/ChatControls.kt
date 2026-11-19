@@ -20,6 +20,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +64,7 @@ object ChatControls {
         archived: Boolean? = null,
         pinned: Boolean? = null,
         favorite: Boolean? = null,
+        locked: Boolean? = null,
         wallpaper: String? = null,
         mutedUntil: String? = null,
         clearMute: Boolean = false,
@@ -72,6 +75,7 @@ object ChatControls {
             archived = archived ?: current.archived,
             pinned = pinned ?: current.pinned,
             favorite = favorite ?: current.favorite,
+            locked = locked ?: current.locked,
             wallpaper = wallpaper ?: current.wallpaper,
             mutedUntil = when {
                 clearMute -> null
@@ -82,6 +86,21 @@ object ChatControls {
         )
         InMemoryChatStore.upsertChat(next)
         return next
+    }
+
+    suspend fun toggleLock(api: AivoraApi, useRemote: Boolean, chat: LocalChat): Boolean {
+        val nextLocked = !chat.locked
+        if (!useRemote) {
+            mergeLocal(chat.id, locked = nextLocked)
+            return true
+        }
+        return runCatching {
+            val res = api.putConversationsIdSettings(
+                chat.id,
+                ConversationSettingsBody(locked = nextLocked),
+            )
+            mergeLocal(chat.id, locked = res.locked)
+        }.isSuccess
     }
 
     suspend fun toggleMute(api: AivoraApi, useRemote: Boolean, chat: LocalChat): Boolean {
@@ -318,6 +337,26 @@ object ChatControls {
                 }
             },
         )
+        add(
+            AivoraSheetAction(
+                if (chat.locked) "Unlock chat" else "Lock chat",
+                AppIcons.Lock,
+            ) {
+                onDismiss()
+                scope.launch {
+                    val ok = toggleLock(api, useRemote, chat)
+                    Toast.makeText(
+                        context,
+                        when {
+                            ok && !chat.locked -> "Chat locked"
+                            ok -> "Chat unlocked"
+                            else -> "Set a chat lock secret code in Privacy first"
+                        },
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            },
+        )
         if (includeReport && onReport != null) {
             add(
                 AivoraSheetAction("Report", AppIcons.Flag, danger = true) {
@@ -506,11 +545,18 @@ private val WallpaperChoices = listOf(
     "sand" to "Sand",
 )
 
+/** Prefer per-chat wallpaper; else app default; else theme canvas. */
+fun resolveChatWallpaperKey(chatKey: String?, defaultKey: String?): String? {
+    val chat = chatKey?.takeIf { it.isNotBlank() && it != "default" }
+    if (chat != null) return chat
+    return defaultKey?.takeIf { it.isNotBlank() && it != "default" }
+}
+
 /** Chat canvas colour for a wallpaper key; null/"default" follows the device theme. */
 fun chatWallpaperColor(key: String?, dark: Boolean): Color = when (key) {
-    "mint" -> AivoraColors.SoftMint
-    "dusk" -> Color(0xFFE4EAF2)
-    "sand" -> Color(0xFFF3EBDD)
+    "mint" -> if (dark) Color(0xFF0F2018) else AivoraColors.SoftMint
+    "dusk" -> if (dark) Color(0xFF101A26) else Color(0xFFE4EAF2)
+    "sand" -> if (dark) Color(0xFF1C1912) else Color(0xFFF3EBDD)
     else -> if (dark) AivoraColors.ChatWallpaperDark else AivoraColors.ChatWallpaperLight
 }
 
@@ -520,7 +566,8 @@ fun ChatWallpaperDialog(
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val dark = isSystemInDarkTheme()
+    val themeMode by com.aivora.app.data.local.AppearancePrefs.themeFlow.collectAsState()
+    val dark = com.aivora.app.data.local.AppearancePrefs.resolveDark(themeMode, isSystemInDarkTheme())
     val ink = if (dark) Color.White else AivoraColors.Ink
     val current = selected?.takeIf { k -> WallpaperChoices.any { it.first == k } } ?: "default"
     AlertDialog(

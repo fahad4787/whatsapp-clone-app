@@ -8,4 +8,5 @@ data class TwoStepStatusDto(
     @SerialName("enabled") val enabled: Boolean = false,
     @SerialName("enabled_at") val enabledAt: String? = null,
     @SerialName("email") val email: String? = null,
+    @SerialName("email_verified") val emailVerified: Boolean = false,
 )

@@ -112,7 +112,7 @@ fun PollCreateScreen(
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.White,
+                containerColor = AivoraColors.LightSurface,
             ),
         )
         HorizontalDivider(color = AivoraColors.BorderMuted, thickness = 1.dp)
@@ -208,7 +208,7 @@ fun PollCreateScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White)
+                    .background(AivoraColors.LightSurface)
                     .border(1.dp, AivoraColors.BorderMuted, RoundedCornerShape(16.dp))
                     .padding(16.dp),
             ) {
@@ -260,7 +260,7 @@ fun PollCreateScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White),
+                .background(AivoraColors.LightSurface),
         ) {
             HorizontalDivider(color = AivoraColors.BorderMuted, thickness = 1.dp)
             PrimaryButton(
@@ -319,8 +319,8 @@ private fun FieldLabel(text: String) {
 
 @Composable
 private fun fieldColors() = OutlinedTextFieldDefaults.colors(
-    unfocusedContainerColor = Color.White,
-    focusedContainerColor = Color.White,
+    unfocusedContainerColor = AivoraColors.LightSurface,
+    focusedContainerColor = AivoraColors.LightSurface,
     unfocusedBorderColor = AivoraColors.BorderMuted,
     focusedBorderColor = AivoraColors.Primary,
 )

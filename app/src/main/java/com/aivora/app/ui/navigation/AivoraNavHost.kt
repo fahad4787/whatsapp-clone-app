@@ -35,9 +35,13 @@ import com.aivora.app.ui.feature.home.HomeScreen
 import com.aivora.app.ui.feature.locked.LockedChatsScreen
 import com.aivora.app.ui.feature.profile.ProfileIdScreen
 import com.aivora.app.ui.feature.profile.YourDetailsScreen
+import com.aivora.app.ui.feature.settings.DeviceLinkPairScreen
+import com.aivora.app.ui.feature.settings.HelpAppInfoScreen
+import com.aivora.app.ui.feature.settings.HelpArticleScreen
 import com.aivora.app.ui.feature.settings.HelpCenterScreen
 import com.aivora.app.ui.feature.settings.HelpFeedbackScreen
 import com.aivora.app.ui.feature.settings.InviteFriendScreen
+import com.aivora.app.ui.feature.settings.LegalDocumentScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountAddScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountChangeNumberScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountDeletedScreen
@@ -72,6 +76,7 @@ import com.aivora.app.ui.feature.settings.SettingsManageStorageScreen
 import com.aivora.app.ui.feature.settings.SettingsNotificationsScreen
 import com.aivora.app.ui.feature.settings.SettingsPermissionsScreen
 import com.aivora.app.ui.feature.settings.SettingsPrivacyAboutScreen
+import com.aivora.app.ui.feature.settings.SettingsPrivacyLinksScreen
 import com.aivora.app.ui.feature.settings.SettingsPrivacyAdvancedScreen
 import com.aivora.app.ui.feature.settings.SettingsPrivacyAppLockScreen
 import com.aivora.app.ui.feature.settings.SettingsPrivacyCallsScreen
@@ -86,8 +91,12 @@ import com.aivora.app.ui.feature.settings.SettingsPrivacyProfilePhotoScreen
 import com.aivora.app.ui.feature.settings.SettingsPrivacyScreen
 import com.aivora.app.ui.feature.settings.SettingsPrivacyStatusScreen
 import com.aivora.app.ui.feature.settings.SettingsProfileScreen
+import com.aivora.app.ui.feature.settings.OpenUserLinkScreen
+import com.aivora.app.ui.feature.settings.SettingsQrMyScreen
+import com.aivora.app.ui.feature.settings.SettingsQrScanScreen
 import com.aivora.app.ui.feature.settings.SettingsQrScreen
 import com.aivora.app.ui.feature.settings.SettingsStarredScreen
+import com.aivora.app.ui.feature.settings.SettingsProxyScreen
 import com.aivora.app.ui.feature.settings.SettingsStorageScreen
 import com.aivora.app.ui.feature.settings.SettingsTwoStepScreen
 import com.aivora.app.ui.feature.status.NewStatusScreen
@@ -244,6 +253,14 @@ fun AivoraNavHost(
         ) {
             LockedChatsScreen(onBack = back, onNavigate = go)
         }
+        composable(Routes.DeviceLinkPair) {
+            DeviceLinkPairScreen(
+                onBack = back,
+                onLinked = {
+                    navController.navigateClearing(Routes.Home, Routes.Login, inclusive = true)
+                },
+            )
+        }
         composable(Routes.Login) {
             LoginScreen(
                 onNavigate = go,
@@ -289,6 +306,21 @@ fun AivoraNavHost(
             )
         }
         composable(
+            route = Routes.OpenUser,
+            arguments = listOf(navArgument("userId") { type = NavType.StringType }),
+        ) { entry ->
+            OpenUserLinkScreen(
+                userId = Uri.decode(entry.arguments?.getString("userId").orEmpty()),
+                onBack = back,
+                onNavigate = { route ->
+                    navController.navigate(route) {
+                        popUpTo(Routes.OpenUser) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+            )
+        }
+        composable(
             route = Routes.AudioCall,
             arguments = listOf(navArgument("name") { type = NavType.StringType }),
         ) { entry ->
@@ -314,7 +346,15 @@ fun AivoraNavHost(
         composable(
             route = Routes.NewGroup,
         ) {
-            NewGroupScreen(onBack = back, onNavigate = go)
+            NewGroupScreen(
+                onBack = back,
+                // Replace the form with the new chat so Back returns to the list, not an empty form.
+                onNavigate = { route ->
+                    navController.navigate(route) {
+                        popUpTo(Routes.NewGroup) { inclusive = true }
+                    }
+                },
+            )
         }
         composable(Routes.NewStatus) {
             NewStatusScreen(onBack = back, onNavigate = go)
@@ -356,7 +396,20 @@ fun AivoraNavHost(
             SettingsAccountScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.SettingsAccountAdd) {
-            SettingsAccountAddScreen(onBack = back, onNavigate = go)
+            SettingsAccountAddScreen(
+                onBack = back,
+                onNavigate = { route ->
+                    if (route == Routes.Login) {
+                        // Wave 54: switch-number signs out — clear stack so Back can’t reopen Home.
+                        navController.navigate(Routes.Login) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    } else {
+                        go(route)
+                    }
+                },
+            )
         }
         composable(Routes.SettingsAccountChangeNumber) {
             SettingsAccountChangeNumberScreen(onBack = back, onNavigate = go)
@@ -455,6 +508,24 @@ fun AivoraNavHost(
         composable(Routes.HelpCenter) {
             HelpCenterScreen(onBack = back, onNavigate = go)
         }
+        composable(
+            route = Routes.HelpArticle,
+            arguments = listOf(navArgument("id") { type = NavType.StringType }),
+        ) { entry ->
+            HelpArticleScreen(
+                articleId = Uri.decode(entry.arguments?.getString("id").orEmpty()),
+                onBack = back,
+            )
+        }
+        composable(Routes.HelpAppInfo) {
+            HelpAppInfoScreen(onBack = back, onNavigate = go)
+        }
+        composable(Routes.HelpTerms) {
+            LegalDocumentScreen(title = "Terms of service", kind = "terms", onBack = back)
+        }
+        composable(Routes.HelpPrivacy) {
+            LegalDocumentScreen(title = "Privacy policy", kind = "privacy", onBack = back)
+        }
         composable(Routes.InviteFriend) {
             InviteFriendScreen(onBack = back, onNavigate = go)
         }
@@ -465,6 +536,9 @@ fun AivoraNavHost(
         }
         composable(Routes.SettingsPrivacyAbout) {
             SettingsPrivacyAboutScreen(onBack = back, onNavigate = go)
+        }
+        composable(Routes.SettingsPrivacyLinks) {
+            SettingsPrivacyLinksScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.SettingsPrivacyAdvanced) {
             SettingsPrivacyAdvancedScreen(onBack = back, onNavigate = go)
@@ -510,11 +584,20 @@ fun AivoraNavHost(
         composable(Routes.SettingsQr) {
             SettingsQrScreen(onBack = back, onNavigate = go)
         }
+        composable(Routes.SettingsQrMy) {
+            SettingsQrMyScreen(onBack = back, onNavigate = go)
+        }
+        composable(Routes.SettingsQrScan) {
+            SettingsQrScanScreen(onBack = back, onNavigate = go)
+        }
         composable(Routes.SettingsStarred) {
             SettingsStarredScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.SettingsStorage) {
             SettingsStorageScreen(onBack = back, onNavigate = go)
+        }
+        composable(Routes.SettingsProxy) {
+            SettingsProxyScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.SettingsManageStorage) {
             SettingsManageStorageScreen(onBack = back, onNavigate = go)

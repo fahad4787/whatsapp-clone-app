@@ -30,6 +30,7 @@ object NetworkModule {
     /** Client used only for token refresh (no auth interceptor / authenticator). */
     private val refreshClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
+            .proxySelector(com.aivora.app.data.local.ProxyPrefs.selector)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .writeTimeout(20, TimeUnit.SECONDS)
@@ -51,6 +52,7 @@ object NetworkModule {
 
     private fun buildOkHttp(): OkHttpClient {
         val builder = OkHttpClient.Builder()
+            .proxySelector(com.aivora.app.data.local.ProxyPrefs.selector)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)

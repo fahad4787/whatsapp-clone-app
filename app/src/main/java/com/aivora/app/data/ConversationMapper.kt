@@ -4,6 +4,9 @@ import com.aivora.app.data.local.LocalChat
 import com.aivora.app.data.model.ConversationDto
 
 fun ConversationDto.toLocalChat(): LocalChat {
+    members?.forEach { m ->
+        SenderNames.put(m.user?.id, m.user?.displayName ?: m.user?.phoneDisplay)
+    }
     val title = when {
         !this.title.isNullOrBlank() -> this.title!!
         peer?.displayName?.isNotBlank() == true -> peer!!.displayName!!
@@ -22,6 +25,7 @@ fun ConversationDto.toLocalChat(): LocalChat {
         favorite = favorite,
         archived = archived,
         pinned = pinned,
+        locked = locked,
         mutedUntil = mutedUntil,
         blockedByMe = blockedByMe,
         blockedMe = blockedMe,

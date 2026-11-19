@@ -2,89 +2,25 @@ package com.aivora.app.ui.feature.community
 
 import com.aivora.app.ui.icons.AppIcons
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Photo
-import androidx.compose.material.icons.filled.Poll
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import com.aivora.app.ui.components.Avatar
+import androidx.compose.ui.platform.LocalContext
+import com.aivora.app.data.api.NetworkModule
+import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.CommunityDto
 import com.aivora.app.ui.components.AivoraScaffold
-import com.aivora.app.ui.components.EmptyState
 import com.aivora.app.ui.components.InfoBanner
-import com.aivora.app.ui.components.LinkButton
-import com.aivora.app.ui.components.PersonRow
-import com.aivora.app.ui.components.PrimaryButton
-import com.aivora.app.ui.components.RadioGroup
-import com.aivora.app.ui.components.SearchField
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VpnKey
+import kotlinx.coroutines.launch
 
 @Composable
 fun CommunityIdScreen(
@@ -92,23 +28,90 @@ fun CommunityIdScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
-    val title = when (communityId) {
-        "1" -> "Local Neighbors"
-        "2" -> "Office Community"
-        else -> "Community"
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val api = remember {
+        NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
     }
+    var community by remember { mutableStateOf<CommunityDto?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(communityId) {
+        if (communityId.isBlank()) return@LaunchedEffect
+        runCatching { api.getCommunitiesId(communityId) }
+            .onSuccess {
+                community = it
+                error = null
+            }
+            .onFailure { error = it.message ?: "Could not load community" }
+    }
+
+    val title = community?.name ?: "Community"
     AivoraScaffold(title = title, onBack = onBack) {
-        InfoBanner("A community keeps related groups together with one announcement group.")
+        InfoBanner(
+            community?.description
+                ?: "A community keeps related groups together with one announcement group.",
+        )
+        if (error != null) {
+            Text(error!!, color = AivoraColors.Danger)
+        }
+        val announcement = community?.announcementId
+        val groups = community?.groups.orEmpty()
         SettingsList(
-            listOf(
-                "Announcement" to listOf(
-                    SettingsItem("Community announcements", "Everyone in the community", AppIcons.Groups, onClick = { onNavigate(Routes.ChatId.replace("{id}", "ann")) }),
-                ),
-                "Groups" to listOf(
-                    SettingsItem("General", "128 members", AppIcons.Groups, onClick = { onNavigate(Routes.ChatId.replace("{id}", "g1")) }),
-                    SettingsItem("Events", "42 members", AppIcons.Event, onClick = { onNavigate(Routes.ChatId.replace("{id}", "g2")) }),
-                ),
-            )
+            buildList {
+                if (!announcement.isNullOrBlank()) {
+                    add(
+                        "Announcement" to listOf(
+                            SettingsItem(
+                                "Community announcements",
+                                "Everyone in the community",
+                                icon = AppIcons.Groups,
+                                onClick = {
+                                    onNavigate(Routes.ChatId.replace("{id}", announcement))
+                                },
+                            ),
+                        ),
+                    )
+                }
+                if (groups.isNotEmpty()) {
+                    add(
+                        "Groups" to groups.mapNotNull { g ->
+                            val gid = g.id ?: return@mapNotNull null
+                            SettingsItem(
+                                g.title ?: "Group",
+                                subtitle = buildString {
+                                    append("${g.memberCount} members")
+                                    if (g.joined) append(" · Joined")
+                                },
+                                icon = AppIcons.Groups,
+                                onClick = {
+                                    if (g.joined) {
+                                        onNavigate(Routes.ChatId.replace("{id}", gid))
+                                    } else {
+                                        scope.launch {
+                                            runCatching {
+                                                api.postCommunitiesIdGroupsConversationIdJoin(
+                                                    communityId,
+                                                    gid,
+                                                )
+                                            }.onSuccess {
+                                                community = it
+                                                onNavigate(Routes.ChatId.replace("{id}", gid))
+                                            }.onFailure {
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    it.message ?: "Join failed",
+                                                    android.widget.Toast.LENGTH_SHORT,
+                                                ).show()
+                                            }
+                                        }
+                                    }
+                                },
+                            )
+                        },
+                    )
+                }
+            },
         )
     }
 }

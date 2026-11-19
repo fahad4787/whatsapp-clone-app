@@ -5,20 +5,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import com.aivora.app.data.local.AppearancePrefs
+import com.aivora.app.data.local.FontScaleStore
 
 private val LightScheme = lightColorScheme(
     primary = AivoraColors.Primary,
     onPrimary = AivoraColors.OnPrimary,
-    primaryContainer = AivoraColors.PrimarySoft,
+    primaryContainer = AivoraColors.PrimarySoftLight,
     secondary = AivoraColors.Blue,
-    background = AivoraColors.LightBackground,
-    surface = AivoraColors.LightSurface,
-    surfaceVariant = AivoraColors.SurfaceMuted,
-    onBackground = AivoraColors.Ink,
-    onSurface = AivoraColors.Ink,
-    onSurfaceVariant = AivoraColors.TextSecondary,
-    outlineVariant = AivoraColors.Divider,
+    background = AivoraColors.LightBackgroundLight,
+    surface = AivoraColors.LightSurfaceLight,
+    surfaceVariant = AivoraColors.SurfaceMutedLight,
+    onBackground = AivoraColors.InkLight,
+    onSurface = AivoraColors.InkLight,
+    onSurfaceVariant = AivoraColors.TextSecondaryLight,
+    outlineVariant = AivoraColors.DividerLight,
     error = AivoraColors.Danger,
 )
 
@@ -39,12 +46,25 @@ private val DarkScheme = darkColorScheme(
 
 @Composable
 fun AivoraTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean? = null,
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkScheme else LightScheme,
-        typography = AivoraTypography,
-        content = content,
-    )
+    val base = LocalDensity.current
+    val scale by FontScaleStore.scaleFlow.collectAsState()
+    val themeMode by AppearancePrefs.themeFlow.collectAsState()
+    val resolvedDark = darkTheme
+        ?: AppearancePrefs.resolveDark(themeMode, isSystemInDarkTheme())
+    if (AivoraColors.isDark != resolvedDark) AivoraColors.isDark = resolvedDark
+    CompositionLocalProvider(
+        LocalDensity provides Density(
+            density = base.density,
+            fontScale = base.fontScale * scale,
+        ),
+    ) {
+        MaterialTheme(
+            colorScheme = if (resolvedDark) DarkScheme else LightScheme,
+            typography = AivoraTypography,
+            content = content,
+        )
+    }
 }

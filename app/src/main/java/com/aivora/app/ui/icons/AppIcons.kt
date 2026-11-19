@@ -122,6 +122,7 @@ object AppIcons {
     val Flag: ImageVector get() = Icons.Outlined.Flag
     val Folder: ImageVector get() = Icons.Outlined.Folder
     val Forward: ImageVector get() = Icons.AutoMirrored.Outlined.Forward
+    val Copy: ImageVector get() = Icons.Outlined.ContentCopy
     val GroupAdd: ImageVector get() = Icons.Outlined.GroupAdd
     val Groups: ImageVector get() = Icons.Outlined.Groups
     val Info: ImageVector get() = Icons.Outlined.Info

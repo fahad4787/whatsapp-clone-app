@@ -53,11 +53,11 @@ import com.aivora.app.ui.theme.AivoraColors
 import kotlinx.coroutines.launch
 
 /** Match Bolta Figma call chrome (light), not WhatsApp dark. */
-private val CallBg = AivoraColors.ChatWallpaperLight
-private val CallInk = Color(0xFF17182B)
+private val CallBg: Color get() = AivoraColors.LightBackground
+private val CallInk: Color get() = if (AivoraColors.isDark) Color(0xFFE9EDEF) else Color(0xFF17182B)
 private val CallGreen = AivoraColors.Primary
 private val CallRed = Color(0xFFE64C53)
-private val CallMuted = AivoraColors.TextSecondary
+private val CallMuted: Color get() = AivoraColors.TextSecondary
 
 @Composable
 fun IncomingCallOverlay(

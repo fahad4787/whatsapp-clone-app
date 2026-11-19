@@ -72,11 +72,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Bolta Figma call tokens (file EWBSJebF5KWRv6BIGzq1VO). */
-private val CallBg = AivoraColors.ChatWallpaperLight
-private val CallInk = Color(0xFF17182B)
-private val CallPanel = Color.White
-private val CallControlIdle = Color(0xFFF8FAF8)
-private val CallBorder = AivoraColors.ChatDivider
+private val CallBg: Color get() = AivoraColors.LightBackground
+private val CallInk: Color get() = if (AivoraColors.isDark) Color(0xFFE9EDEF) else Color(0xFF17182B)
+private val CallPanel: Color get() = AivoraColors.LightSurface
+private val CallControlIdle: Color get() = AivoraColors.SurfaceMuted
+private val CallBorder: Color get() = AivoraColors.ChatDivider
 private val CallEndRed = Color(0xFFE64C53)
 private val CallMuted = Color(0xFFA6B0A9)
 
@@ -308,7 +308,7 @@ private fun BoltaCallScreen(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(Color.White)
+                        .background(CallPanel)
                         .clickable(onClick = onBack),
                     contentAlignment = Alignment.Center,
                 ) {

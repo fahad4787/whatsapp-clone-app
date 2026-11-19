@@ -66,6 +66,8 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
                 else -> "Message"
             },
             deleted = r.deleted,
+            mine = r.senderId != null && r.senderId == myUserId,
+            senderId = r.senderId,
         )
     }
     val fallbackBody = when (kind) {
@@ -99,7 +101,15 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         val lat = l.lat
         val lng = l.lng
         if (lat != null && lng != null) {
-            LocalLocation(lat = lat, lng = lng, name = l.name, address = l.address)
+            LocalLocation(
+                lat = lat,
+                lng = lng,
+                name = l.name,
+                address = l.address,
+                live = l.live && !l.ended,
+                ended = l.ended,
+                expiresAtIso = l.expiresAt,
+            )
         } else {
             null
         }
@@ -131,7 +141,11 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
                 runCatching { java.time.Instant.parse(exp).isBefore(java.time.Instant.now()) }.getOrDefault(false)
             } == true
         )
+    val isSticker = type.equals("sticker", ignoreCase = true)
+    val stickerEmoji = sticker?.emoji?.takeIf { it.isNotBlank() }
+        ?: text?.takeIf { isSticker && it.isNotBlank() }
     val richBody = when {
+        isSticker && stickerEmoji != null -> stickerEmoji
         localPoll != null -> "Poll: ${localPoll.question}"
         localContact != null -> "Contact: ${localContact.name}"
         localLocation != null -> "Location"
@@ -141,11 +155,12 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
     return LocalMessage(
         id = id.orEmpty(),
         mine = senderId == myUserId,
+        senderName = if (senderId == myUserId) null else SenderNames.get(senderId),
         body = when {
             deleted -> "This message was deleted"
             disappeared -> DISAPPEARED_TEXT
-            !text.isNullOrBlank() -> text!!
             richBody != null -> richBody
+            !text.isNullOrBlank() -> text!!
             viewOnce && media == null -> "Opened"
             else -> fallbackBody
         },
@@ -186,5 +201,6 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
             looksLikeSystemNotice(text.orEmpty()),
         editedAtIso = editedAt,
         viewOnce = viewOnce,
+        isSticker = isSticker,
     )
 }

@@ -9,6 +9,7 @@ data class ConversationSettingsResult(
     @SerialName("archived") val archived: Boolean = false,
     @SerialName("pinned") val pinned: Boolean = false,
     @SerialName("favorite") val favorite: Boolean = false,
+    @SerialName("locked") val locked: Boolean = false,
     @SerialName("wallpaper") val wallpaper: String? = null,
     @SerialName("muted_until") val mutedUntil: String? = null,
     @SerialName("blocked_by_me") val blockedByMe: Boolean = false,

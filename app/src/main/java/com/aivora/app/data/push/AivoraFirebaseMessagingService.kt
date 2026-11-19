@@ -41,15 +41,19 @@ class AivoraFirebaseMessagingService : FirebaseMessagingService() {
         val media = message.data["media"]?.ifBlank { null } ?: "audio"
         val callerName = message.data["caller_name"]?.ifBlank { null } ?: "Incoming call"
         val conversationId = message.data["conversation_id"]?.ifBlank { null }
-        ActiveCallSession.setIncoming(
-            CallDto(
-                id = callId,
-                media = media,
-                conversationId = conversationId,
-                status = "ringing",
-                caller = CallerDto(name = callerName),
-            ),
+        val initiatorId = message.data["initiator_id"]?.ifBlank { null }
+            ?: message.data["caller_id"]?.ifBlank { null }
+        val stub = CallDto(
+            id = callId,
+            media = media,
+            conversationId = conversationId,
+            initiatorId = initiatorId,
+            status = "ringing",
+            caller = CallerDto(id = initiatorId, name = callerName),
         )
+        // Wave 52 — Silence unknown callers.
+        if (com.aivora.app.data.call.CallSilence.shouldSuppressRing(stub)) return
+        ActiveCallSession.setIncoming(stub)
         MessageNotifier.ensureCallsChannel(applicationContext)
         MessageNotifier.showCall(
             applicationContext,

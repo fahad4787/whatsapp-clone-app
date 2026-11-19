@@ -398,7 +398,7 @@ object InMemoryChatStore {
                 x.reactions != y.reactions || x.editedAtIso != y.editedAtIso ||
                 x.mediaUri != y.mediaUri || x.system != y.system || x.disappeared != y.disappeared ||
                 x.poll != y.poll || x.contact != y.contact || x.location != y.location ||
-                x.event != y.event || x.viewOnce != y.viewOnce
+                x.event != y.event || x.viewOnce != y.viewOnce || x.senderName != y.senderName
             ) {
                 return false
             }
@@ -440,8 +440,18 @@ object InMemoryChatStore {
             // Only bump home preview for new / latest messages (not mid-thread reacts).
             val preview = if (!alreadyHad || isLatest) message.body else current.preview
             val time = if (!alreadyHad || isLatest) message.time else current.time
+            val keepArchived = runCatching {
+                ChatComposerPrefs.load(com.aivora.app.AivoraApp.instance).keepArchived
+            }.getOrDefault(true)
+            val unarchive =
+                !message.mine && !alreadyHad && current.archived && !keepArchived
             listOf(
-                current.copy(preview = preview, time = time, unread = unread),
+                current.copy(
+                    preview = preview,
+                    time = time,
+                    unread = unread,
+                    archived = if (unarchive) false else current.archived,
+                ),
             ) + list.filterNot { it.id == chatId }
         }
     }

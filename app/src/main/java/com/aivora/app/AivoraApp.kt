@@ -16,6 +16,14 @@ class AivoraApp : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        com.aivora.app.data.local.FontScaleStore.hydrate(this)
+        com.aivora.app.data.local.AppearancePrefs.hydrate(this)
+        com.aivora.app.data.local.NotificationPrefs.hydrate(this)
+        com.aivora.app.data.local.ChatComposerPrefs.hydrate(this)
+        com.aivora.app.data.local.ProxyPrefs.hydrate(this)
+        com.aivora.app.data.local.CallPrivacyPrefs.hydrate(this)
+        com.aivora.app.data.local.AutoDownloadPrefs.hydrate(this)
+        com.aivora.app.data.backup.ChatBackupScheduler.apply(this)
         // Register only — WS connect waits for first frame (MainActivity.allowConnect).
         PresenceLifecycle.install(this)
         // Parallel disk hydrate so Home often paints with rows on frame 1.

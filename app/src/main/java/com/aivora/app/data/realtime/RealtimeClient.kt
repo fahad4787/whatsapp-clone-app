@@ -92,6 +92,7 @@ object RealtimeClient {
         OkHttpClient.Builder()
             .dispatcher(shared.dispatcher)
             .connectionPool(shared.connectionPool)
+            .proxySelector(shared.proxySelector)
             .pingInterval(25, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.MILLISECONDS)
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -257,7 +258,10 @@ object RealtimeClient {
                 }.getOrNull() ?: return
                 val chatId = dto.conversationId ?: return
                 val uid = myUserIdProvider?.invoke() ?: return
-                val local = dto.toLocalMessage(uid)
+                // Broadcast frames carry the *sender's* starred flag; stars are per-viewer.
+                val prevStar = InMemoryChatStore.messages(chatId).value
+                    .firstOrNull { it.id == dto.id }?.starred ?: false
+                val local = dto.toLocalMessage(uid).copy(starred = prevStar)
                 InMemoryChatStore.upsertMessage(chatId, local)
                 val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
                 // Debounced IO persist — never block the WS reader on Mate-class devices.
@@ -270,8 +274,15 @@ object RealtimeClient {
                             local.body.isNotBlank() -> local.body
                             else -> "New message"
                         }
-                        val title = InMemoryChatStore.chat(chatId).title.ifBlank { "Aivora" }
-                        com.aivora.app.data.push.MessageNotifier.show(app, title, preview, chatId)
+                        val chat = InMemoryChatStore.chat(chatId)
+                        val title = chat.title.ifBlank { "Aivora" }
+                        com.aivora.app.data.push.MessageNotifier.show(
+                            app,
+                            title,
+                            preview,
+                            chatId,
+                            isGroup = chat.isGroup,
+                        )
                     }
                 }
             }
@@ -339,6 +350,11 @@ object RealtimeClient {
                 val call = runCatching {
                     NetworkModule.json.decodeFromJsonElement(CallDto.serializer(), data)
                 }.onFailure { CallLog.w("decode call.incoming failed", it) }.getOrNull() ?: return
+                // Wave 52 — Silence unknown callers (server usually skips notify; belt-and-suspenders).
+                if (com.aivora.app.data.call.CallSilence.shouldSuppressRing(call)) {
+                    CallLog.i("suppressed ring for unknown caller callId=${call.id}")
+                    return
+                }
                 // Never auto-join — only show Accept / Decline.
                 ActiveCallSession.setIncoming(call)
             }

@@ -49,11 +49,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.EmptyState
@@ -67,6 +69,7 @@ import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.SettingsList
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Devices
@@ -93,17 +96,60 @@ fun EventDetailsChatMessageScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val api = remember {
+        com.aivora.app.data.api.NetworkModule.api(
+            com.aivora.app.data.api.NetworkModule.okHttp {
+                com.aivora.app.data.local.SessionStore.accessToken(context)
+            },
+        )
+    }
+    fun rsvp(answer: String) {
+        if (messageId.isBlank()) return
+        scope.launch {
+            runCatching {
+                api.postMessagesIdRsvp(
+                    messageId,
+                    com.aivora.app.data.model.RsvpBody(answer = answer),
+                )
+            }.onSuccess { dto ->
+                val uid = com.aivora.app.data.local.SessionStore.userId(context)
+                if (uid != null && chatId.isNotBlank()) {
+                    com.aivora.app.data.local.InMemoryChatStore.upsertMessage(
+                        chatId,
+                        dto.toLocalMessage(uid),
+                    )
+                }
+                android.widget.Toast.makeText(context, "RSVP saved", android.widget.Toast.LENGTH_SHORT).show()
+                onBack?.invoke()
+            }.onFailure {
+                android.widget.Toast.makeText(context, "Could not RSVP", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     AivoraScaffold(title = "Event details", onBack = onBack) {
         SettingsList(
             listOf(
                 null to listOf(
-                    SettingsItem("Going", null, AppIcons.Check, onClick = { }),
-                    SettingsItem("Maybe", null, AppIcons.Info, onClick = { }),
-                    SettingsItem("Can't go", null, AppIcons.Close, onClick = { }),
-                    SettingsItem("Edit event", null, AppIcons.Edit, onClick = { onNavigate(Routes.EventEditChatMessage.replace("{chat}", "1").replace("{message}", "1")) }),
+                    SettingsItem("Going", null, AppIcons.Check, onClick = { rsvp("going") }),
+                    SettingsItem("Maybe", null, AppIcons.Info, onClick = { rsvp("maybe") }),
+                    SettingsItem("Can't go", null, AppIcons.Close, onClick = { rsvp("not_going") }),
+                    SettingsItem(
+                        "Edit event",
+                        null,
+                        AppIcons.Edit,
+                        onClick = {
+                            onNavigate(
+                                Routes.EventEditChatMessage
+                                    .replace("{chat}", chatId.ifBlank { "1" })
+                                    .replace("{message}", messageId.ifBlank { "1" }),
+                            )
+                        },
+                    ),
                     SettingsItem("Cancel event", "Cancel this event?", AppIcons.Delete, danger = true, onClick = { }),
-                )
-            )
+                ),
+            ),
         )
     }
 }

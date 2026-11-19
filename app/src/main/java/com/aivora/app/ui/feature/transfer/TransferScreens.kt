@@ -92,14 +92,44 @@ fun TransferNewPhoneScreen(
     onNavigate: (String) -> Unit = {},
 ) {
     AivoraScaffold(title = "Transfer chats", onBack = onBack) {
-        InfoBanner("Aivora needs the camera to scan your new phone’s QR code.")
+        InfoBanner("Phone-to-phone QR transfer is not available yet. Use a chat backup instead.")
         SettingsList(
             listOf(
-                null to listOf(
-                    SettingsItem("Scan QR code", "Camera access lets this phone scan the QR code your new phone shows.", AppIcons.QrCode, onClick = { }),
-                    SettingsItem("Continue", null, AppIcons.Devices, onClick = { onNavigate(Routes.Home) }),
-                )
-            )
+                "On this phone" to listOf(
+                    SettingsItem(
+                        "Create or open a backup",
+                        "Export chats to a zip you can move yourself (USB, Drive, etc.).",
+                        AppIcons.Folder,
+                        onClick = { onNavigate(Routes.SettingsChatsBackup) },
+                    ),
+                    SettingsItem(
+                        "Browse backup files",
+                        "See zips Aivora already wrote on this device.",
+                        AppIcons.Storage,
+                        onClick = { onNavigate(Routes.SettingsChatsBackupOpen) },
+                    ),
+                ),
+                "On your new phone" to listOf(
+                    SettingsItem(
+                        "Install Aivora and sign in",
+                        "Use the same phone number so your account matches.",
+                        AppIcons.Phone,
+                        onClick = { },
+                    ),
+                    SettingsItem(
+                        "Copy the zip, then open backup",
+                        "Place the file on the new phone and use Open backup / restore when available.",
+                        AppIcons.Devices,
+                        onClick = { },
+                    ),
+                ),
+            ),
+        )
+        Spacer(Modifier.weight(1f))
+        PrimaryButton(
+            text = "Open chat backup",
+            onClick = { onNavigate(Routes.SettingsChatsBackup) },
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
         )
     }
 }

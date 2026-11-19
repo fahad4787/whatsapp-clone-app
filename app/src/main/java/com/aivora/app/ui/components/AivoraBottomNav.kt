@@ -115,7 +115,7 @@ fun AivoraBottomNav(
                             contentAlignment = Alignment.Center,
                         ) {
                             if (index == 3) {
-                                Avatar(name = "You", size = 22)
+                                Avatar(name = com.aivora.app.data.local.InMemoryMeStore.me?.displayName?.takeIf { it.isNotBlank() } ?: "You", size = 22)
                             } else {
                                 val res = if (selectedNow) dest.iconSelected else dest.iconIdle
                                 val applyTint = !(selectedNow && !dest.tintSelected)

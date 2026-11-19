@@ -46,8 +46,8 @@ interface AivoraApi {
     suspend fun postChannelsSlugPostsPostIdReaction(
         @Path("slug") slug: String,
         @Path("postId") postId: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): com.aivora.app.data.model.ChannelPostDto
 
     @PUT("api/me/push-token")
     suspend fun putMePushToken(
@@ -62,8 +62,8 @@ interface AivoraApi {
 
     @POST("api/auth/link/claim")
     suspend fun postAuthLinkClaim(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.DeviceLinkCodeBody,
+    ): com.aivora.app.data.model.DeviceLinkPollResult
 
     @GET("api/people/search")
     suspend fun getPeopleSearch(
@@ -90,7 +90,7 @@ interface AivoraApi {
     @GET("api/communities/{id}")
     suspend fun getCommunitiesId(
         @Path("id") id: String,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.CommunityDto
 
     @POST("api/messages/{id}/view-once")
     suspend fun postMessagesIdViewOnce(
@@ -102,8 +102,8 @@ interface AivoraApi {
     suspend fun postCommunitiesIdGroupsConversationIdJoin(
         @Path("id") id: String,
         @Path("conversationId") conversationId: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.EmptyRequestBody = com.aivora.app.data.model.EmptyRequestBody(),
+    ): com.aivora.app.data.model.CommunityDto
 
     @GET("api/conversations/{id}/media")
     suspend fun getConversationsIdMedia(
@@ -175,11 +175,6 @@ interface AivoraApi {
         @Body body: com.aivora.app.data.model.BlockBody,
     ): com.aivora.app.data.model.BlockItemDto
 
-    @POST("api/auth/link/cancel")
-    suspend fun postAuthLinkCancel(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
-
     @DELETE("api/messages/{id}/rsvp")
     suspend fun deleteMessagesIdRsvp(
         @Path("id") id: String,
@@ -234,7 +229,34 @@ interface AivoraApi {
     ): com.aivora.app.data.model.ConversationDto
 
     @GET("api/me/auto-download")
-    suspend fun getMeAutoDownload(): okhttp3.ResponseBody
+    suspend fun getMeAutoDownload(): com.aivora.app.data.model.AutoDownloadDto
+
+    @GET("api/me/preferences")
+    suspend fun getMePreferences(): com.aivora.app.data.model.UserPreferencesDto
+
+    @GET("api/me/lists")
+    suspend fun getMeLists(): com.aivora.app.data.model.ChatListListDto
+
+    @POST("api/me/lists")
+    suspend fun postMeLists(
+        @Body body: com.aivora.app.data.model.ChatListCreateBody,
+    ): com.aivora.app.data.model.ChatListDto
+
+    @PATCH("api/me/lists/{id}")
+    suspend fun patchMeListsId(
+        @Path("id") id: String,
+        @Body body: com.aivora.app.data.model.ChatListPatchBody,
+    ): com.aivora.app.data.model.ChatListDto
+
+    @DELETE("api/me/lists/{id}")
+    suspend fun deleteMeListsId(
+        @Path("id") id: String,
+    ): okhttp3.ResponseBody
+
+    @PUT("api/me/lists/order")
+    suspend fun putMeListsOrder(
+        @Body body: com.aivora.app.data.model.ChatListOrderBody,
+    ): com.aivora.app.data.model.ChatListListDto
 
     @PUT("api/me/privacy")
     suspend fun putMePrivacyAlt(
@@ -243,6 +265,9 @@ interface AivoraApi {
 
     @GET("api/app/config")
     suspend fun getAppConfig(): com.aivora.app.data.model.AppConfigDto
+
+    @GET("api/legal")
+    suspend fun getLegalDocs(): com.aivora.app.data.model.LegalDocsDto
 
     @POST("api/messages/delivered")
     suspend fun postMessagesDelivered(
@@ -286,7 +311,7 @@ interface AivoraApi {
     ): retrofit2.Response<okhttp3.ResponseBody>
 
     @GET("api/me/live-locations")
-    suspend fun getMeLiveLocations(): okhttp3.ResponseBody
+    suspend fun getMeLiveLocations(): com.aivora.app.data.model.LiveLocationListDto
 
     @POST("api/me/passkeys/options")
     suspend fun postMePasskeysOptions(
@@ -295,8 +320,8 @@ interface AivoraApi {
 
     @POST("api/me/chat-lock/unlock")
     suspend fun postMeChatLockUnlock(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.ChatLockPinBody,
+    ): com.aivora.app.data.model.ChatLockUnlockResult
 
     @GET("api/status/{id}/viewers")
     suspend fun getStatusIdViewers(
@@ -306,14 +331,14 @@ interface AivoraApi {
     @POST("api/conversations/{id}/stickers")
     suspend fun postConversationsIdStickers(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.SendStickerBody,
+    ): com.aivora.app.data.model.MessageDto
 
     @PUT("api/messages/{id}/live-location")
     suspend fun putMessagesIdLiveLocation(
         @Path("id") id: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.LiveLocationBody,
+    ): com.aivora.app.data.model.MessageDto
 
     @GET("api/conversations/{id}/media/counts")
     suspend fun getConversationsIdMediaCounts(
@@ -338,11 +363,6 @@ interface AivoraApi {
         @Body body: Map<String, @JvmSuppressWildcards Any?>,
     ): okhttp3.ResponseBody
 
-    @GET("api/users/{id}")
-    suspend fun getUsersId(
-        @Path("id") id: String,
-    ): okhttp3.ResponseBody
-
     @POST("api/messages/{id}/vote")
     suspend fun postMessagesIdVote(
         @Path("id") id: String,
@@ -362,8 +382,8 @@ interface AivoraApi {
 
     @POST("api/me/live-locations/stop")
     suspend fun postMeLiveLocationsStop(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: Map<String, @JvmSuppressWildcards Any?> = emptyMap(),
+    ): com.aivora.app.data.model.LiveLocationStopResult
 
     @DELETE("api/conversations/{id}")
     suspend fun deleteConversationsId(
@@ -377,7 +397,12 @@ interface AivoraApi {
     suspend fun deleteMeStarred(): okhttp3.ResponseBody
 
     @GET("api/communities")
-    suspend fun getCommunities(): okhttp3.ResponseBody
+    suspend fun getCommunities(): com.aivora.app.data.model.CommunityListDto
+
+    @POST("api/communities")
+    suspend fun postCommunities(
+        @Body body: com.aivora.app.data.model.CommunityCreateBody,
+    ): com.aivora.app.data.model.CommunityDto
 
     @GET("api/me/privacy")
     suspend fun getMePrivacy(): com.aivora.app.data.model.PrivacySettingsDto
@@ -391,8 +416,8 @@ interface AivoraApi {
     @POST("api/channels/{slug}/posts")
     suspend fun postChannelsSlugPosts(
         @Path("slug") slug: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): com.aivora.app.data.model.ChannelPostDto
 
     @GET("api/status")
     suspend fun getStatus(): com.aivora.app.data.model.StatusListDto
@@ -420,12 +445,17 @@ interface AivoraApi {
     @POST("api/channels/{slug}/follow")
     suspend fun postChannelsSlugFollow(
         @Path("slug") slug: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.ChannelFollowBody = com.aivora.app.data.model.ChannelFollowBody(),
+    ): com.aivora.app.data.model.ChannelDto
 
     @POST("api/auth/link/start")
     suspend fun postAuthLinkStart(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Body body: com.aivora.app.data.model.DeviceLinkStartBody = com.aivora.app.data.model.DeviceLinkStartBody(),
+    ): com.aivora.app.data.model.DeviceLinkStartResult
+
+    @POST("api/auth/link/cancel")
+    suspend fun postAuthLinkCancel(
+        @Body body: com.aivora.app.data.model.DeviceLinkCodeBody,
     ): okhttp3.ResponseBody
 
     @POST("api/status/{id}/reaction")
@@ -462,7 +492,7 @@ interface AivoraApi {
     @GET("api/channels/{slug}")
     suspend fun getChannelsSlug(
         @Path("slug") slug: String,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.ChannelDto
 
     @GET("api/conversations/{id}/messages")
     suspend fun getConversationsIdMessages(
@@ -496,7 +526,7 @@ interface AivoraApi {
     ): com.aivora.app.data.model.CallTokenResult
 
     @GET("api/me/storage")
-    suspend fun getMeStorage(): okhttp3.ResponseBody
+    suspend fun getMeStorage(): com.aivora.app.data.model.StorageDto
 
     @GET("api/conversations")
     suspend fun getConversations(): com.aivora.app.data.model.ConversationListDto
@@ -504,7 +534,7 @@ interface AivoraApi {
     @GET("api/auth/link/approved/{code}")
     suspend fun getAuthLinkApprovedCode(
         @Path("code") code: String,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.DeviceLinkPollResult
 
     @POST("api/contacts/sync")
     suspend fun postContactsSync(
@@ -513,6 +543,11 @@ interface AivoraApi {
 
     @GET("api/users/by-username")
     suspend fun getUsersByUsername(): okhttp3.ResponseBody
+
+    @GET("api/users/{id}")
+    suspend fun getUsersId(
+        @Path("id") id: String,
+    ): com.aivora.app.data.model.UserDto
 
     @POST("api/messages/{id}/star")
     suspend fun postMessagesIdStar(
@@ -536,6 +571,7 @@ interface AivoraApi {
         @Part file: MultipartBody.Part,
     ): com.aivora.app.data.model.UserDto
 
+    @Streaming
     @GET("api/me/data")
     suspend fun getMeData(): okhttp3.ResponseBody
 
@@ -582,8 +618,24 @@ interface AivoraApi {
 
     @POST("api/auth/email/request")
     suspend fun postAuthEmailRequest(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.EmailSignInRequestBody,
+    ): com.aivora.app.data.model.EmailOtpRequestResult
+
+    @GET("api/me/email")
+    suspend fun getMeEmail(): com.aivora.app.data.model.AccountEmailDto
+
+    @POST("api/me/email/request")
+    suspend fun postMeEmailRequest(
+        @Body body: com.aivora.app.data.model.AccountEmailRequestBody,
+    ): com.aivora.app.data.model.EmailOtpRequestResult
+
+    @POST("api/me/email/verify")
+    suspend fun postMeEmailVerify(
+        @Body body: com.aivora.app.data.model.AccountEmailVerifyBody,
+    ): com.aivora.app.data.model.AccountEmailDto
+
+    @DELETE("api/me/email")
+    suspend fun deleteMeEmail(): com.aivora.app.data.model.AccountEmailDto
 
     @POST("api/me/delete/request")
     suspend fun postMeDeleteRequest(
@@ -591,7 +643,12 @@ interface AivoraApi {
     ): okhttp3.ResponseBody
 
     @GET("api/me/chat-lock")
-    suspend fun getMeChatLock(): okhttp3.ResponseBody
+    suspend fun getMeChatLock(): com.aivora.app.data.model.ChatLockDto
+
+    @PATCH("api/me/chat-lock")
+    suspend fun patchMeChatLock(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): com.aivora.app.data.model.ChatLockDto
 
     @GET("api/me/starred")
     suspend fun getMeStarred(): com.aivora.app.data.model.MessageListDto
@@ -617,12 +674,19 @@ interface AivoraApi {
     ): okhttp3.ResponseBody
 
     @GET("api/channels")
-    suspend fun getChannels(): okhttp3.ResponseBody
+    suspend fun getChannels(
+        @Query("q") q: String? = null,
+    ): com.aivora.app.data.model.ChannelListDto
+
+    @POST("api/channels")
+    suspend fun postChannels(
+        @Body body: com.aivora.app.data.model.ChannelCreateBody,
+    ): com.aivora.app.data.model.ChannelDto
 
     @GET("api/channels/{slug}/posts")
     suspend fun getChannelsSlugPosts(
         @Path("slug") slug: String,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.ChannelPostListDto
 
     @DELETE("api/messages/{id}/vote")
     suspend fun deleteMessagesIdVote(
@@ -651,6 +715,12 @@ interface AivoraApi {
         @Query("media") media: Int = 0,
     ): okhttp3.ResponseBody
 
+    @Streaming
+    @GET("api/me/backup")
+    suspend fun getMeBackup(
+        @Query("media") media: Int = 0,
+    ): okhttp3.ResponseBody
+
     @GET("api/contacts")
     suspend fun getContacts(): okhttp3.ResponseBody
 
@@ -668,8 +738,8 @@ interface AivoraApi {
     @POST("api/channels/{slug}/report")
     suspend fun postChannelsSlugReport(
         @Path("slug") slug: String,
-            @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): retrofit2.Response<okhttp3.ResponseBody>
 
     @POST("api/conversations/{id}/members")
     suspend fun postConversationsIdMembers(
@@ -696,8 +766,13 @@ interface AivoraApi {
 
     @POST("api/auth/email/verify")
     suspend fun postAuthEmailVerify(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.EmailSignInVerifyBody,
+    ): com.aivora.app.data.model.RefreshResult
+
+    @POST("api/auth/two-step/reset/request")
+    suspend fun postAuthTwoStepResetRequest(
+        @Body body: com.aivora.app.data.model.AccountEmailRequestBody,
+    ): com.aivora.app.data.model.EmailOtpRequestResult
 
     @POST("api/auth/otp/request")
     suspend fun postAuthOtpRequest(
@@ -705,17 +780,22 @@ interface AivoraApi {
     ): com.aivora.app.data.model.OtpRequestResult
 
     @GET("api/stickers")
-    suspend fun getStickers(): okhttp3.ResponseBody
+    suspend fun getStickers(): com.aivora.app.data.model.StickerPackListDto
 
     @DELETE("api/channels/{slug}/follow")
     suspend fun deleteChannelsSlugFollow(
         @Path("slug") slug: String,
-    ): okhttp3.ResponseBody
+    ): com.aivora.app.data.model.ChannelDto
 
     @PATCH("api/me/auto-download")
     suspend fun patchMeAutoDownload(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.AutoDownloadPatchBody,
+    ): com.aivora.app.data.model.AutoDownloadDto
+
+    @PATCH("api/me/preferences")
+    suspend fun patchMePreferences(
+        @Body body: com.aivora.app.data.model.UserPreferencesPatchBody,
+    ): com.aivora.app.data.model.UserPreferencesDto
 
     @POST("api/auth/two-step")
     suspend fun postAuthTwoStep(
@@ -745,8 +825,8 @@ interface AivoraApi {
 
     @POST("api/auth/link/approve")
     suspend fun postAuthLinkApprove(
-        @Body body: Map<String, @JvmSuppressWildcards Any?>,
-    ): okhttp3.ResponseBody
+        @Body body: com.aivora.app.data.model.DeviceLinkCodeBody,
+    ): com.aivora.app.data.model.DeviceLinkApproveResult
 
     @POST("api/calls/{id}/{action}")
     suspend fun postCallsIdAction(

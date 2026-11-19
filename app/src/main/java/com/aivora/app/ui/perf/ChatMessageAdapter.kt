@@ -25,7 +25,9 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import coil3.SingletonImageLoader
 import coil3.asDrawable
+import coil3.network.httpHeaders
 import coil3.request.ImageRequest
+import coil3.request.allowHardware
 import coil3.request.SuccessResult
 import coil3.size.Size
 import com.aivora.app.data.local.LocalMediaKind
@@ -53,6 +55,10 @@ class ChatMessageAdapter(
     var onViewOnce: (LocalMessage) -> Unit = {}
     /** Open normal image / video in the in-app viewer (not the browser). */
     var onOpenImage: (LocalMessage) -> Unit = {}
+    /** Poll option tap → (message, optionId). */
+    var onVote: (LocalMessage, String) -> Unit = { _, _ -> }
+    /** Event RSVP tap → (message, going|maybe|not_going). */
+    var onRsvp: (LocalMessage, String) -> Unit = { _, _ -> }
     /** 1:1 peer display name / avatar — letter fallback when URL null. */
     var peerTitle: String = ""
     var peerAvatarUrl: String? = null
@@ -83,7 +89,7 @@ class ChatMessageAdapter(
                     background = GradientDrawable().apply {
                         shape = GradientDrawable.RECTANGLE
                         cornerRadius = 10f * d
-                        setColor(0xFFE8EDE9.toInt())
+                        setColor(NativeColors.ChatDivider)
                     }
                 }
                 row.addView(pill)
@@ -106,6 +112,8 @@ class ChatMessageAdapter(
                 onLongPress = onLongPress,
                 onViewOnce = onViewOnce,
                 onOpenImage = onOpenImage,
+                onVote = onVote,
+                onRsvp = onRsvp,
             )
             is SystemHolder -> holder.bind(msg.body)
         }
@@ -162,6 +170,7 @@ class ChatMessageAdapter(
         private val linkBlock: LinearLayout,
         private val linkTitle: TextView,
         private val linkSite: TextView,
+        private val richBlock: LinearLayout,
         private val body: TextView,
         private val time: TextView,
         private val ticks: TextView,
@@ -221,6 +230,8 @@ class ChatMessageAdapter(
             onLongPress: (LocalMessage) -> Unit,
             onViewOnce: (LocalMessage) -> Unit,
             onOpenImage: (LocalMessage) -> Unit,
+            onVote: (LocalMessage, String) -> Unit,
+            onRsvp: (LocalMessage, String) -> Unit,
         ) {
             if (boundId != msg.id) stopVoice()
             boundId = msg.id
@@ -298,6 +309,9 @@ class ChatMessageAdapter(
             fileRow.visibility = View.GONE
             mapBlock.visibility = View.GONE
             linkBlock.visibility = View.GONE
+            richBlock.visibility = View.GONE
+            richBlock.removeAllViews()
+            richBlock.minimumWidth = 0
             body.visibility = View.GONE
             mediaImage.setImageDrawable(null)
             viewOnceRow.setOnClickListener(null)
@@ -306,7 +320,25 @@ class ChatMessageAdapter(
 
             msg.replyTo?.let { q ->
                 reply.visibility = View.VISIBLE
-                reply.text = q.body
+                val who = when {
+                    q.mine -> "You"
+                    isGroup -> bindingAdapter?.let { ad ->
+                        (ad as? ChatMessageAdapter)?.currentList
+                            ?.firstOrNull { it.id == q.id }?.senderName
+                    }.orEmpty().ifBlank { "" }
+                    else -> peerTitle
+                }
+                if (who.isBlank()) {
+                    reply.text = q.body
+                } else {
+                    val sp = android.text.SpannableStringBuilder(who).apply {
+                        setSpan(android.text.style.StyleSpan(Typeface.BOLD), 0, length, 0)
+                        setSpan(android.text.style.ForegroundColorSpan(NativeColors.Primary), 0, length, 0)
+                        append("\n")
+                        append(q.body)
+                    }
+                    reply.text = sp
+                }
             }
 
             val ink = if (dark && !msg.mine) NativeColors.White else NativeColors.Ink
@@ -350,15 +382,16 @@ class ChatMessageAdapter(
                 msg.location != null -> {
                     val loc = msg.location!!
                     mapBlock.visibility = View.VISIBLE
-                    mapTitle.text = loc.name?.takeIf { it.isNotBlank() } ?: "Location"
+                    mapTitle.text = when {
+                        loc.live -> "Live location"
+                        loc.ended -> loc.name?.takeIf { it.isNotBlank() } ?: "Live location ended"
+                        else -> loc.name?.takeIf { it.isNotBlank() } ?: "Location"
+                    }
                     mapSub.text = buildString {
                         loc.address?.takeIf { it.isNotBlank() }?.let { append(it).append('\n') }
                         append("%.4f, %.4f".format(java.util.Locale.US, loc.lat, loc.lng))
                     }
-                    val mapUrl =
-                        "https://staticmap.openstreetmap.de/staticmap.php?center=${loc.lat},${loc.lng}" +
-                            "&zoom=15&size=440x220&markers=${loc.lat},${loc.lng},red-pushpin"
-                    loadInto(mapPreview, mapUrl)
+                    loadMapInto(mapPreview, loc.lat, loc.lng)
                     mapBlock.setOnClickListener {
                         val label = Uri.encode(loc.name ?: "Location")
                         val geo = Uri.parse(
@@ -443,14 +476,100 @@ class ChatMessageAdapter(
                         body.text = msg.body
                     }
                 }
-                msg.poll != null -> {
+                msg.isSticker -> {
                     body.visibility = View.VISIBLE
                     body.setTypeface(null, Typeface.NORMAL)
+                    body.setTextSize(TypedValue.COMPLEX_UNIT_SP, 42f)
+                    body.text = msg.body
+                    bubble.setPadding(dp(10), dp(6), dp(10), dp(6))
+                }
+                msg.poll != null -> {
                     val p = msg.poll!!
-                    body.text = buildString {
-                        append("📊 ").append(p.question)
-                        p.options.take(4).forEach { append("\n• ").append(it.text) }
+                    richBlock.visibility = View.VISIBLE
+                    richBlock.removeAllViews()
+                    richBlock.minimumWidth = dp(250)
+                    val ctx = itemView.context
+                    richBlock.addView(
+                        TextView(ctx).apply {
+                            text = p.question
+                            setTextColor(ink)
+                            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                            typeface = Typeface.DEFAULT_BOLD
+                            setPadding(0, dp(2), 0, dp(2))
+                        },
+                    )
+                    richBlock.addView(
+                        TextView(ctx).apply {
+                            text = if (p.multiple) "Select one or more" else "Select one"
+                            setTextColor(NativeColors.TextSecondary)
+                            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                            setPadding(0, 0, 0, dp(6))
+                        },
+                    )
+                    val total = p.options.sumOf { it.votes }.coerceAtLeast(1)
+                    p.options.forEach { opt ->
+                        val pct = opt.votes * 10000 / total
+                        val rowOpt = TextView(ctx).apply {
+                            val mark = if (opt.mine) "✓  " else "○  "
+                            text = "$mark${opt.text}"
+                            setTextColor(if (opt.mine) NativeColors.Primary else ink)
+                            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                            minHeight = dp(44)
+                            gravity = Gravity.CENTER_VERTICAL
+                            setPadding(dp(12), dp(8), dp(52), dp(8))
+                            val track = GradientDrawable().apply {
+                                cornerRadius = 10f * density
+                                setColor(0x14000000)
+                            }
+                            val fill = android.graphics.drawable.ClipDrawable(
+                                GradientDrawable().apply {
+                                    cornerRadius = 10f * density
+                                    setColor(if (opt.mine) 0x3300BE3C else 0x1F000000)
+                                },
+                                Gravity.START,
+                                android.graphics.drawable.ClipDrawable.HORIZONTAL,
+                            ).also { it.level = pct }
+                            background = android.graphics.drawable.LayerDrawable(arrayOf(track, fill))
+                            layoutParams = LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ).also { it.topMargin = dp(6) }
+                            isEnabled = !p.closed
+                            alpha = if (p.closed) 0.55f else 1f
+                            setOnClickListener {
+                                if (!p.closed) onVote(msg, opt.id)
+                            }
+                        }
+                        val frame = FrameLayout(ctx).apply {
+                            layoutParams = LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                            )
+                            addView(rowOpt)
+                            addView(
+                                TextView(ctx).apply {
+                                    text = opt.votes.toString()
+                                    setTextColor(NativeColors.TextSecondary)
+                                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                                    layoutParams = FrameLayout.LayoutParams(
+                                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                                        Gravity.END or Gravity.CENTER_VERTICAL,
+                                    ).also { it.topMargin = dp(6); it.marginEnd = dp(14) }
+                                },
+                            )
+                        }
+                        richBlock.addView(frame)
                     }
+                    richBlock.addView(
+                        TextView(ctx).apply {
+                            text = "${p.totalVoters} vote${if (p.totalVoters == 1) "" else "s"}"
+                            setTextColor(NativeColors.TextSecondary)
+                            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                            gravity = Gravity.CENTER
+                            setPadding(0, dp(8), 0, dp(2))
+                        },
+                    )
                 }
                 msg.contact != null -> {
                     body.visibility = View.VISIBLE
@@ -459,9 +578,52 @@ class ChatMessageAdapter(
                     body.text = "👤 ${c.name}\n${c.phones.firstOrNull().orEmpty()}"
                 }
                 msg.event != null -> {
-                    body.visibility = View.VISIBLE
-                    body.setTypeface(null, Typeface.NORMAL)
-                    body.text = "📅 ${msg.event!!.title}"
+                    val e = msg.event!!
+                    richBlock.visibility = View.VISIBLE
+                    richBlock.removeAllViews()
+                    richBlock.addView(
+                        TextView(itemView.context).apply {
+                            text = e.title
+                            setTextColor(NativeColors.Ink)
+                            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                            typeface = Typeface.DEFAULT_BOLD
+                        },
+                    )
+                    richBlock.addView(
+                        TextView(itemView.context).apply {
+                            text = "Going ${e.going} · Maybe ${e.maybe} · Can't ${e.notGoing}"
+                            setTextColor(NativeColors.TextSecondary)
+                            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                            setPadding(0, dp(4), 0, dp(6))
+                        },
+                    )
+                    if (!e.cancelled) {
+                        fun rsvpChip(label: String, answer: String, selected: Boolean): TextView {
+                            return TextView(itemView.context).apply {
+                                text = label
+                                setTextColor(if (selected) NativeColors.White else NativeColors.Ink)
+                                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                                gravity = Gravity.CENTER
+                                maxLines = 1
+                                setPadding(dp(6), dp(9), dp(6), dp(9))
+                                background = GradientDrawable().apply {
+                                    cornerRadius = 8f * density
+                                    setColor(if (selected) NativeColors.Primary else 0x14000000)
+                                }
+                                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                                    .also { it.marginEnd = dp(4) }
+                                setOnClickListener { onRsvp(msg, answer) }
+                            }
+                        }
+                        val rowRsvp = LinearLayout(itemView.context).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            addView(rsvpChip("Going", "going", e.myAnswer == "going"))
+                            addView(rsvpChip("Maybe", "maybe", e.myAnswer == "maybe"))
+                            addView(rsvpChip("Can't", "not_going", e.myAnswer == "not_going"))
+                        }
+                        richBlock.minimumWidth = dp(250)
+                        richBlock.addView(rowRsvp)
+                    }
                 }
                 else -> {
                     if (msg.body.isNotBlank()) {
@@ -484,8 +646,28 @@ class ChatMessageAdapter(
                 }
             }
 
-            time.text = msg.time
-            voiceTime.text = msg.time
+            val reactionPrefix = (if (msg.starred) "★ " else "") +
+                (if (!msg.editedAtIso.isNullOrBlank() && !msg.deletedForEveryone) "Edited · " else "")
+            val chipBox = bubble.getChildAt(bubble.childCount - 1) as LinearLayout
+            val chip = chipBox.getChildAt(0) as TextView
+            if (msg.reactions.isEmpty() || msg.deletedForEveryone) {
+                chipBox.visibility = View.GONE
+                row.setPadding(dp(6), dp(2), dp(10), dp(2))
+            } else {
+                chipBox.visibility = View.VISIBLE
+                chip.text = buildString {
+                    msg.reactions.forEach { r ->
+                        if (isNotEmpty()) append(' ')
+                        append(r.emoji)
+                        if (r.count > 1) append(r.count)
+                    }
+                }
+                chipBox.gravity = if (msg.mine) Gravity.END else Gravity.START
+                chip.translationY = dp(1).toFloat()
+                row.setPadding(dp(6), dp(2), dp(10), dp(16))
+            }
+            time.text = reactionPrefix + msg.time
+            voiceTime.text = reactionPrefix + msg.time
             val isVoice = voiceBlock.visibility == View.VISIBLE
             meta.visibility = if (isVoice) View.GONE else View.VISIBLE
 
@@ -532,6 +714,67 @@ class ChatMessageAdapter(
         }
 
         private fun loadImage(url: String) = loadInto(mediaImage, url)
+
+        /** OSM raster tile (static-map service is defunct) with a pin drawn at the exact point. */
+        private fun loadMapInto(target: ImageView, lat: Double, lng: Double) {
+            loadJob?.cancel()
+            val ctx = itemView.context
+            target.setBackgroundColor(0xFFE8EDE9.toInt())
+            val z = 15
+            val n = 1 shl z
+            val xf = (lng + 180.0) / 360.0 * n
+            val latRad = Math.toRadians(lat)
+            val yf = (1.0 - Math.log(Math.tan(latRad) + 1.0 / Math.cos(latRad)) / Math.PI) / 2.0 * n
+            val tx = Math.floor(xf).toInt().coerceIn(0, n - 1)
+            val ty = Math.floor(yf).toInt().coerceIn(0, n - 1)
+            val fx = (xf - tx).toFloat()
+            val fy = (yf - ty).toFloat()
+            val url = "https://tile.openstreetmap.org/$z/$tx/$ty.png"
+            loadJob = CoroutineScope(Dispatchers.Main.immediate).launch {
+                val bmp = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val req = ImageRequest.Builder(ctx)
+                            .data(url)
+                            .httpHeaders(
+                                coil3.network.NetworkHeaders.Builder()
+                                    .add("User-Agent", "AivoraApp/1.0 (Android)").build(),
+                            )
+                            .size(Size(512, 512))
+                            .allowHardware(false)
+                            .build()
+                        val r = SingletonImageLoader.get(ctx).execute(req)
+                        if (r !is SuccessResult) {
+                            return@runCatching null
+                        }
+                        val dr = r.image.asDrawable(ctx.resources)
+                        val w = 512; val h = 512
+                        val out = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                        val c = android.graphics.Canvas(out)
+                        dr.setBounds(0, 0, w, h); dr.draw(c)
+                        val px = fx * w; val py = fy * h
+                        val ring = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+                        ring.color = android.graphics.Color.WHITE
+                        c.drawCircle(px, py, 22f, ring)
+                        ring.color = 0xFFE64C53.toInt()
+                        c.drawCircle(px, py, 15f, ring)
+                        Triple(out, px, py)
+                    }.getOrNull()
+                }
+                if (bmp != null) {
+                    val (b, px, py) = bmp
+                    target.setImageBitmap(b)
+                    target.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    target.scaleType = ImageView.ScaleType.MATRIX
+                    val vw = target.layoutParams.width.toFloat()
+                    val vh = target.layoutParams.height.toFloat()
+                    val sc = vw / b.width * 1.25f
+                    val m = android.graphics.Matrix()
+                    m.postScale(sc, sc)
+                    m.postTranslate(vw / 2f - px * sc, vh / 2f - py * sc)
+                    target.imageMatrix = m
+                }
+            }
+        }
 
         private fun loadInto(target: ImageView, url: String) {
             loadJob?.cancel()
@@ -656,19 +899,43 @@ class ChatMessageAdapter(
                 }
                 val sender = TextView(ctx).apply {
                     setTextColor(NativeColors.Primary)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
                     typeface = Typeface.DEFAULT_BOLD
                     visibility = View.GONE
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).also { it.bottomMargin = dp(6) }
                 }
                 val reply = TextView(ctx).apply {
                     setTextColor(NativeColors.TextSecondary)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                    maxLines = 2
-                    setPadding(dp(8), dp(6), dp(8), dp(6))
-                    background = GradientDrawable().apply {
-                        setColor(0x1F00BE3C)
-                        cornerRadius = 8f * d
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    maxLines = 3
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    minWidth = dp(190)
+                    setPadding(dp(14), dp(8), dp(10), dp(8))
+                    background = android.graphics.drawable.LayerDrawable(
+                        arrayOf(
+                            GradientDrawable().apply {
+                                setColor(0x2400BE3C)
+                                cornerRadius = 8f * d
+                            },
+                            android.graphics.drawable.InsetDrawable(
+                                GradientDrawable().apply {
+                                    setColor(NativeColors.Primary)
+                                    cornerRadius = 2f * d
+                                },
+                                0, 0, 0, 0,
+                            ),
+                        ),
+                    ).also { ld ->
+                        ld.setLayerSize(1, dp(4), ViewGroup.LayoutParams.MATCH_PARENT)
+                        ld.setLayerGravity(1, Gravity.START or Gravity.FILL_VERTICAL)
                     }
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).also { it.bottomMargin = dp(4) }
                     visibility = View.GONE
                 }
                 val mediaImage = ImageView(ctx).apply {
@@ -910,6 +1177,14 @@ class ChatMessageAdapter(
                     addView(linkTitle)
                     addView(linkSite)
                 }
+                val richBlock = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.VERTICAL
+                    visibility = View.GONE
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                }
                 val body = TextView(ctx).apply {
                     setTextColor(NativeColors.Ink)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
@@ -946,8 +1221,36 @@ class ChatMessageAdapter(
                 bubble.addView(fileRow)
                 bubble.addView(mapBlock)
                 bubble.addView(linkBlock)
+                bubble.addView(richBlock)
                 bubble.addView(body)
                 bubble.addView(meta)
+                val reactionChip = TextView(ctx).apply {
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                    setTextColor(NativeColors.Ink)
+                    setPadding(dp(7), dp(2), dp(7), dp(2))
+                    background = GradientDrawable().apply {
+                        cornerRadius = 14f * d
+                        setColor(NativeColors.SurfaceMuted)
+                        setStroke(dp(1), NativeColors.ChatDivider)
+                    }
+                    elevation = 2f * d
+                }
+                val chipBox = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    visibility = View.GONE
+                    clipChildren = false
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        dp(10),
+                    ).also { it.topMargin = 0 }
+                    addView(reactionChip, LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(24)))
+                }
+                bubble.addView(chipBox)
+                bubble.clipChildren = false
+                bubble.clipToPadding = false
+                row.clipChildren = false
+                row.clipToPadding = false
                 row.addView(avatarFrame)
                 row.addView(bubble)
                 return BubbleHolder(
@@ -956,7 +1259,7 @@ class ChatMessageAdapter(
                     voiceBlock, voicePlay, waveform, voiceDur, voiceSpeed, voiceTime, voiceTicks, meta,
                     viewOnceRow, viewOnceIcon, viewOnceTitle, viewOnceSub,
                     fileRow, fileNameTv, mapBlock, mapPreview, mapTitle, mapSub,
-                    linkBlock, linkTitle, linkSite, body, time, ticks,
+                    linkBlock, linkTitle, linkSite, richBlock, body, time, ticks,
                 )
             }
         }
@@ -1025,6 +1328,7 @@ class ChatMessageAdapter(
                     a.linkPreview == b.linkPreview &&
                     a.location == b.location &&
                     a.poll == b.poll &&
+                    a.event == b.event &&
                     a.deletedForEveryone == b.deletedForEveryone &&
                     a.disappeared == b.disappeared
         }

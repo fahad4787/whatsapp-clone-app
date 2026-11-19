@@ -686,7 +686,7 @@ private fun ScheduleCallForm(onBack: () -> Unit, onDone: () -> Unit) {
             )
             Spacer(Modifier.width(12.dp))
             Text(
-                "Add participants and choose a date and time to continue. Invitations are sent after you confirm.",
+                "Add a title and participants, then choose a date and time to continue. Invitations are sent after you confirm.",
                 color = AivoraColors.InfoGreen,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,

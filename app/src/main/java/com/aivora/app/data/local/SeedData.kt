@@ -13,6 +13,8 @@ data class LocalChat(
     val favorite: Boolean = false,
     val archived: Boolean = false,
     val pinned: Boolean = false,
+    /** Wave 25 — chat lock for this conversation. */
+    val locked: Boolean = false,
     /** ISO muted-until; null/blank = not muted. */
     val mutedUntil: String? = null,
     /** I blocked this peer. */
@@ -57,6 +59,8 @@ data class LocalReplyPreview(
     val id: String,
     val body: String,
     val deleted: Boolean = false,
+    val mine: Boolean = false,
+    val senderId: String? = null,
 )
 
 @Immutable
@@ -98,7 +102,15 @@ data class LocalPoll(
 data class LocalContact(val name: String, val phones: List<String>, val userId: String?)
 
 @Immutable
-data class LocalLocation(val lat: Double, val lng: Double, val name: String?, val address: String?)
+data class LocalLocation(
+    val lat: Double,
+    val lng: Double,
+    val name: String?,
+    val address: String?,
+    val live: Boolean = false,
+    val ended: Boolean = false,
+    val expiresAtIso: String? = null,
+)
 
 @Immutable
 data class LocalEvent(
@@ -147,6 +159,8 @@ data class LocalMessage(
     val system: Boolean = false,
     val editedAtIso: String? = null,
     val viewOnce: Boolean = false,
+    /** Wave 25 — emoji sticker bubble. */
+    val isSticker: Boolean = false,
 ) {
     val edited: Boolean get() = !editedAtIso.isNullOrBlank()
 }

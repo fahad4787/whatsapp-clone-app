@@ -40,11 +40,19 @@ suspend fun AivoraApi.sendAttachmentMessage(
     durationSec: Int? = null,
     viewOnce: Boolean = false,
 ): MessageDto {
-    val bytes = withContext(Dispatchers.IO) {
+    val raw = withContext(Dispatchers.IO) {
         context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
     } ?: throw IllegalStateException("Could not read file")
-    val mime = context.contentResolver.getType(uri) ?: defaultMime
-    val name = queryDisplayName(context, uri) ?: defaultName
+    val rawMime = context.contentResolver.getType(uri) ?: defaultMime
+    val rawName = queryDisplayName(context, uri) ?: defaultName
+    val prepared = if (rawMime.startsWith("image/")) {
+        PhotoUploadQuality.prepare(context, raw, rawMime, rawName)
+    } else {
+        PhotoUploadQuality.Encoded(raw, rawMime, rawName)
+    }
+    val bytes = prepared.bytes
+    val mime = prepared.mime
+    val name = prepared.name
 
     val part = okhttp3.MultipartBody.Part.createFormData(
         "file",
@@ -80,11 +88,19 @@ suspend fun AivoraApi.uploadAttachment(
     defaultName: String = "file.bin",
     defaultMime: String = "application/octet-stream",
 ): AttachmentDto {
-    val bytes = withContext(Dispatchers.IO) {
+    val raw = withContext(Dispatchers.IO) {
         context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
     } ?: throw IllegalStateException("Could not read file")
-    val mime = context.contentResolver.getType(uri) ?: defaultMime
-    val name = queryDisplayName(context, uri) ?: defaultName
+    val rawMime = context.contentResolver.getType(uri) ?: defaultMime
+    val rawName = queryDisplayName(context, uri) ?: defaultName
+    val prepared = if (rawMime.startsWith("image/")) {
+        PhotoUploadQuality.prepare(context, raw, rawMime, rawName)
+    } else {
+        PhotoUploadQuality.Encoded(raw, rawMime, rawName)
+    }
+    val bytes = prepared.bytes
+    val mime = prepared.mime
+    val name = prepared.name
     val part = okhttp3.MultipartBody.Part.createFormData(
         "file",
         name,

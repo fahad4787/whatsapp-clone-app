@@ -83,8 +83,18 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
     implementation("androidx.navigation:navigation-compose:2.8.4")
     implementation("androidx.core:core-splashscreen:1.0.1")
+    // Wave 33 — app lock with device biometric / credential
+    implementation("androidx.biometric:biometric:1.1.0")
+    // Wave 38/44 — profile QR encode + gallery/live decode
+    implementation("com.google.zxing:core:3.5.3")
+    val cameraX = "1.4.2"
+    implementation("androidx.camera:camera-camera2:$cameraX")
+    implementation("androidx.camera:camera-lifecycle:$cameraX")
+    implementation("androidx.camera:camera-view:$cameraX")
     // F13 — WhatsApp-style native recycle on hot lists (Mate-class fling).
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    // Wave 48 — scheduled chat backup
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")

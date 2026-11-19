@@ -6,6 +6,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -20,25 +24,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +48,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aivora.app.BuildConfig
+import com.aivora.app.data.HelpArticles
+import com.aivora.app.data.QrCodec
+import com.aivora.app.data.api.NetworkModule
+import com.aivora.app.data.local.DeviceContact
+import com.aivora.app.data.local.DeviceContacts
+import com.aivora.app.data.local.SessionStore
 import com.aivora.app.ui.components.AivoraBottomSheet
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.AivoraScrollColumn
@@ -66,12 +68,15 @@ import com.aivora.app.ui.icons.AivoraIcons
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun HelpFeedbackScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = LocalContext.current
     AivoraScaffold(title = "Help and feedback", onBack = onBack) {
         Column(
             modifier = Modifier
@@ -104,21 +109,36 @@ fun HelpFeedbackScreen(
                     iconRes = AivoraIcons.Chat,
                     title = "Contact us",
                     subtitle = "Get help or send feedback",
-                    onClick = { },
+                    onClick = {
+                        val uid = SessionStore.userId(context)?.take(8).orEmpty()
+                        val mail = Intent(Intent.ACTION_SENDTO).apply {
+                            data = Uri.parse("mailto:")
+                            putExtra(Intent.EXTRA_EMAIL, arrayOf("support@aivora.app"))
+                            putExtra(Intent.EXTRA_SUBJECT, "Aivora feedback")
+                            putExtra(
+                                Intent.EXTRA_TEXT,
+                                "Describe your issue or idea:\n\n\n---\nApp ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\nUser $uid",
+                            )
+                        }
+                        runCatching { context.startActivity(Intent.createChooser(mail, "Contact us")) }
+                            .onFailure {
+                                Toast.makeText(context, "No email app found", Toast.LENGTH_SHORT).show()
+                            }
+                    },
                 )
                 HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = AivoraColors.Divider)
                 HelpActionRow(
                     icon = AppIcons.Info,
                     title = "App info",
                     subtitle = "About Aivora",
-                    onClick = { },
+                    onClick = { onNavigate(Routes.HelpAppInfo) },
                 )
             }
             Spacer(Modifier.height(12.dp))
             SettingsMutedGroup {
-                SettingsRow(SettingsItem("Terms of service", onClick = { }))
+                SettingsRow(SettingsItem("Terms of service", onClick = { onNavigate(Routes.HelpTerms) }))
                 HorizontalDivider(modifier = Modifier.padding(start = 16.dp), color = AivoraColors.Divider)
-                SettingsRow(SettingsItem("Privacy policy", onClick = { }))
+                SettingsRow(SettingsItem("Privacy policy", onClick = { onNavigate(Routes.HelpPrivacy) }))
             }
             Spacer(Modifier.height(16.dp))
             Column(
@@ -151,7 +171,7 @@ fun HelpFeedbackScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                "Version 1.0.0",
+                "Version ${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodySmall,
                 color = AivoraColors.TextSecondary,
                 textAlign = TextAlign.Center,
@@ -162,19 +182,75 @@ fun HelpFeedbackScreen(
 }
 
 @Composable
+fun HelpAppInfoScreen(
+    onBack: (() -> Unit)? = null,
+    onNavigate: (String) -> Unit = {},
+) {
+    AivoraScaffold(title = "App info", onBack = onBack) {
+        SettingsList(
+            listOf(
+                null to listOf(
+                    SettingsItem("App name", trailing = "Aivora"),
+                    SettingsItem("Version", trailing = BuildConfig.VERSION_NAME),
+                    SettingsItem("Build", trailing = BuildConfig.VERSION_CODE.toString()),
+                ),
+                "Legal" to listOf(
+                    SettingsItem("Terms of service", onClick = { onNavigate(Routes.HelpTerms) }),
+                    SettingsItem("Privacy policy", onClick = { onNavigate(Routes.HelpPrivacy) }),
+                ),
+            ),
+        )
+        Text(
+            "Aivora is a messaging app for chats, calls, and updates. Feedback: support@aivora.app",
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = AivoraColors.TextSecondary,
+        )
+    }
+}
+
+@Composable
+fun HelpArticleScreen(
+    articleId: String,
+    onBack: (() -> Unit)? = null,
+) {
+    val article = remember(articleId) { HelpArticles.byId(articleId) }
+    AivoraScaffold(title = article?.title ?: "Help", onBack = onBack) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .padding(bottom = 24.dp),
+        ) {
+            if (article == null) {
+                Text("Article not found.", color = AivoraColors.Danger)
+            } else {
+                Text(
+                    article.subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AivoraColors.TextSecondary,
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    article.body,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = AivoraColors.Ink,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun HelpCenterScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
     var query by remember { mutableStateOf("") }
-    val topics = listOf(
-        "Get started" to "Set up your account and start chatting",
-        "Chats and media" to "Messages, photos, documents, and more",
-        "Calls and video" to "Voice, video, and scheduled calls",
-        "Privacy and security" to "Controls that protect your account",
-        "Notifications" to "Manage alerts and sounds",
-        "Account and backup" to "Number, passkeys, and chat backup",
-    )
+    val topics = remember {
+        HelpArticles.all.map { it.id to (it.title to it.subtitle) }
+    }
     AivoraScaffold(title = "Help Center", onBack = onBack) {
         SearchField(
             value = query,
@@ -184,13 +260,17 @@ fun HelpCenterScreen(
         SettingsList(
             listOf(
                 "Popular topics" to topics
-                    .filter {
+                    .filter { (_, pair) ->
                         query.isBlank() ||
-                            it.first.contains(query, ignoreCase = true) ||
-                            it.second.contains(query, ignoreCase = true)
+                            pair.first.contains(query, ignoreCase = true) ||
+                            pair.second.contains(query, ignoreCase = true)
                     }
-                    .map { (title, subtitle) ->
-                        SettingsItem(title, subtitle = subtitle, onClick = { })
+                    .map { (id, pair) ->
+                        SettingsItem(
+                            pair.first,
+                            subtitle = pair.second,
+                            onClick = { onNavigate(Routes.helpArticle(id)) },
+                        )
                     },
             ),
         )
@@ -205,20 +285,39 @@ fun InviteFriendScreen(
     var query by remember { mutableStateOf("") }
     var showShare by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val inviteLink = "aivora.app/invite"
+    val userId = remember { SessionStore.userId(context).orEmpty() }
+    val inviteLink = remember(userId) {
+        if (userId.isNotBlank()) QrCodec.HttpsPrefix + userId
+        else "https://whatsapp-clone-backend-hep1.onrender.com/"
+    }
     val inviteBody =
         "Join me on Aivora! Let’s stay connected with messages, voice and video calls.\n$inviteLink"
-    val contacts = listOf(
-        "Amrit Singh" to "+91 98765 43210",
-        "Navjot Singh" to "+91 98765 43211",
-        "Gurpreet Kaur" to "+91 98765 43212",
-        "Harleen Kaur" to "+91 98765 43213",
-        "Jaspreet Singh" to "+91 98765 43214",
-        "Manpreet Kaur" to "+91 98765 43215",
-    ).filter {
+    var deviceContacts by remember { mutableStateOf<List<DeviceContact>>(emptyList()) }
+    var contactsDenied by remember { mutableStateOf(false) }
+
+    val permission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            deviceContacts = DeviceContacts.load(context)
+            contactsDenied = false
+        } else {
+            contactsDenied = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (DeviceContacts.hasPermission(context)) {
+            deviceContacts = withContext(Dispatchers.IO) { DeviceContacts.load(context) }
+        } else {
+            permission.launch(android.Manifest.permission.READ_CONTACTS)
+        }
+    }
+
+    val contacts = deviceContacts.filter {
         query.isBlank() ||
-            it.first.contains(query, ignoreCase = true) ||
-            it.second.contains(query, ignoreCase = true)
+            it.name.contains(query, ignoreCase = true) ||
+            it.phone.contains(query, ignoreCase = true)
     }
 
     if (showShare) {
@@ -259,8 +358,14 @@ fun InviteFriendScreen(
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                listOf("Gurpreet", "Amrit", "Harleen", "Jaspreet").forEach { name ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                contacts.take(4).forEach { c ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable {
+                            showShare = false
+                            sendSmsInvite(context, c.phone, inviteBody)
+                        },
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(52.dp)
@@ -271,7 +376,11 @@ fun InviteFriendScreen(
                             Icon(AppIcons.Person, null, tint = AivoraColors.Primary)
                         }
                         Spacer(Modifier.height(6.dp))
-                        Text(name, fontSize = 12.sp, color = AivoraColors.InkMuted)
+                        Text(
+                            c.name.substringBefore(' ').ifBlank { c.name }.take(10),
+                            fontSize = 12.sp,
+                            color = AivoraColors.InkMuted,
+                        )
                     }
                 }
             }
@@ -328,6 +437,7 @@ fun InviteFriendScreen(
                         val clipboard =
                             context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText("Aivora invite", inviteLink))
+                        Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
                         showShare = false
                     }
                     .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -364,7 +474,7 @@ fun InviteFriendScreen(
                 placeholder = "Search name or phone number",
             )
             Text(
-                "Contacts not on Aivora",
+                "From your contacts",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
@@ -374,29 +484,101 @@ fun InviteFriendScreen(
                     .weight(1f)
                     .padding(horizontal = AivoraDimens.CardHorizontal),
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
-                        .background(AivoraColors.SurfaceMuted),
-                ) {
-                    contacts.forEachIndexed { index, (name, phone) ->
-                        InviteContactRow(name = name, phone = phone, onInvite = { })
-                        if (index < contacts.lastIndex) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(start = 66.dp),
-                                color = AivoraColors.Divider,
-                            )
+                when {
+                    contactsDenied && contacts.isEmpty() -> {
+                        Text(
+                            "Allow contacts access to invite people from your address book, or share the link above.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AivoraColors.TextSecondary,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                    contacts.isEmpty() -> {
+                        Text(
+                            if (query.isNotBlank()) "No contacts match “$query”."
+                            else "No phone contacts found yet.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AivoraColors.TextSecondary,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                    else -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
+                                .background(AivoraColors.SurfaceMuted),
+                        ) {
+                            contacts.forEachIndexed { index, c ->
+                                InviteContactRow(
+                                    name = c.name,
+                                    phone = c.phone,
+                                    onInvite = { sendSmsInvite(context, c.phone, inviteBody) },
+                                )
+                                if (index < contacts.lastIndex) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(start = 66.dp),
+                                        color = AivoraColors.Divider,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
                 Text(
-                    "Invitations are sent through your phone’s messaging app. Standard SMS charges may apply.",
+                    "Invitations open your messaging app. Standard SMS charges may apply. Your invite link opens a chat with you in Aivora.",
                     style = MaterialTheme.typography.bodySmall,
                     color = AivoraColors.TextSecondary,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp),
                 )
             }
+        }
+    }
+}
+
+private fun sendSmsInvite(context: Context, phone: String, body: String) {
+    val intent = Intent(Intent.ACTION_SENDTO).apply {
+        data = Uri.parse("smsto:${Uri.encode(phone)}")
+        putExtra("sms_body", body)
+    }
+    runCatching { context.startActivity(intent) }
+        .onFailure {
+            Toast.makeText(context, "No messaging app found", Toast.LENGTH_SHORT).show()
+        }
+}
+
+@Composable
+fun LegalDocumentScreen(
+    title: String,
+    kind: String,
+    onBack: (() -> Unit)? = null,
+) {
+    var body by remember { mutableStateOf("Loading…") }
+    val api = remember { NetworkModule.api() }
+    LaunchedEffect(kind) {
+        body = withContext(Dispatchers.IO) {
+            runCatching {
+                val docs = api.getLegalDocs()
+                when (kind) {
+                    "terms" -> docs.termsOfService
+                    else -> docs.privacyPolicy
+                }.ifBlank { "No document available." }
+            }.getOrElse { "Could not load document. Check your connection." }
+        }
+    }
+    AivoraScaffold(title = title, onBack = onBack) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .padding(bottom = 24.dp),
+        ) {
+            Text(
+                body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = AivoraColors.Ink,
+            )
         }
     }
 }

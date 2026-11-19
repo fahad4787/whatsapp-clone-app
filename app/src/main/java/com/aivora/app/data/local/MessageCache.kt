@@ -23,7 +23,13 @@ object MessageCache {
     }
 
     @Serializable
-    private data class CachedReply(val id: String, val body: String, val deleted: Boolean = false)
+    private data class CachedReply(
+        val id: String,
+        val body: String,
+        val deleted: Boolean = false,
+        val mine: Boolean = false,
+        val senderId: String? = null,
+    )
 
     @Serializable
     private data class CachedReaction(val emoji: String, val count: Int, val mine: Boolean = false)
@@ -208,7 +214,7 @@ object MessageCache {
         voiceDurationSec = voiceDurationSec,
         status = status.name,
         deletedForEveryone = deletedForEveryone,
-        replyTo = replyTo?.let { CachedReply(it.id, it.body, it.deleted) },
+        replyTo = replyTo?.let { CachedReply(it.id, it.body, it.deleted, it.mine, it.senderId) },
         reactions = reactions.map { CachedReaction(it.emoji, it.count, it.mine) },
         starred = starred,
         forwarded = forwarded,
@@ -263,7 +269,7 @@ object MessageCache {
         status = runCatching { MessageDeliveryStatus.valueOf(status) }
             .getOrDefault(MessageDeliveryStatus.Sent),
         deletedForEveryone = deletedForEveryone,
-        replyTo = replyTo?.let { LocalReplyPreview(it.id, it.body, it.deleted) },
+        replyTo = replyTo?.let { LocalReplyPreview(it.id, it.body, it.deleted, it.mine, it.senderId) },
         reactions = reactions.map { LocalReaction(it.emoji, it.count, it.mine) },
         starred = starred,
         forwarded = forwarded,

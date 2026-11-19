@@ -156,12 +156,11 @@ object InMemoryMeStore {
         val avatarUrl: String? = null,
     )
 
-    @Volatile
-    var me: Me? = null
-        private set
+    private val meState = androidx.compose.runtime.mutableStateOf<Me?>(null)
+    val me: Me? get() = meState.value
 
     fun replace(displayName: String?, about: String?, phone: String?, avatarUrl: String?) {
-        me = Me(
+        meState.value = Me(
             displayName = displayName.orEmpty(),
             about = about.orEmpty(),
             phone = phone.orEmpty(),
@@ -170,6 +169,6 @@ object InMemoryMeStore {
     }
 
     fun clear() {
-        me = null
+        meState.value = null
     }
 }

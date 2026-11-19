@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -160,8 +161,8 @@ fun SettingsRow(item: SettingsItem) {
         modifier = Modifier
             .fillMaxWidth()
             .then(if (click != null) Modifier.clickable(onClick = click) else Modifier)
-            .height(AivoraDimens.SettingsRowHeight)
-            .padding(horizontal = AivoraDimens.Space4),
+            .heightIn(min = AivoraDimens.SettingsRowHeight)
+            .padding(horizontal = AivoraDimens.Space4, vertical = if (item.subtitle != null) 10.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Figma Settings “Action icon”: 24×24, no plate, Ink — same chrome for Material or drawable.
@@ -173,7 +174,7 @@ fun SettingsRow(item: SettingsItem) {
             )
             Spacer(Modifier.width(14.dp))
         }
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).padding(end = if (item.toggle != null) 12.dp else 0.dp)) {
             Text(
                 item.title,
                 style = MaterialTheme.typography.bodyMedium,
@@ -183,7 +184,7 @@ fun SettingsRow(item: SettingsItem) {
             if (item.subtitle != null) {
                 Text(
                     item.subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
@@ -615,7 +616,7 @@ fun PrimaryButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = AivoraColors.Primary,
             contentColor = AivoraColors.OnPrimary,
-            disabledContainerColor = Color(0xFFE9ECEA),
+            disabledContainerColor = if (AivoraColors.isDark) Color(0xFF2A3139) else Color(0xFFE9ECEA),
             disabledContentColor = AivoraColors.TextTertiary,
         ),
         shape = RoundedCornerShape(AivoraDimens.RadiusMd),

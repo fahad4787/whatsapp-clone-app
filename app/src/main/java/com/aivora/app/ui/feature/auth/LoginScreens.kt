@@ -112,6 +112,8 @@ fun LoginScreen(
     var otpDevBypass by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var emailMode by remember { mutableStateOf(false) }
+    var loginEmail by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         runCatching { api.getAppConfig() }.onSuccess { cfg ->
@@ -225,6 +227,33 @@ fun LoginScreen(
         return finishLogin(access, refresh, targetPhone)
     }
 
+    suspend fun completeEmailVerify(email: String, code: String): String? {
+        val tokens = api.postAuthEmailVerify(
+            com.aivora.app.data.model.EmailSignInVerifyBody(
+                email = email,
+                code = code,
+                device = DeviceInfo(
+                    platform = "android",
+                    deviceName = android.os.Build.MODEL,
+                    appVersion = BuildConfig.VERSION_NAME,
+                ),
+            ),
+        )
+        if (tokens.twoStepRequired && !tokens.challenge.isNullOrBlank()) {
+            twoStepChallenge = tokens.challenge
+            pin = ""
+            step = 2
+            return null
+        }
+        val access = tokens.access
+        val refresh = tokens.refresh
+        if (access.isNullOrBlank() || refresh.isNullOrBlank()) {
+            return "Invalid server response"
+        }
+        val phoneForSession = SessionStore.phone(context) ?: email
+        return finishLogin(access, refresh, phoneForSession)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -302,7 +331,88 @@ fun LoginScreen(
                 label = "loginStep",
             ) { current ->
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    if (current == 0) {
+                    if (current == 0 && emailMode) {
+                        Text(
+                            "Email sign-in",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp,
+                            color = AivoraColors.Ink,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Use the recovery email you verified in Settings.",
+                            fontSize = 14.sp,
+                            color = AivoraColors.TextSecondary,
+                            lineHeight = 18.sp,
+                        )
+                        Spacer(Modifier.height(20.dp))
+                        AuthFieldLabel("Email")
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .clip(FieldShape)
+                                .background(AivoraColors.SurfaceMuted)
+                                .border(1.dp, AivoraColors.BorderMuted, FieldShape)
+                                .padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            if (loginEmail.isEmpty()) {
+                                Text("you@example.com", color = Color(0xFF9B9B9B), fontSize = 16.sp)
+                            }
+                            BasicTextField(
+                                value = loginEmail,
+                                onValueChange = {
+                                    loginEmail = it.trim()
+                                    error = null
+                                },
+                                singleLine = true,
+                                textStyle = TextStyle(color = AivoraColors.InkMuted, fontSize = 16.sp),
+                                cursorBrush = SolidColor(AivoraColors.Primary),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        if (error != null) {
+                            Spacer(Modifier.height(10.dp))
+                            Text(error!!, color = AivoraColors.Danger, fontSize = 13.sp)
+                        }
+                        Spacer(Modifier.height(22.dp))
+                        PrimaryButton(
+                            text = if (busy) "Sending…" else "Send code",
+                            enabled = !busy,
+                            onClick = {
+                                if (!loginEmail.contains("@")) {
+                                    error = "Enter a valid email"
+                                    return@PrimaryButton
+                                }
+                                busy = true
+                                error = null
+                                scope.launch {
+                                    try {
+                                        val result = api.postAuthEmailRequest(
+                                            com.aivora.app.data.model.EmailSignInRequestBody(
+                                                email = loginEmail,
+                                            ),
+                                        )
+                                        otp = ""
+                                        otpDevBypass = result.otpDevBypass || otpDevBypass
+                                        step = 1
+                                    } catch (e: Exception) {
+                                        error = e.message ?: "Could not send code"
+                                    } finally {
+                                        busy = false
+                                    }
+                                }
+                            },
+                        )
+                        Spacer(Modifier.height(18.dp))
+                        AuthTextLink("Use phone instead") {
+                            emailMode = false
+                            error = null
+                            otp = ""
+                        }
+                    } else if (current == 0) {
                         Text(
                             "Phone number",
                             fontWeight = FontWeight.SemiBold,
@@ -410,7 +520,96 @@ fun LoginScreen(
                             onNavigate(Routes.SettingsAccountPasskeys)
                         }
                         AuthTextLink("Use email instead") {
-                            onNavigate(Routes.SettingsAccountEmail)
+                            emailMode = true
+                            step = 0
+                            error = null
+                            otp = ""
+                        }
+                        AuthTextLink("Link this device") {
+                            onNavigate(Routes.DeviceLinkPair)
+                        }
+                    } else if (current == 1 && emailMode) {
+                        Text(
+                            "Enter the code",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp,
+                            color = AivoraColors.Ink,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Sent to $loginEmail",
+                            fontSize = 14.sp,
+                            color = AivoraColors.TextSecondary,
+                        )
+                        if (otpDevBypass) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Dev: use 000000 or the code in server logs",
+                                fontSize = 12.sp,
+                                color = AivoraColors.TextTertiary,
+                            )
+                        }
+                        Spacer(Modifier.height(20.dp))
+                        AuthFieldLabel("Verification code")
+                        OtpField(
+                            value = otp,
+                            onValueChange = {
+                                otp = it.filter { ch -> ch.isDigit() }.take(6)
+                                error = null
+                            },
+                        )
+                        if (error != null) {
+                            Spacer(Modifier.height(10.dp))
+                            Text(error!!, color = AivoraColors.Danger, fontSize = 13.sp)
+                        }
+                        Spacer(Modifier.height(22.dp))
+                        PrimaryButton(
+                            text = if (busy) "Verifying…" else "Verify",
+                            enabled = otp.length == 6 && !busy,
+                            onClick = {
+                                if (otp.length != 6) {
+                                    error = "Enter the 6-digit code"
+                                    return@PrimaryButton
+                                }
+                                busy = true
+                                error = null
+                                scope.launch {
+                                    try {
+                                        val fail = completeEmailVerify(loginEmail, otp)
+                                        if (fail != null) error = fail
+                                        else if (twoStepChallenge == null) onVerified()
+                                    } catch (e: Exception) {
+                                        error = e.message ?: "Invalid code"
+                                    } finally {
+                                        busy = false
+                                    }
+                                }
+                            },
+                        )
+                        Spacer(Modifier.height(18.dp))
+                        AuthTextLink("Resend code") {
+                            if (busy) return@AuthTextLink
+                            busy = true
+                            error = null
+                            scope.launch {
+                                try {
+                                    val result = api.postAuthEmailRequest(
+                                        com.aivora.app.data.model.EmailSignInRequestBody(
+                                            email = loginEmail,
+                                        ),
+                                    )
+                                    otpDevBypass = result.otpDevBypass || otpDevBypass
+                                    otp = ""
+                                } catch (e: Exception) {
+                                    error = e.message ?: "Could not resend"
+                                } finally {
+                                    busy = false
+                                }
+                            }
+                        }
+                        AuthTextLink("Wrong email?") {
+                            step = 0
+                            error = null
                         }
                     } else if (current == 1) {
                         Text(

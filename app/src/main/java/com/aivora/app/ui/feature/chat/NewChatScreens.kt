@@ -73,7 +73,7 @@ fun NewChatScreen(
                         InMemoryChatStore.upsertChat(conv.toLocalChat())
                         onNavigate(Routes.ChatId.replace("{id}", conv.id.orEmpty()))
                     } catch (e: Exception) {
-                        error = e.message ?: "Could not start chat"
+                        error = com.aivora.app.data.api.ApiErrors.message(e, "Could not start chat")
                     } finally {
                         busy = false
                     }

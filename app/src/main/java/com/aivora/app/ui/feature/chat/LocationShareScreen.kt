@@ -51,6 +51,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.compose.material3.AlertDialog
+import com.aivora.app.data.LiveLocationSession
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.SessionStore
@@ -76,7 +78,10 @@ private data class ResolvedLocation(
     val lng: Double,
     val name: String?,
     val address: String?,
+    val accuracy: Double? = null,
 )
+
+private enum class ShareMode { Once, Live }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +95,8 @@ fun LocationShareScreen(
     var sending by remember { mutableStateOf(false) }
     var locating by remember { mutableStateOf(false) }
     var preview by remember { mutableStateOf<ResolvedLocation?>(null) }
+    var pendingMode by remember { mutableStateOf(ShareMode.Once) }
+    var showDurationPicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val fused = remember { LocationServices.getFusedLocationProviderClient(context) }
@@ -101,7 +108,7 @@ fun LocationShareScreen(
     }
 
     @SuppressLint("MissingPermission")
-    fun fetchAndSend() {
+    fun fetchAndSend(mode: ShareMode, durationSeconds: Int = 900) {
         if (sending || locating) return
         locating = true
         scope.launch {
@@ -122,8 +129,14 @@ fun LocationShareScreen(
                 val line = address?.getAddressLine(0)
                 val name = listOfNotNull(address?.featureName, address?.locality, address?.subLocality)
                     .firstOrNull { !it.isNullOrBlank() && it != line }
-                    ?: "Current location"
-                ResolvedLocation(loc.latitude, loc.longitude, name, line)
+                    ?: if (mode == ShareMode.Live) "Live location" else "Current location"
+                ResolvedLocation(
+                    loc.latitude,
+                    loc.longitude,
+                    name,
+                    line,
+                    accuracy = loc.accuracy.toDouble(),
+                )
             }.getOrElse {
                 locating = false
                 Toast.makeText(
@@ -157,11 +170,18 @@ fun LocationShareScreen(
                             lng = resolved.lng,
                             name = resolved.name,
                             address = resolved.address,
+                            live = mode == ShareMode.Live,
+                            accuracy = resolved.accuracy,
+                            durationSeconds = if (mode == ShareMode.Live) durationSeconds else null,
                         ),
                     ),
                 )
             }.onSuccess {
                 InMemoryChatStore.upsertMessage(chatId, it.toLocalMessage(uid))
+                val msgId = it.id
+                if (mode == ShareMode.Live && !msgId.isNullOrBlank()) {
+                    LiveLocationSession.start(context, msgId, chatId)
+                }
                 onBack?.invoke()
             }.onFailure {
                 sending = false
@@ -175,13 +195,18 @@ fun LocationShareScreen(
     ) { grants ->
         val ok = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
             grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (ok) fetchAndSend()
-        else Toast.makeText(context, "Location permission needed", Toast.LENGTH_SHORT).show()
+        if (ok) {
+            if (pendingMode == ShareMode.Live) showDurationPicker = true
+            else fetchAndSend(ShareMode.Once)
+        } else Toast.makeText(context, "Location permission needed", Toast.LENGTH_SHORT).show()
     }
 
-    fun requestOrSend() {
-        if (hasLocationPermission()) fetchAndSend()
-        else {
+    fun requestOrSend(mode: ShareMode) {
+        pendingMode = mode
+        if (hasLocationPermission()) {
+            if (mode == ShareMode.Live) showDurationPicker = true
+            else fetchAndSend(ShareMode.Once)
+        } else {
             permissionLauncher.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
@@ -189,6 +214,35 @@ fun LocationShareScreen(
                 ),
             )
         }
+    }
+
+    if (showDurationPicker) {
+        AlertDialog(
+            onDismissRequest = { if (!locating && !sending) showDurationPicker = false },
+            title = { Text("Share live location") },
+            text = { Text("How long should $peer see your live location?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDurationPicker = false
+                    fetchAndSend(ShareMode.Live, 900)
+                }) { Text("15 minutes") }
+            },
+            dismissButton = {
+                Column {
+                    TextButton(onClick = {
+                        showDurationPicker = false
+                        fetchAndSend(ShareMode.Live, 3600)
+                    }) { Text("1 hour") }
+                    TextButton(onClick = {
+                        showDurationPicker = false
+                        fetchAndSend(ShareMode.Live, 8 * 3600)
+                    }) { Text("8 hours") }
+                    TextButton(onClick = {
+                        if (!locating && !sending) showDurationPicker = false
+                    }) { Text("Cancel") }
+                }
+            },
+        )
     }
 
     Column(
@@ -285,7 +339,7 @@ fun LocationShareScreen(
                         subtitle = preview?.address
                             ?: "Uses GPS on this device",
                         icon = AppIcons.NearMe,
-                        onClick = { if (!locating && !sending) requestOrSend() },
+                        onClick = { if (!locating && !sending) requestOrSend(ShareMode.Once) },
                     ),
                 )
             }
@@ -299,11 +353,9 @@ fun LocationShareScreen(
                 SettingsRow(
                     SettingsItem(
                         "Share live location",
-                        subtitle = "Let $peer see your location for a while",
+                        subtitle = "Let $peer see updates for 15m / 1h / 8h",
                         icon = AppIcons.ShareLocation,
-                        onClick = {
-                            Toast.makeText(context, "Live location coming in a later wave", Toast.LENGTH_SHORT).show()
-                        },
+                        onClick = { if (!locating && !sending) requestOrSend(ShareMode.Live) },
                     ),
                 )
             }

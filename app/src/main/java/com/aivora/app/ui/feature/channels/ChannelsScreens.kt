@@ -2,128 +2,131 @@ package com.aivora.app.ui.feature.channels
 
 import com.aivora.app.ui.icons.AppIcons
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.key
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Photo
-import androidx.compose.material.icons.filled.Poll
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import com.aivora.app.ui.components.Avatar
+import androidx.compose.ui.platform.LocalContext
+import com.aivora.app.data.api.NetworkModule
+import com.aivora.app.data.local.SessionStore
+import com.aivora.app.data.model.ChannelCreateBody
+import com.aivora.app.data.model.ChannelDto
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.AivoraScrollColumn
 import com.aivora.app.ui.components.EmptyState
 import com.aivora.app.ui.components.InfoBanner
-import com.aivora.app.ui.components.LinkButton
 import com.aivora.app.ui.components.PersonRow
-import com.aivora.app.ui.components.PrimaryButton
-import com.aivora.app.ui.components.RadioGroup
 import com.aivora.app.ui.components.SearchField
-import com.aivora.app.ui.components.SettingsItem
-import com.aivora.app.ui.components.SettingsList
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VpnKey
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChannelsScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val api = remember {
+        NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
+    }
     var query by remember { mutableStateOf("") }
-    val channels = listOf(
-        "Aivora News" to "Verified · 12.4k followers",
-        "Aivora Updates" to "Listed channel",
-        "Tech Daily" to "1.2k followers",
-    ).filter { query.isBlank() || it.first.contains(query, true) }
+    var channels by remember { mutableStateOf<List<ChannelDto>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var creating by remember { mutableStateOf(false) }
+
+    fun reload(q: String = query) {
+        scope.launch {
+            loading = channels.isEmpty()
+            runCatching { api.getChannels(q = q.takeIf { it.isNotBlank() }) }
+                .onSuccess {
+                    channels = it.items
+                    error = null
+                }
+                .onFailure { error = it.message ?: "Could not load channels" }
+            loading = false
+        }
+    }
+
+    LaunchedEffect(Unit) { reload() }
+
     AivoraScaffold(
         title = "Channels",
         onBack = onBack,
         fab = {
-            FloatingActionButton(onClick = { onNavigate(Routes.ChannelSlug.replace("{slug}", "new")) }, containerColor = AivoraColors.Primary, contentColor = AivoraColors.OnPrimary) {
+            FloatingActionButton(
+                onClick = {
+                    if (creating) return@FloatingActionButton
+                    creating = true
+                    scope.launch {
+                        runCatching {
+                            api.postChannels(
+                                ChannelCreateBody(
+                                    name = "My channel",
+                                    listed = true,
+                                ),
+                            )
+                        }.onSuccess { ch ->
+                            val slug = ch.slug ?: return@onSuccess
+                            onNavigate(Routes.ChannelSlug.replace("{slug}", slug))
+                        }.onFailure {
+                            android.widget.Toast.makeText(
+                                context,
+                                it.message ?: "Create failed",
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                        creating = false
+                    }
+                },
+                containerColor = AivoraColors.Primary,
+                contentColor = AivoraColors.OnPrimary,
+            ) {
                 Icon(AppIcons.Add, null)
             }
         },
     ) {
         InfoBanner("Find channels")
-        SearchField(query, { query = it }, "Search channels")
-        if (channels.isEmpty()) EmptyState("No channels match.", "Try a different search.")
-        AivoraScrollColumn(modifier = Modifier.fillMaxSize()) {
-            channels.forEach { (n, s) ->
-                key(n) {
-                    PersonRow(
-                        n,
-                        s,
-                        onClick = {
-                            onNavigate(
-                                Routes.ChannelSlug.replace(
-                                    "{slug}",
-                                    n.lowercase().replace(" ", "-"),
-                                ),
-                            )
-                        },
-                    )
+        SearchField(
+            query,
+            {
+                query = it
+                reload(it)
+            },
+            "Search channels",
+        )
+        when {
+            loading -> EmptyState("Loading…", "Fetching channels")
+            error != null && channels.isEmpty() -> EmptyState("Couldn’t load", error!!)
+            channels.isEmpty() -> EmptyState("No channels match.", "Try a different search.")
+            else -> AivoraScrollColumn(modifier = Modifier.fillMaxSize()) {
+                channels.forEach { ch ->
+                    val name = ch.name ?: ch.slug ?: "Channel"
+                    val slug = ch.slug ?: return@forEach
+                    val subtitle = buildString {
+                        if (ch.verified) append("Verified · ")
+                        append("${ch.followerCount} followers")
+                        if (ch.following) append(" · Following")
+                    }
+                    key(ch.id ?: slug) {
+                        PersonRow(
+                            name,
+                            subtitle,
+                            onClick = {
+                                onNavigate(Routes.ChannelSlug.replace("{slug}", slug))
+                            },
+                        )
+                    }
                 }
             }
         }

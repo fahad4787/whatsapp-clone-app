@@ -40,6 +40,9 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.filled.CameraAlt
@@ -198,7 +201,9 @@ fun ChatIdScreen(
     val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
     val api = remember { ChatRepository.api() }
-    val dark = isSystemInDarkTheme()
+    val themeMode by com.aivora.app.data.local.AppearancePrefs.themeFlow.collectAsState()
+    val defaultWallpaper by com.aivora.app.data.local.AppearancePrefs.wallpaperFlow.collectAsState()
+    val dark = com.aivora.app.data.local.AppearancePrefs.resolveDark(themeMode, isSystemInDarkTheme())
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val haptics = rememberAivoraHaptics()
@@ -217,6 +222,7 @@ fun ChatIdScreen(
     var showSearch by remember(chatId) { mutableStateOf(false) }
     var peerTyping by remember(chatId) { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
+    var showStickers by remember { mutableStateOf(false) }
     var showChatMenu by remember { mutableStateOf(false) }
     var showClearChat by remember { mutableStateOf(false) }
     var showExportChat by remember { mutableStateOf(false) }
@@ -236,7 +242,10 @@ fun ChatIdScreen(
     var mediaCompose by remember { mutableStateOf<Pair<Uri, Boolean>?>(null) }
     var replyTo by remember(chatId) { mutableStateOf<LocalMessage?>(null) }
     var myUserId by remember { mutableStateOf(SessionStore.userId(context)) }
-    val wallpaper = chatWallpaperColor(chat.wallpaper, dark)
+    val wallpaper = chatWallpaperColor(
+        resolveChatWallpaperKey(chat.wallpaper, defaultWallpaper),
+        dark,
+    )
     fun sendPickedMedia(uri: Uri, caption: String, viewOnce: Boolean) {
         haptics.confirm()
         val mime = context.contentResolver.getType(uri).orEmpty()
@@ -281,6 +290,18 @@ fun ChatIdScreen(
                             sent.toLocalMessage(uid).copy(mediaUri = uri.toString()),
                         )
                     }
+                    com.aivora.app.data.MediaGallery.publishOutgoingIfVisible(
+                        context,
+                        uri,
+                        mime.ifBlank {
+                            when (kind) {
+                                LocalMediaKind.Video -> "video/mp4"
+                                LocalMediaKind.Image -> "image/jpeg"
+                                else -> "application/octet-stream"
+                            }
+                        },
+                        viewOnce,
+                    )
                 } catch (_: Exception) {
                     InMemoryChatStore.sendMedia(
                         chatId,
@@ -299,6 +320,20 @@ fun ChatIdScreen(
                 kind = kind,
                 viewOnce = viewOnce,
             )
+            scope.launch {
+                com.aivora.app.data.MediaGallery.publishOutgoingIfVisible(
+                    context,
+                    uri,
+                    mime.ifBlank {
+                        when (kind) {
+                            LocalMediaKind.Video -> "video/mp4"
+                            LocalMediaKind.Image -> "image/jpeg"
+                            else -> "application/octet-stream"
+                        }
+                    },
+                    viewOnce,
+                )
+            }
             peerTyping = true
         }
     }
@@ -482,12 +517,22 @@ fun ChatIdScreen(
             if (empty) {
                 // Cold open: need network for first paint fill.
                 ChatRepository.refreshMessages(context, chatId, myUserId!!)
-            } else if (!RealtimeClient.connected.value) {
-                // Warm + WS down: deferred catch-up merge (silent when unchanged).
+            } else {
+                // Warm: deferred catch-up merge (silent when unchanged). Always run it —
+                // messages/receipts missed while the socket was down are never pushed again.
                 delay(900)
                 ChatRepository.refreshMessages(context, chatId, myUserId!!)
             }
-            // Warm + WS up: skip pull — socket + backup poll below are enough.
+            // Re-sync after every socket reconnect (gap may have dropped frames).
+            launch {
+                var wasConnected = RealtimeClient.connected.value
+                RealtimeClient.connected.collect { up ->
+                    if (up && !wasConnected) {
+                        ChatRepository.refreshMessages(context, chatId, myUserId!!)
+                    }
+                    wasConnected = up
+                }
+            }
             while (true) {
                 delay(30_000)
                 if (RealtimeClient.connected.value) continue
@@ -779,6 +824,10 @@ fun ChatIdScreen(
                 replyPreview = replyTo?.let { r ->
                     if (r.deletedForEveryone) "Original message was deleted" else r.body.ifBlank { "Message" }
                 },
+                replyLabel = replyTo?.let { r ->
+                    if (r.mine) "Replying to You"
+                    else "Replying to " + (r.senderName?.takeIf { it.isNotBlank() } ?: chat.title)
+                },
                 onClearReply = { replyTo = null },
                 recording = recordingVoice,
                 voiceRecorder = voiceRecorder,
@@ -808,6 +857,7 @@ fun ChatIdScreen(
                             id = it.id,
                             body = if (it.deletedForEveryone) "Original message was deleted" else it.body,
                             deleted = it.deletedForEveryone,
+                            mine = it.mine,
                         )
                     }
                     if (useRemote) {
@@ -889,10 +939,49 @@ fun ChatIdScreen(
                         showAttach = false
                         onNavigate(Routes.eventCreate(chatId))
                     },
+                    AivoraSheetAction("Sticker", AppIcons.EmojiEmotions) {
+                        showAttach = false
+                        showStickers = true
+                    },
                 ),
             )
             Spacer(Modifier.height(8.dp))
         }
+    }
+
+    if (showStickers) {
+        StickerPickerSheet(
+            onDismiss = { showStickers = false },
+            onPick = { stickerId ->
+                showStickers = false
+                if (!useRemote) {
+                    InMemoryChatStore.sendText(chatId, "😀")
+                    return@StickerPickerSheet
+                }
+                scope.launch {
+                    runCatching {
+                        api.postConversationsIdStickers(
+                            chatId,
+                            com.aivora.app.data.model.SendStickerBody(
+                                stickerId = stickerId,
+                                clientId = java.util.UUID.randomUUID().toString(),
+                            ),
+                        )
+                    }.onSuccess { dto ->
+                        val uid = SessionStore.userId(context)
+                        if (uid != null) {
+                            InMemoryChatStore.upsertMessage(chatId, dto.toLocalMessage(uid))
+                        }
+                    }.onFailure {
+                        android.widget.Toast.makeText(
+                            context,
+                            it.message ?: "Could not send sticker",
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+            },
+        )
     }
 
     if (showClearChat) {
@@ -1031,6 +1120,17 @@ fun ChatIdScreen(
                                 }
                             },
                         )
+                        if (target.body.isNotBlank()) {
+                            add(
+                                AivoraSheetAction("Copy", AppIcons.Copy) {
+                                    val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                                        as android.content.ClipboardManager
+                                    cm.setPrimaryClip(android.content.ClipData.newPlainText("message", target.body))
+                                    Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                                    actionTarget = null
+                                },
+                            )
+                        }
                         add(
                             AivoraSheetAction("Forward", AppIcons.Forward) {
                                 forwardTarget = target
@@ -1296,6 +1396,7 @@ fun ChatIdScreen(
             } else {
                 null
             },
+            viewOnce = viewOnceMsg != null,
             onDismiss = closeViewer,
         )
     }
@@ -1410,6 +1511,48 @@ private fun ChatMessageList(
         msg.mediaUri?.let { url -> onViewOnceState.value(msg, url) }
     }
     adapter.onOpenImage = { msg -> onOpenImageState.value(msg) }
+    adapter.onVote = { msg, optionId ->
+        val uid = myUserIdState.value
+        if (useRemoteState.value && uid != null && !msg.id.startsWith("local-")) {
+            scope.launch {
+                runCatching {
+                    api.postMessagesIdVote(
+                        msg.id,
+                        VoteBody(optionId = optionId),
+                    )
+                }.onSuccess { dto ->
+                    InMemoryChatStore.upsertMessage(chatId, dto.toLocalMessage(uid))
+                }.onFailure {
+                    android.widget.Toast.makeText(
+                        context,
+                        "Could not vote",
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
+        }
+    }
+    adapter.onRsvp = { msg, answer ->
+        val uid = myUserIdState.value
+        if (useRemoteState.value && uid != null && !msg.id.startsWith("local-")) {
+            scope.launch {
+                runCatching {
+                    api.postMessagesIdRsvp(
+                        msg.id,
+                        RsvpBody(answer = answer),
+                    )
+                }.onSuccess { dto ->
+                    InMemoryChatStore.upsertMessage(chatId, dto.toLocalMessage(uid))
+                }.onFailure {
+                    android.widget.Toast.makeText(
+                        context,
+                        "Could not RSVP",
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
+        }
+    }
     adapter.peerTitle = peerTitle
     adapter.peerAvatarUrl = peerAvatarUrl
     // Chronological adapter first; loader prepended at visual top while paging older (WA spinner).
@@ -1521,22 +1664,41 @@ private fun ChatMessageList(
     }
 }
 
-/** Fixed-size media slot — always Coil (cached); no mid-fling placeholder thrash. */
+/** Fixed-size media slot. Remote URLs respect auto-download until tapped (Wave 58). */
 @Composable
-private fun ChatMediaImage(uri: String, contentDescription: String) {
+private fun ChatMediaImage(
+    uri: String,
+    contentDescription: String,
+    kind: com.aivora.app.data.AutoDownloadPolicy.Kind,
+) {
+    val context = LocalContext.current
+    val remote = uri.startsWith("http://") || uri.startsWith("https://")
+    var unlocked by remember(uri) { mutableStateOf(false) }
+    val blocked = remote && !unlocked &&
+        !com.aivora.app.data.AutoDownloadPolicy.allows(context, kind)
     Box(
         modifier = Modifier
             .widthIn(min = 160.dp, max = 236.dp)
             .heightIn(min = 120.dp, max = 196.dp)
             .clip(RoundedCornerShape(AivoraDimens.RadiusMd))
-            .background(AivoraColors.PrimarySoft),
+            .background(AivoraColors.PrimarySoft)
+            .then(if (blocked) Modifier.clickable { unlocked = true } else Modifier),
+        contentAlignment = Alignment.Center,
     ) {
-        AsyncImage(
-            model = rememberBubbleImageModel(uri),
-            contentDescription = contentDescription,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
-        )
+        if (blocked) {
+            Text(
+                "Tap to download",
+                color = AivoraColors.TextSecondary,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        } else {
+            AsyncImage(
+                model = rememberBubbleImageModel(uri),
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
     }
 }
 
@@ -1926,6 +2088,12 @@ private fun MessageRow(
                         null
                     },
                 )
+            } else if (message.isSticker) {
+                Text(
+                    message.body,
+                    style = MaterialTheme.typography.displayMedium,
+                    modifier = Modifier.padding(vertical = 4.dp),
+                )
             } else if (message.poll != null) {
                 PollBubble(message.poll) { optionId -> vote(message, optionId) }
             } else if (message.location != null) {
@@ -1957,7 +2125,11 @@ private fun MessageRow(
                             },
                             contentAlignment = Alignment.Center,
                         ) {
-                            ChatMediaImage(uri = uri, contentDescription = "Video")
+                            ChatMediaImage(
+                                uri = uri,
+                                contentDescription = "Video",
+                                kind = com.aivora.app.data.AutoDownloadPolicy.Kind.Video,
+                            )
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
@@ -1986,7 +2158,11 @@ private fun MessageRow(
                 }
                 LocalMediaKind.Image, null -> {
                     message.mediaUri?.let { uri ->
-                        ChatMediaImage(uri = uri, contentDescription = "Photo")
+                        ChatMediaImage(
+                            uri = uri,
+                            contentDescription = "Photo",
+                            kind = com.aivora.app.data.AutoDownloadPolicy.Kind.Photo,
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                     if (message.body.isNotBlank() && message.mediaUri == null) {
@@ -2622,7 +2798,7 @@ private fun RecordingVoiceBubble(
 ) {
     val barColor = AivoraColors.Danger
     val idleColor = AivoraColors.Danger.copy(alpha = 0.28f)
-    val durationColor = Color(0xFFB42318)
+    val durationColor = if (AivoraColors.isDark) Color(0xFFFF8A80) else Color(0xFFB42318)
     Column(
         modifier = modifier
             .clip(
@@ -2633,8 +2809,8 @@ private fun RecordingVoiceBubble(
                     bottomEnd = 4.dp,
                 ),
             )
-            .background(Color(0xFFFFF1F0))
-            .border(1.dp, Color(0xFFF5C2C0), RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp))
+            .background(if (AivoraColors.isDark) Color(0xFF3A1F22) else Color(0xFFFFF1F0))
+            .border(1.dp, if (AivoraColors.isDark) Color(0xFF6B2E31) else Color(0xFFF5C2C0), RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -2715,6 +2891,7 @@ private fun ChatComposer(
     useRemote: Boolean,
     placeholder: String,
     replyPreview: String? = null,
+    replyLabel: String? = null,
     onClearReply: () -> Unit = {},
     recording: Boolean = false,
     voiceRecorder: VoiceRecorder? = null,
@@ -2728,9 +2905,21 @@ private fun ChatComposer(
     // Draft lives here so keystrokes do not recompose the message LazyColumn (PERF F7).
     var draft by remember(chatId) { mutableStateOf("") }
     var typingSent by remember(chatId) { mutableStateOf(false) }
+    val composerPrefs by com.aivora.app.data.local.ChatComposerPrefs.flow.collectAsState()
+    val enterIsSend = composerPrefs.enterIsSend
     val canSend = draft.isNotBlank() || recording
     var recordingSecs by remember { mutableStateOf(0) }
     var liveLevels by remember { mutableStateOf(FloatArray(28) { 0.2f }) }
+    fun flushSend() {
+        val body = draft.trim()
+        if (body.isEmpty()) return
+        draft = ""
+        if (typingSent) {
+            RealtimeClient.setTyping(chatId, false)
+            typingSent = false
+        }
+        onSendText(body)
+    }
     LaunchedEffect(draft, useRemote, chatId) {
         if (!useRemote) return@LaunchedEffect
         val hasText = draft.trim().isNotEmpty()
@@ -2791,7 +2980,7 @@ private fun ChatComposer(
                 Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Replying",
+                        replyLabel ?: "Replying",
                         color = AivoraColors.Primary,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
@@ -2850,9 +3039,16 @@ private fun ChatComposer(
                         value = draft,
                         onValueChange = { draft = it },
                         modifier = Modifier.weight(1f),
-                        singleLine = true,
+                        singleLine = enterIsSend,
+                        maxLines = if (enterIsSend) 1 else 6,
                         textStyle = MaterialTheme.typography.bodyMedium.copy(color = AivoraColors.Ink),
                         cursorBrush = SolidColor(AivoraColors.Primary),
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = if (enterIsSend) ImeAction.Send else ImeAction.Default,
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onSend = { flushSend() },
+                        ),
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
                                 if (draft.isEmpty()) {
@@ -2887,15 +3083,7 @@ private fun ChatComposer(
                     .clickable {
                         when {
                             recording -> onFinishRecording()
-                            draft.trim().isNotEmpty() -> {
-                                val body = draft.trim()
-                                draft = ""
-                                if (typingSent) {
-                                    RealtimeClient.setTyping(chatId, false)
-                                    typingSent = false
-                                }
-                                onSendText(body)
-                            }
+                            draft.trim().isNotEmpty() -> flushSend()
                             else -> onRequestMic()
                         }
                     },
@@ -2915,6 +3103,64 @@ private fun ChatComposer(
                         modifier = Modifier.size(26.dp),
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StickerPickerSheet(
+    onDismiss: () -> Unit,
+    onPick: (stickerId: String) -> Unit,
+) {
+    val api = remember { ChatRepository.api() }
+    var packs by remember {
+        mutableStateOf<List<com.aivora.app.data.model.StickerPackDto>>(emptyList())
+    }
+    var loading by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        runCatching { api.getStickers() }
+            .onSuccess { packs = it.items }
+        loading = false
+    }
+    AivoraBottomSheet(onDismiss = onDismiss, title = "Stickers") {
+        when {
+            loading -> Text(
+                "Loading…",
+                color = AivoraColors.TextSecondary,
+                modifier = Modifier.padding(16.dp),
+            )
+            packs.isEmpty() -> Text(
+                "No stickers",
+                color = AivoraColors.TextSecondary,
+                modifier = Modifier.padding(16.dp),
+            )
+            else -> {
+                packs.forEach { pack ->
+                    Text(
+                        pack.name ?: "Pack",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        pack.stickers.orEmpty().forEach { s ->
+                            val id = s.id ?: return@forEach
+                            Text(
+                                s.emoji ?: "😀",
+                                fontSize = 28.sp,
+                                modifier = Modifier
+                                    .clickable { onPick(id) }
+                                    .padding(6.dp),
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
             }
         }
     }

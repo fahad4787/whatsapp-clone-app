@@ -12,4 +12,5 @@ data class ConversationSettingsBody(
     /** true = mute 8h, false = unmute. Prefer this over muted_until for kotlinx null omission. */
     @SerialName("muted") val muted: Boolean? = null,
     @SerialName("muted_until") val mutedUntil: String? = null,
+    @SerialName("locked") val locked: Boolean? = null,
 )

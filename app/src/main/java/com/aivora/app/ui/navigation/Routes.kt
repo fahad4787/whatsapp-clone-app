@@ -25,6 +25,9 @@ object Routes {
     const val VideoCall = "call/video/{name}"
     /** Wave 19 — join shareable call link by code. */
     const val CallLinkJoin = "call-link/{code}"
+    const val OpenUser = "open-user/{userId}"
+    const val SettingsQrMy = "settings/qr/my"
+    const val SettingsQrScan = "settings/qr/scan"
     const val NewChat = "new-chat"
     const val NewGroup = "new-group"
     const val NewStatus = "new-status"
@@ -58,15 +61,28 @@ object Routes {
     const val SettingsDeleteAccount = "settings/delete-account"
     const val SettingsDevices = "settings/devices"
     const val SettingsDevicesLink = "settings/devices/link"
+    /** Wave 31 — new device shows pairing code and waits for phone approval. */
+    const val DeviceLinkPair = "device-link"
     const val SettingsListsEditId = "settings/lists/edit/{id}"
     const val SettingsListsNew = "settings/lists/new"
     const val SettingsListsReorder = "settings/lists/reorder"
     const val SettingsPermissions = "settings/permissions"
     const val HelpFeedback = "help/feedback"
     const val HelpCenter = "help/center"
+    const val HelpArticle = "help/article/{id}"
+    const val HelpAppInfo = "help/app-info"
+    const val HelpTerms = "help/terms"
+    const val HelpPrivacy = "help/privacy"
     const val InviteFriend = "invite/friend"
+
+    fun helpArticle(id: String): String =
+        HelpArticle.replace("{id}", android.net.Uri.encode(id))
+
+    fun listsEdit(id: String): String =
+        SettingsListsEditId.replace("{id}", android.net.Uri.encode(id))
     const val SettingsPrivacy = "settings/privacy"
     const val SettingsPrivacyAbout = "settings/privacy/about"
+    const val SettingsPrivacyLinks = "settings/privacy/links"
     const val SettingsPrivacyAdvanced = "settings/privacy/advanced"
     const val SettingsPrivacyAppLock = "settings/privacy/app-lock"
     const val SettingsPrivacyCalls = "settings/privacy/calls"
@@ -83,6 +99,7 @@ object Routes {
     const val SettingsQr = "settings/qr"
     const val SettingsStarred = "settings/starred"
     const val SettingsStorage = "settings/storage"
+    const val SettingsProxy = "settings/storage/proxy"
     const val SettingsManageStorage = "settings/storage/manage"
     const val SettingsAppearance = "settings/appearance"
     const val SettingsNotifications = "settings/notifications"
@@ -126,4 +143,7 @@ object Routes {
 
     fun callLinkJoin(code: String): String =
         CallLinkJoin.replace("{code}", android.net.Uri.encode(code))
+
+    fun openUser(userId: String): String =
+        OpenUser.replace("{userId}", android.net.Uri.encode(userId))
 }

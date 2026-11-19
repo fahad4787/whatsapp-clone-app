@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.aivora.app.data.SessionRestorer
@@ -31,12 +31,13 @@ import com.aivora.app.ui.motion.MotionPrefs
 import com.aivora.app.ui.navigation.AivoraNavHost
 import com.aivora.app.ui.navigation.DeepLinks
 import com.aivora.app.ui.navigation.Routes
+import com.aivora.app.ui.security.AppLockHost
 import com.aivora.app.ui.theme.AivoraTheme
 import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val requestNotifications = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { /* user may deny; badge still works */ }
@@ -71,6 +72,11 @@ class MainActivity : ComponentActivity() {
                 // After token refresh, ensure WS uses the fresh access token (idempotent).
                 com.aivora.app.data.realtime.RealtimeClient.startFromSession(applicationContext)
                 PushRegistrar.refresh(applicationContext)
+                runCatching {
+                    val api = com.aivora.app.data.api.NetworkModule.api()
+                    val prefs = api.getMeAutoDownload()
+                    com.aivora.app.data.local.AutoDownloadPrefs.apply(applicationContext, prefs)
+                }
             }
         }
         setContent {
@@ -115,14 +121,16 @@ fun AivoraAppRoot(
                 }
                 onDeepLinkConsumed()
             }
-            Box(Modifier.fillMaxSize()) {
-                AivoraNavHost(
-                    navController = navController,
-                    startDestination = startDestination,
-                )
-                IncomingCallOverlay(
-                    onNavigate = { route -> navController.navigate(route) },
-                )
+            AppLockHost {
+                Box(Modifier.fillMaxSize()) {
+                    AivoraNavHost(
+                        navController = navController,
+                        startDestination = startDestination,
+                    )
+                    IncomingCallOverlay(
+                        onNavigate = { route -> navController.navigate(route) },
+                    )
+                }
             }
         }
     }
