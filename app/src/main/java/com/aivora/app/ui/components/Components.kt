@@ -523,7 +523,9 @@ fun Avatar(
         } else {
             Text(
                 name.trim().first().uppercaseChar().toString(),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = (size * 0.42f).sp,
+                ),
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
             )

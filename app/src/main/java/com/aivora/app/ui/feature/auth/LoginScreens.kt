@@ -399,7 +399,7 @@ fun LoginScreen(
                                         otpDevBypass = result.otpDevBypass || otpDevBypass
                                         step = 1
                                     } catch (e: Exception) {
-                                        error = e.message ?: "Could not send code"
+                                        error = com.aivora.app.data.api.ApiErrors.auth(e, "Could not send code")
                                     } finally {
                                         busy = false
                                     }
@@ -507,7 +507,19 @@ fun LoginScreen(
                                             step = 1
                                         }
                                     } catch (e: Exception) {
-                                        error = e.message ?: "Could not send code"
+                                        val http = e as? retrofit2.HttpException
+                                        val body = if (http?.code() == 429)
+                                            http.response()?.errorBody()?.string().orEmpty() else ""
+                                        if (body.contains("rate_limited")) {
+                                            // A code was just sent: go straight to code entry.
+                                            e164Phone = Regex("\"phone\"\\s*:\\s*\"([^\"]+)\"")
+                                                .find(body)?.groupValues?.get(1)
+                                                ?: "+${dial.filter { it.isDigit() }}$phone"
+                                            otp = ""
+                                            step = 1
+                                        } else {
+                                            error = com.aivora.app.data.api.ApiErrors.auth(e, "Could not send code")
+                                        }
                                     } finally {
                                         busy = false
                                     }
@@ -579,7 +591,7 @@ fun LoginScreen(
                                         if (fail != null) error = fail
                                         else if (twoStepChallenge == null) onVerified()
                                     } catch (e: Exception) {
-                                        error = e.message ?: "Invalid code"
+                                        error = com.aivora.app.data.api.ApiErrors.auth(e, "Invalid code")
                                     } finally {
                                         busy = false
                                     }
@@ -601,7 +613,7 @@ fun LoginScreen(
                                     otpDevBypass = result.otpDevBypass || otpDevBypass
                                     otp = ""
                                 } catch (e: Exception) {
-                                    error = e.message ?: "Could not resend"
+                                    error = com.aivora.app.data.api.ApiErrors.auth(e, "Could not resend")
                                 } finally {
                                     busy = false
                                 }
@@ -667,7 +679,7 @@ fun LoginScreen(
                                         if (fail != null) error = fail
                                         else if (twoStepChallenge == null) onVerified()
                                     } catch (e: Exception) {
-                                        error = e.message ?: "Invalid code"
+                                        error = com.aivora.app.data.api.ApiErrors.auth(e, "Invalid code")
                                     } finally {
                                         busy = false
                                     }
@@ -691,7 +703,7 @@ fun LoginScreen(
                                     otpDevBypass = result.otpDevBypass || otpDevBypass
                                     otp = ""
                                 } catch (e: Exception) {
-                                    error = e.message ?: "Could not resend"
+                                    error = com.aivora.app.data.api.ApiErrors.auth(e, "Could not resend")
                                 } finally {
                                     busy = false
                                 }
@@ -740,7 +752,7 @@ fun LoginScreen(
                                         if (fail != null) error = fail
                                         else onVerified()
                                     } catch (e: Exception) {
-                                        error = e.message ?: "Invalid PIN"
+                                        error = com.aivora.app.data.api.ApiErrors.auth(e, "Invalid PIN")
                                     } finally {
                                         busy = false
                                     }

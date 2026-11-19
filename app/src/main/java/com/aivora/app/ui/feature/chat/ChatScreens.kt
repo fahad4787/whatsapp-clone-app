@@ -570,6 +570,7 @@ fun ChatIdScreen(
                     title = chat.title,
                     subtitle = subtitle,
                     showTyping = peerTyping,
+                    muted = chat.isMuted,
                     menuExpanded = showChatMenu,
                     onMenuExpandedChange = { showChatMenu = it },
                     onBack = {
@@ -1759,6 +1760,7 @@ private fun ChatHeader(
     title: String,
     subtitle: String,
     showTyping: Boolean,
+    muted: Boolean = false,
     menuExpanded: Boolean,
     onMenuExpandedChange: (Boolean) -> Unit,
     onBack: () -> Unit,
@@ -1803,14 +1805,26 @@ private fun ChatHeader(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
-                    fontWeight = FontWeight.SemiBold,
-                    color = AivoraColors.InkMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                        fontWeight = FontWeight.SemiBold,
+                        color = AivoraColors.InkMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (muted) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            AppIcons.NotificationsOff,
+                            contentDescription = "Muted",
+                            tint = AivoraColors.TextSecondary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                    }
+                }
                 if (subtitle.isNotBlank()) {
                     Text(
                         subtitle,

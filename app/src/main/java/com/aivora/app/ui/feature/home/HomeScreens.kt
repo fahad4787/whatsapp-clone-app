@@ -631,7 +631,7 @@ private fun ChatsTab(
         val lockedFooter = remember {
             LockedChatsFooterAdapter { navigateState.value(Routes.LockedChats) }
         }
-        lockedFooter.visible = filter == ChatFilter.All && customListId == null
+        lockedFooter.visible = filter == ChatFilter.All && customListId == null && debouncedQuery.isBlank()
         val homeConcat = remember { ConcatAdapter(chatAdapter, lockedFooter) }
         when {
             showSkeleton && chats.isEmpty() -> {
@@ -654,7 +654,7 @@ private fun ChatsTab(
                     },
                     update = { rv ->
                         if (rv.adapter !== homeConcat) rv.adapter = homeConcat
-                        lockedFooter.visible = filter == ChatFilter.All
+                        lockedFooter.visible = filter == ChatFilter.All && customListId == null && debouncedQuery.isBlank()
                         chatAdapter.submitList(chats)
                     },
                 )
