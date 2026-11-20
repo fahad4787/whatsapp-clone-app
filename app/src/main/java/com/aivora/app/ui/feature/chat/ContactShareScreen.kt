@@ -15,6 +15,7 @@ import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.ContactCardDto
 import com.aivora.app.data.model.SendMessageBody
+import com.aivora.app.data.model.UserDto
 import com.aivora.app.data.toLocalMessage
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.InfoBanner
@@ -36,6 +37,7 @@ fun ContactShareScreen(
     val myUserId = remember { SessionStore.userId(context) }
     var query by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var pending by remember { mutableStateOf<UserDto?>(null) }
     val search = rememberPeopleSearch(query, excludeIds = setOfNotNull(myUserId))
 
     AivoraScaffold(title = "Share contact", onBack = onBack) {
@@ -44,9 +46,20 @@ fun ContactShareScreen(
         search.error?.let { Text(it, color = AivoraColors.Danger, fontSize = 13.sp) }
         PeopleTapList(
             people = search.people,
-            onPersonClick = { user ->
-                val uid = myUserId ?: return@PeopleTapList
-                if (busy) return@PeopleTapList
+            onPersonClick = { user -> if (!busy) pending = user },
+        )
+    }
+
+    pending?.let { user ->
+        AivoraAlertDialog(
+            title = "Send contact?",
+            body = "Send ${user.displayLabel()}'s contact card to this chat.",
+            confirmLabel = "Send",
+            onDismiss = { pending = null },
+            onConfirm = {
+                pending = null
+                val uid = myUserId ?: return@AivoraAlertDialog
+                if (busy) return@AivoraAlertDialog
                 busy = true
                 scope.launch {
                     runCatching {

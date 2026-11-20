@@ -1719,7 +1719,7 @@ private fun ChatMediaImage(
 }
 
 @Composable
-private fun AivoraAlertDialog(
+internal fun AivoraAlertDialog(
     title: String,
     body: String,
     confirmLabel: String,
