@@ -791,10 +791,17 @@ class ChatMessageAdapter(
                         loader.execute(req)
                     }.getOrNull()
                 }
+                target.clearColorFilter()
                 if (result is SuccessResult) {
                     target.setImageDrawable(result.image.asDrawable(ctx.resources))
                     target.setBackgroundColor(android.graphics.Color.TRANSPARENT)
                     target.scaleType = ImageView.ScaleType.CENTER_CROP
+                } else {
+                    // Media missing on the server (e.g. lost upload): show a clear placeholder, not a blank box.
+                    target.setBackgroundColor(0xFF2A3942.toInt())
+                    target.scaleType = ImageView.ScaleType.CENTER
+                    target.setImageResource(android.R.drawable.ic_menu_report_image)
+                    target.setColorFilter(0xFF8696A0.toInt())
                 }
             }
         }

@@ -1581,9 +1581,9 @@ fun SettingsProxyScreen(
 private fun formatBytes(bytes: Long): String {
     if (bytes <= 0L) return "0 MB"
     val mb = bytes / (1024.0 * 1024.0)
-    return if (mb >= 1024) String.format("%.1f GB", mb / 1024.0)
-    else if (mb >= 10) String.format("%.0f MB", mb)
-    else String.format("%.1f MB", mb)
+    return if (mb >= 1024) String.format(java.util.Locale.US, "%.1f GB", mb / 1024.0)
+    else if (mb >= 10) String.format(java.util.Locale.US, "%.0f MB", mb)
+    else String.format(java.util.Locale.US, "%.1f MB", mb)
 }
 
 
