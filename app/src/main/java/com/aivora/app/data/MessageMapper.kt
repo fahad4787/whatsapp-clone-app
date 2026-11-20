@@ -19,7 +19,11 @@ private const val DISAPPEARED_TEXT = "This message has disappeared"
 fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
     val created = createdAt.orEmpty()
     val time = when {
-        created.length >= 16 -> created.substring(11, 16)
+        created.length >= 16 -> runCatching {
+            java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(
+                java.time.Instant.parse(created).atZone(java.time.ZoneId.systemDefault()),
+            )
+        }.getOrElse { created.substring(11, 16) }
         created.isNotBlank() -> created
         else -> "Now"
     }

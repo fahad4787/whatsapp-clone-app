@@ -257,7 +257,13 @@ object MessageCache {
         id = id,
         mine = mine,
         body = body,
-        time = time,
+        time = createdAtIso?.takeIf { it.length >= 16 }?.let { iso ->
+            runCatching {
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(
+                    java.time.Instant.parse(iso).atZone(java.time.ZoneId.systemDefault()),
+                )
+            }.getOrNull()
+        } ?: time,
         mediaUri = mediaUri,
         mediaKind = mediaKind?.let { runCatching { LocalMediaKind.valueOf(it) }.getOrNull() },
         fileName = fileName,
