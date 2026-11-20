@@ -11,3 +11,7 @@ graphify-out/
 .cursor/
 .kotlin/
 
+
+/keystore.properties
+*.jks
+*.keystore
