@@ -589,6 +589,26 @@ class ChatMessageAdapter(
                             typeface = Typeface.DEFAULT_BOLD
                         },
                     )
+                    val whenText = runCatching {
+                        java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM · h:mm a", java.util.Locale.getDefault())
+                            .format(java.time.Instant.parse(e.startsAt).atZone(java.time.ZoneId.systemDefault()))
+                    }.getOrNull()
+                    val details = listOfNotNull(
+                        whenText?.let { "🗓 $it" },
+                        e.location?.takeIf { it.isNotBlank() }?.let { "📍 $it" },
+                        e.description?.takeIf { it.isNotBlank() },
+                        if (e.cancelled) "Cancelled" else null,
+                    ).joinToString("\n")
+                    if (details.isNotEmpty()) {
+                        richBlock.addView(
+                            TextView(itemView.context).apply {
+                                text = details
+                                setTextColor(NativeColors.Ink)
+                                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                                setPadding(0, dp(4), 0, 0)
+                            },
+                        )
+                    }
                     richBlock.addView(
                         TextView(itemView.context).apply {
                             text = "Going ${e.going} · Maybe ${e.maybe} · Can't ${e.notGoing}"
