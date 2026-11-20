@@ -133,6 +133,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -1070,23 +1071,39 @@ fun ChatIdScreen(
         )
     }
 
+    fun sendReaction(target: LocalMessage, emoji: String) {
+        if (!useRemote) return
+        scope.launch {
+            runCatching {
+                api.postMessagesIdReactions(target.id, ReactionBody(emoji = emoji))
+            }.onSuccess { dto ->
+                val uid = myUserId ?: SessionStore.userId(context)
+                if (uid != null) {
+                    InMemoryChatStore.upsertMessage(chatId, dto.toLocalMessage(uid))
+                }
+            }.onFailure {
+                Toast.makeText(context, "Could not react", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     actionTarget?.let { target ->
-        AivoraBottomSheet(
+        MessageActionOverlay(
+            target = target,
             onDismiss = { actionTarget = null },
-            title = "Message",
-        ) {
-            AivoraSheetActionList(
-                actions = buildList {
+            onReact = { emoji ->
+                actionTarget = null
+                sendReaction(target, emoji)
+            },
+            onMoreReactions = {
+                reactTarget = target
+                actionTarget = null
+            },
+            actions = buildList {
                     if (!target.deletedForEveryone) {
                         add(
                             AivoraSheetAction("Reply", AppIcons.Reply) {
                                 replyTo = target
-                                actionTarget = null
-                            },
-                        )
-                        add(
-                            AivoraSheetAction("React", AppIcons.EmojiEmotions) {
-                                reactTarget = target
                                 actionTarget = null
                             },
                         )
@@ -1163,9 +1180,7 @@ fun ChatIdScreen(
                         },
                     )
                 },
-            )
-            Spacer(Modifier.height(8.dp))
-        }
+        )
     }
 
     reactTarget?.let { target ->
@@ -1719,40 +1734,190 @@ private fun AivoraAlertDialog(
     val container = if (dark) AivoraColors.DarkSurface else AivoraColors.LightSurface
     val ink = if (dark) Color.White else AivoraColors.Ink
     val muted = AivoraColors.TextSecondary
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(20.dp),
-        containerColor = container,
-        titleContentColor = ink,
-        textContentColor = muted,
-        title = { Text(title, fontWeight = FontWeight.Bold, color = ink) },
-        text = { Text(body, color = muted) },
-        confirmButton = {
-            Column(horizontalAlignment = Alignment.End) {
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 28.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(container)
+                .padding(start = 24.dp, end = 12.dp, top = 24.dp, bottom = 8.dp),
+        ) {
+            Text(
+                title,
+                color = ink,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(end = 12.dp),
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                body,
+                color = muted,
+                fontSize = 15.sp,
+                lineHeight = 21.sp,
+                modifier = Modifier.padding(end = 12.dp),
+            )
+            Spacer(Modifier.height(14.dp))
+            val rows = buildList {
                 if (secondaryLabel != null && onSecondary != null) {
-                    TextButton(onClick = onSecondary) {
-                        Text(
-                            secondaryLabel,
-                            color = if (secondaryDanger) AivoraColors.Danger else AivoraColors.Primary,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                    add(Triple(secondaryLabel, secondaryDanger, onSecondary))
                 }
-                TextButton(onClick = onConfirm) {
+                add(Triple(confirmLabel, confirmDanger, onConfirm))
+                add(Triple("Cancel", false, onDismiss))
+            }
+            rows.forEachIndexed { i, (label, danger, click) ->
+                val isCancel = i == rows.lastIndex
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = click)
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
                     Text(
-                        confirmLabel,
-                        color = if (confirmDanger) AivoraColors.Danger else AivoraColors.Primary,
+                        label,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
+                        color = when {
+                            danger -> AivoraColors.Danger
+                            isCancel -> muted
+                            else -> AivoraColors.Primary
+                        },
                     )
                 }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = muted)
+        }
+    }
+}
+
+/** WhatsApp-style long-press: reaction pill, message preview, then the action card. */
+@Composable
+private fun MessageActionOverlay(
+    target: LocalMessage,
+    onDismiss: () -> Unit,
+    onReact: (String) -> Unit,
+    onMoreReactions: () -> Unit,
+    actions: List<AivoraSheetAction>,
+) {
+    val dark = isSystemInDarkTheme()
+    val surface = if (dark) AivoraColors.DarkSurface else Color.White
+    val ink = if (dark) Color.White else AivoraColors.Ink
+    val mine = target.mine
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.6f))
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    onClick = onDismiss,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 24.dp)
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        onClick = {},
+                    ),
+                horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
+            ) {
+                if (!target.deletedForEveryone) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(surface)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        ReactionEmojis.forEach { emoji ->
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .clickable { onReact(emoji) },
+                                contentAlignment = Alignment.Center,
+                            ) { Text(emoji, fontSize = 26.sp) }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(AivoraColors.SurfaceMuted)
+                                .clickable(onClick = onMoreReactions),
+                            contentAlignment = Alignment.Center,
+                        ) { Text("+", fontSize = 22.sp, color = AivoraColors.TextSecondary) }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.82f)
+                        .align(if (mine) Alignment.End else Alignment.Start),
+                    contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart,
+                ) {
+                    Text(
+                        target.body.ifBlank { "Message" },
+                        color = if (mine && !dark) AivoraColors.Ink else ink,
+                        fontSize = 15.sp,
+                        maxLines = 6,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (mine) Color(0xFFD9FDD3).let { if (dark) Color(0xFF144D37) else it } else surface)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Column(
+                    modifier = Modifier
+                        .width(250.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(surface)
+                        .padding(vertical = 6.dp),
+                ) {
+                    actions.forEach { action ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .clickable(onClick = action.onClick)
+                                .padding(horizontal = 18.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                action.label,
+                                modifier = Modifier.weight(1f),
+                                fontSize = 16.sp,
+                                color = if (action.danger) AivoraColors.Danger else ink,
+                            )
+                            Icon(
+                                action.icon,
+                                contentDescription = null,
+                                tint = if (action.danger) AivoraColors.Danger else AivoraColors.TextSecondary,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                    }
+                }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable

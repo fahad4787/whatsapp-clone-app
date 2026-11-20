@@ -312,6 +312,9 @@ class ChatMessageAdapter(
             richBlock.visibility = View.GONE
             richBlock.removeAllViews()
             richBlock.minimumWidth = 0
+            richBlock.layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
             body.visibility = View.GONE
             mediaImage.setImageDrawable(null)
             viewOnceRow.setOnClickListener(null)
@@ -387,10 +390,9 @@ class ChatMessageAdapter(
                         loc.ended -> loc.name?.takeIf { it.isNotBlank() } ?: "Live location ended"
                         else -> loc.name?.takeIf { it.isNotBlank() } ?: "Location"
                     }
-                    mapSub.text = buildString {
-                        loc.address?.takeIf { it.isNotBlank() }?.let { append(it).append('\n') }
-                        append("%.4f, %.4f".format(java.util.Locale.US, loc.lat, loc.lng))
-                    }
+                    mapSub.text = loc.address?.takeIf { it.isNotBlank() }
+                        ?: "%.4f, %.4f".format(java.util.Locale.US, loc.lat, loc.lng)
+                    bubble.setPadding(dp(4), dp(4), dp(4), dp(8))
                     loadMapInto(mapPreview, loc.lat, loc.lng)
                     mapBlock.setOnClickListener {
                         val label = Uri.encode(loc.name ?: "Location")
@@ -572,10 +574,86 @@ class ChatMessageAdapter(
                     )
                 }
                 msg.contact != null -> {
-                    body.visibility = View.VISIBLE
-                    body.setTypeface(null, Typeface.NORMAL)
                     val c = msg.contact!!
-                    body.text = "👤 ${c.name}\n${c.phones.firstOrNull().orEmpty()}"
+                    val ctx = itemView.context
+                    richBlock.visibility = View.VISIBLE
+                    richBlock.removeAllViews()
+                    richBlock.layoutParams = LinearLayout.LayoutParams(
+                        dp(240), ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                    val phone = c.phones.firstOrNull().orEmpty()
+                    val avatar = TextView(ctx).apply {
+                        text = c.name.trim().firstOrNull()?.uppercase() ?: "?"
+                        gravity = Gravity.CENTER
+                        setTextColor(NativeColors.White)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+                        typeface = Typeface.DEFAULT_BOLD
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.OVAL
+                            setColor(0xFF8696A0.toInt())
+                        }
+                        layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+                    }
+                    val nameTv = TextView(ctx).apply {
+                        text = c.name
+                        setTextColor(ink)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                        typeface = Typeface.DEFAULT_BOLD
+                        maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                    }
+                    val phoneTv = TextView(ctx).apply {
+                        text = phone
+                        setTextColor(NativeColors.TextSecondary)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                        maxLines = 1
+                    }
+                    val col = LinearLayout(ctx).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(dp(10), 0, 0, 0)
+                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                        addView(nameTv)
+                        if (phone.isNotBlank()) addView(phoneTv)
+                    }
+                    richBlock.addView(
+                        LinearLayout(ctx).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                            setPadding(0, dp(2), 0, dp(6))
+                            addView(avatar)
+                            addView(col)
+                        },
+                    )
+                    richBlock.addView(
+                        View(ctx).apply {
+                            setBackgroundColor(0x33808080)
+                            layoutParams = LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT, dp(1),
+                            )
+                        },
+                    )
+                    richBlock.addView(
+                        TextView(ctx).apply {
+                            text = "Add to contacts"
+                            gravity = Gravity.CENTER
+                            setTextColor(NativeColors.Primary)
+                            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                            typeface = Typeface.DEFAULT_BOLD
+                            setPadding(0, dp(8), 0, dp(4))
+                            setOnClickListener {
+                                runCatching {
+                                    ctx.startActivity(
+                                        Intent(android.provider.ContactsContract.Intents.Insert.ACTION).apply {
+                                            type = android.provider.ContactsContract.RawContacts.CONTENT_TYPE
+                                            putExtra(android.provider.ContactsContract.Intents.Insert.NAME, c.name)
+                                            putExtra(android.provider.ContactsContract.Intents.Insert.PHONE, phone)
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        },
+                                    )
+                                }
+                            }
+                        },
+                    )
                 }
                 msg.event != null -> {
                     val e = msg.event!!
@@ -714,10 +792,14 @@ class ChatMessageAdapter(
                 voiceTicks.visibility = View.GONE
             }
 
-            itemView.setOnLongClickListener {
+            val longPress = View.OnLongClickListener {
                 onLongPress(msg)
                 true
             }
+            itemView.setOnLongClickListener(longPress)
+            // Children with their own tap handlers would otherwise swallow the long press.
+            listOf(mapBlock, viewOnceRow, fileRow, mediaFrame, richBlock, linkBlock, voicePlay, waveform)
+                .forEach { it.setOnLongClickListener(longPress) }
         }
 
         private fun setPlayIcon(playing: Boolean) {
@@ -749,45 +831,58 @@ class ChatMessageAdapter(
             val ty = Math.floor(yf).toInt().coerceIn(0, n - 1)
             val fx = (xf - tx).toFloat()
             val fy = (yf - ty).toFloat()
-            val url = "https://tile.openstreetmap.org/$z/$tx/$ty.png"
+            // 2x2 tiles chosen so the pin's +-0.5 tile window is always fully covered.
+            val x0 = if (fx < 0.5f) tx - 1 else tx
+            val y0 = if (fy < 0.5f) ty - 1 else ty
             loadJob = CoroutineScope(Dispatchers.Main.immediate).launch {
-                val bmp = withContext(Dispatchers.IO) {
+                val res = withContext(Dispatchers.IO) {
                     runCatching {
-                        val req = ImageRequest.Builder(ctx)
-                            .data(url)
-                            .httpHeaders(
-                                coil3.network.NetworkHeaders.Builder()
-                                    .add("User-Agent", "AivoraApp/1.0 (Android)").build(),
-                            )
-                            .size(Size(512, 512))
-                            .allowHardware(false)
-                            .build()
-                        val r = SingletonImageLoader.get(ctx).execute(req)
-                        if (r !is SuccessResult) {
-                            return@runCatching null
-                        }
-                        val dr = r.image.asDrawable(ctx.resources)
-                        val w = 512; val h = 512
-                        val out = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                        val tile = 256
+                        val out = android.graphics.Bitmap.createBitmap(tile * 2, tile * 2, android.graphics.Bitmap.Config.ARGB_8888)
                         val c = android.graphics.Canvas(out)
-                        dr.setBounds(0, 0, w, h); dr.draw(c)
-                        val px = fx * w; val py = fy * h
+                        c.drawColor(0xFFE8EDE9.toInt())
+                        var ok = false
+                        for (dx in 0..1) for (dy in 0..1) {
+                            val X = (x0 + dx).coerceIn(0, n - 1)
+                            val Y = (y0 + dy).coerceIn(0, n - 1)
+                            val req = ImageRequest.Builder(ctx)
+                                .data("https://tile.openstreetmap.org/$z/$X/$Y.png")
+                                .httpHeaders(
+                                    coil3.network.NetworkHeaders.Builder()
+                                        .add("User-Agent", "AivoraApp/1.0 (Android)").build(),
+                                )
+                                .size(Size(tile, tile))
+                                .allowHardware(false)
+                                .build()
+                            val r = SingletonImageLoader.get(ctx).execute(req)
+                            if (r is SuccessResult) {
+                                val dr = r.image.asDrawable(ctx.resources)
+                                dr.setBounds(dx * tile, dy * tile, (dx + 1) * tile, (dy + 1) * tile)
+                                dr.draw(c)
+                                ok = true
+                            }
+                        }
+                        if (!ok) return@runCatching null
+                        val px = ((tx - x0) + fx) * tile
+                        val py = ((ty - y0) + fy) * tile
                         val ring = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+                        ring.color = 0x33000000
+                        c.drawCircle(px, py + 2f, 12f, ring)
                         ring.color = android.graphics.Color.WHITE
-                        c.drawCircle(px, py, 22f, ring)
+                        c.drawCircle(px, py, 11f, ring)
                         ring.color = 0xFFE64C53.toInt()
-                        c.drawCircle(px, py, 15f, ring)
+                        c.drawCircle(px, py, 7.5f, ring)
                         Triple(out, px, py)
                     }.getOrNull()
                 }
-                if (bmp != null) {
-                    val (b, px, py) = bmp
+                if (res != null) {
+                    val (b, px, py) = res
                     target.setImageBitmap(b)
                     target.setBackgroundColor(android.graphics.Color.TRANSPARENT)
                     target.scaleType = ImageView.ScaleType.MATRIX
                     val vw = target.layoutParams.width.toFloat()
                     val vh = target.layoutParams.height.toFloat()
-                    val sc = vw / b.width * 1.25f
+                    val sc = maxOf(vw / 256f * 0.9f, vh / 256f * 0.9f)
                     val m = android.graphics.Matrix()
                     m.postScale(sc, sc)
                     m.postTranslate(vw / 2f - px * sc, vh / 2f - py * sc)
@@ -1145,12 +1240,12 @@ class ChatMessageAdapter(
                 }
 
                 val mapPreview = ImageView(ctx).apply {
-                    layoutParams = LinearLayout.LayoutParams(dp(220), dp(110))
+                    layoutParams = LinearLayout.LayoutParams(dp(240), dp(150))
                     scaleType = ImageView.ScaleType.CENTER_CROP
                     clipToOutline = true
                     outlineProvider = object : ViewOutlineProvider() {
                         override fun getOutline(view: View, outline: Outline) {
-                            outline.setRoundRect(0, 0, view.width, view.height, 10f * d)
+                            outline.setRoundRect(0, 0, view.width, view.height, 8f * d)
                         }
                     }
                     background = GradientDrawable().apply {
@@ -1164,11 +1259,16 @@ class ChatMessageAdapter(
                     setTextColor(NativeColors.Ink)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                     typeface = Typeface.DEFAULT_BOLD
-                    setPadding(0, dp(6), 0, 0)
+                    setPadding(dp(6), dp(8), dp(6), 0)
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
                 }
                 val mapSub = TextView(ctx).apply {
                     setTextColor(NativeColors.TextSecondary)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                    setPadding(dp(6), dp(1), dp(6), dp(2))
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
                 }
                 val mapBlock = LinearLayout(ctx).apply {
                     orientation = LinearLayout.VERTICAL
