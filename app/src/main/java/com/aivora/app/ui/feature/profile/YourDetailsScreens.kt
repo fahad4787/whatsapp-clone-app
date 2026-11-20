@@ -379,7 +379,7 @@ fun YourDetailsScreen(
 }
 
 @Composable
-private fun ProfileAvatar(name: String, avatarUrl: String?, size: Int) {
+internal fun ProfileAvatar(name: String, avatarUrl: String?, size: Int) {
     var failed by remember(avatarUrl) { mutableStateOf(false) }
     if (!avatarUrl.isNullOrBlank() && !failed) {
         AsyncImage(
