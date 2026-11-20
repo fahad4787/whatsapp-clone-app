@@ -181,6 +181,7 @@ class ChatMessageAdapter(
         private var avatarJob: Job? = null
         private var boundId: String? = null
         private var voiceSecs: Int = 0
+        private var voiceRate: Float = 1f
         private val handler = Handler(Looper.getMainLooper())
         private val tickProgress = object : Runnable {
             override fun run() {
@@ -429,7 +430,9 @@ class ChatMessageAdapter(
                     voiceSecs = msg.voiceDurationSec ?: 1
                     waveform.progress = 0f
                     voiceDur.text = "0:00 / ${formatDuration(voiceSecs)}"
-                    voiceSpeed.text = "1×"
+                    voiceRate = 1f
+                    voiceSpeed.text = rateLabel(voiceRate)
+                    voiceSpeed.setOnClickListener { cycleVoiceRate() }
                     setPlayIcon(playing = false)
                     voicePlay.setOnClickListener { toggleVoice(msg.mediaUri) }
                     waveform.setOnClickListener { toggleVoice(msg.mediaUri) }
@@ -798,7 +801,7 @@ class ChatMessageAdapter(
             }
             itemView.setOnLongClickListener(longPress)
             // Children with their own tap handlers would otherwise swallow the long press.
-            listOf(mapBlock, viewOnceRow, fileRow, mediaFrame, richBlock, linkBlock, voicePlay, waveform)
+            listOf(mapBlock, viewOnceRow, fileRow, mediaFrame, richBlock, linkBlock, voicePlay, waveform, voiceSpeed)
                 .forEach { it.setOnLongClickListener(longPress) }
         }
 
@@ -921,6 +924,22 @@ class ChatMessageAdapter(
             }
         }
 
+        private fun rateLabel(r: Float) = if (r == 1f) "1×" else if (r == 2f) "2×" else "1.5×"
+
+        private fun applyRate(mp: MediaPlayer) {
+            runCatching {
+                if (mp.isPlaying) {
+                    mp.playbackParams = android.media.PlaybackParams().setSpeed(voiceRate)
+                }
+            }
+        }
+
+        private fun cycleVoiceRate() {
+            voiceRate = when (voiceRate) { 1f -> 1.5f; 1.5f -> 2f; else -> 1f }
+            voiceSpeed.text = rateLabel(voiceRate)
+            player?.let { applyRate(it) }
+        }
+
         private fun toggleVoice(url: String?) {
             if (url.isNullOrBlank()) return
             val playing = player?.isPlaying == true
@@ -933,6 +952,7 @@ class ChatMessageAdapter(
             val existing = player
             if (existing != null) {
                 runCatching { existing.start() }
+                applyRate(existing)
                 setPlayIcon(playing = true)
                 handler.post(tickProgress)
                 return
@@ -944,6 +964,7 @@ class ChatMessageAdapter(
                 mp.setOnPreparedListener {
                     setPlayIcon(playing = true)
                     runCatching { mp.start() }
+                    applyRate(mp)
                     handler.post(tickProgress)
                 }
                 mp.setOnCompletionListener {
@@ -1141,7 +1162,18 @@ class ChatMessageAdapter(
                     text = "1×"
                     setTextColor(NativeColors.TextSecondary)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-                    setPadding(dp(12), 0, 0, 0)
+                    typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+                    gravity = Gravity.CENTER
+                    minWidth = dp(40)
+                    setPadding(dp(8), dp(3), dp(8), dp(3))
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        cornerRadius = dp(12).toFloat()
+                        setColor(0x33808080)
+                    }
+                    (this as View).layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).also { it.marginStart = dp(10) }
                 }
                 val voiceTime = TextView(ctx).apply {
                     setTextColor(NativeColors.TextSecondary)

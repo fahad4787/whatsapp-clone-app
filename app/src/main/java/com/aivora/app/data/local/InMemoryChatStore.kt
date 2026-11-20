@@ -410,7 +410,9 @@ object InMemoryChatStore {
     fun upsertMessage(chatId: String, message: LocalMessage) {
         val flow = messageFlow(chatId)
         val before = flow.value
-        val existingIdx = before.indexOfFirst { it.id == message.id }
+        val existingIdx = before.indexOfFirst {
+            it.id == message.id || (message.clientId != null && it.clientId == message.clientId)
+        }
         val alreadyHad = existingIdx >= 0
         flow.update { list ->
             val existing = if (existingIdx >= 0) list[existingIdx] else null
@@ -454,6 +456,16 @@ object InMemoryChatStore {
                 ),
             ) + list.filterNot { it.id == chatId }
         }
+    }
+
+    /** Show an outgoing message instantly (status Sending); the server copy replaces it by clientId. */
+    fun addPending(chatId: String, message: LocalMessage) {
+        val preview = when {
+            message.viewOnce -> "View once photo"
+            message.body.isNotBlank() -> message.body
+            else -> "Message"
+        }
+        append(chatId, message.copy(mine = true, status = MessageDeliveryStatus.Sending), preview)
     }
 
     private fun append(chatId: String, message: LocalMessage, preview: String) {

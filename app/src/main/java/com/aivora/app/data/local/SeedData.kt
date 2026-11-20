@@ -161,6 +161,8 @@ data class LocalMessage(
     val viewOnce: Boolean = false,
     /** Wave 25 — emoji sticker bubble. */
     val isSticker: Boolean = false,
+    /** Client-generated id; lets an optimistic (Sending) bubble be replaced by the server copy. */
+    val clientId: String? = null,
 ) {
     val edited: Boolean get() = !editedAtIso.isNullOrBlank()
 }

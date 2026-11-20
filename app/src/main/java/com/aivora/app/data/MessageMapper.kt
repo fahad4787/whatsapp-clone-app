@@ -158,6 +158,7 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
     }
     return LocalMessage(
         id = id.orEmpty(),
+        clientId = clientId,
         mine = senderId == myUserId,
         senderName = if (senderId == myUserId) null else SenderNames.get(senderId),
         body = when {

@@ -264,6 +264,20 @@ fun ChatIdScreen(
             }
         }
         if (useRemote) {
+            val clientId = UUID.randomUUID().toString()
+            InMemoryChatStore.addPending(
+                chatId,
+                LocalMessage(
+                    id = "pending-$clientId",
+                    clientId = clientId,
+                    mine = true,
+                    body = bodyCaption,
+                    time = "Now",
+                    mediaUri = uri.toString(),
+                    mediaKind = kind,
+                    viewOnce = viewOnce,
+                ),
+            )
             scope.launch {
                 try {
                     val sent = when (kind) {
@@ -273,6 +287,7 @@ fun ChatIdScreen(
                             uri,
                             caption = caption.takeIf { it.isNotBlank() },
                             viewOnce = viewOnce,
+                            clientId = clientId,
                         )
                         else -> api.sendAttachmentMessage(
                             context = context,
@@ -282,6 +297,7 @@ fun ChatIdScreen(
                             defaultName = if (kind == LocalMediaKind.Video) "video.mp4" else "document.bin",
                             defaultMime = mime.ifBlank { "application/octet-stream" },
                             viewOnce = viewOnce,
+                            clientId = clientId,
                         )
                     }
                     val uid = myUserId ?: SessionStore.userId(context)
@@ -304,13 +320,7 @@ fun ChatIdScreen(
                         viewOnce,
                     )
                 } catch (_: Exception) {
-                    InMemoryChatStore.sendMedia(
-                        chatId,
-                        uri.toString(),
-                        caption = bodyCaption,
-                        kind = kind,
-                        viewOnce = viewOnce,
-                    )
+                    Toast.makeText(context, "Couldn't send — check your connection", Toast.LENGTH_SHORT).show()
                 }
             }
         } else {
@@ -342,6 +352,19 @@ fun ChatIdScreen(
         haptics.confirm()
         val mime = context.contentResolver.getType(uri).orEmpty()
         if (useRemote) {
+            val clientId = UUID.randomUUID().toString()
+            InMemoryChatStore.addPending(
+                chatId,
+                LocalMessage(
+                    id = "pending-$clientId",
+                    clientId = clientId,
+                    mine = true,
+                    body = "Document",
+                    time = "Now",
+                    mediaUri = uri.toString(),
+                    mediaKind = LocalMediaKind.File,
+                ),
+            )
             scope.launch {
                 try {
                     val sent = api.sendAttachmentMessage(
@@ -350,6 +373,7 @@ fun ChatIdScreen(
                         uri = uri,
                         defaultName = "document.bin",
                         defaultMime = mime.ifBlank { "application/octet-stream" },
+                        clientId = clientId,
                     )
                     val uid = myUserId ?: SessionStore.userId(context)
                     if (uid != null) {
@@ -359,7 +383,7 @@ fun ChatIdScreen(
                         )
                     }
                 } catch (_: Exception) {
-                    InMemoryChatStore.sendMedia(chatId, uri.toString(), kind = LocalMediaKind.File)
+                    Toast.makeText(context, "Couldn't send document", Toast.LENGTH_SHORT).show()
                 }
             }
         } else {
@@ -405,21 +429,30 @@ fun ChatIdScreen(
         if (result == null) return
         val (file, secs) = result
         if (useRemote) {
+            val clientId = UUID.randomUUID().toString()
+            InMemoryChatStore.addPending(
+                chatId,
+                LocalMessage(
+                    id = "pending-$clientId",
+                    clientId = clientId,
+                    mine = true,
+                    body = "Voice message",
+                    time = "Now",
+                    mediaUri = Uri.fromFile(file).toString(),
+                    mediaKind = LocalMediaKind.Audio,
+                    voiceDurationSec = secs.coerceAtLeast(1),
+                ),
+            )
             scope.launch {
                 try {
-                    val sent = api.sendVoiceFile(chatId, file, durationSec = secs)
+                    val sent = api.sendVoiceFile(chatId, file, durationSec = secs, clientId = clientId)
                     val uid = myUserId ?: SessionStore.userId(context)
                     if (uid != null) {
                         InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
                     }
-                } catch (_: Exception) {
-                    InMemoryChatStore.sendVoice(
-                        chatId,
-                        durationSec = secs,
-                        uri = Uri.fromFile(file).toString(),
-                    )
-                } finally {
                     file.delete()
+                } catch (_: Exception) {
+                    Toast.makeText(context, "Couldn't send voice note", Toast.LENGTH_SHORT).show()
                 }
             }
         } else {
@@ -864,13 +897,26 @@ fun ChatIdScreen(
                     }
                     if (useRemote) {
                         RealtimeClient.setTyping(chatId, false)
+                        val clientId = UUID.randomUUID().toString()
+                        // Show the bubble instantly; the server copy replaces it by clientId.
+                        InMemoryChatStore.addPending(
+                            chatId,
+                            LocalMessage(
+                                id = "pending-$clientId",
+                                clientId = clientId,
+                                mine = true,
+                                body = body.trim(),
+                                time = "Now",
+                                replyTo = localReply,
+                            ),
+                        )
                         scope.launch {
                             try {
                                 val sent = api.postConversationsIdMessages(
                                     chatId,
                                     SendMessageBody(
                                         text = body,
-                                        clientId = UUID.randomUUID().toString(),
+                                        clientId = clientId,
                                         replyTo = replyDto,
                                     ),
                                 )
@@ -879,7 +925,7 @@ fun ChatIdScreen(
                                     InMemoryChatStore.upsertMessage(chatId, sent.toLocalMessage(uid))
                                 }
                             } catch (_: Exception) {
-                                InMemoryChatStore.sendText(chatId, body, replyTo = localReply)
+                                Toast.makeText(context, "Couldn't send — check your connection", Toast.LENGTH_SHORT).show()
                             }
                         }
                     } else {

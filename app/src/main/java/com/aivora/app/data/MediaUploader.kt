@@ -20,12 +20,14 @@ suspend fun AivoraApi.sendImageMessage(
     imageUri: Uri,
     caption: String? = null,
     viewOnce: Boolean = false,
+    clientId: String = UUID.randomUUID().toString(),
 ): MessageDto = sendAttachmentMessage(
     context = context,
     conversationId = conversationId,
     uri = imageUri,
     caption = caption,
     viewOnce = viewOnce,
+    clientId = clientId,
     defaultName = "photo.jpg",
     defaultMime = "image/jpeg",
 )
@@ -39,6 +41,7 @@ suspend fun AivoraApi.sendAttachmentMessage(
     defaultMime: String = "application/octet-stream",
     durationSec: Int? = null,
     viewOnce: Boolean = false,
+    clientId: String = UUID.randomUUID().toString(),
 ): MessageDto {
     val raw = withContext(Dispatchers.IO) {
         context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
@@ -68,7 +71,7 @@ suspend fun AivoraApi.sendAttachmentMessage(
         conversationId,
         SendMessageBody(
             text = caption?.takeIf { it.isNotBlank() },
-            clientId = UUID.randomUUID().toString(),
+            clientId = clientId,
             attachment = AttachmentDto(
                 key = key,
                 url = url,
@@ -123,6 +126,7 @@ suspend fun AivoraApi.sendVoiceFile(
     file: File,
     mime: String = "audio/mp4",
     durationSec: Int,
+    clientId: String = UUID.randomUUID().toString(),
 ): MessageDto {
     val bytes = withContext(Dispatchers.IO) { file.readBytes() }
     val name = file.name.ifBlank { "voice.m4a" }
@@ -137,7 +141,7 @@ suspend fun AivoraApi.sendVoiceFile(
     return postConversationsIdMessages(
         conversationId,
         SendMessageBody(
-            clientId = UUID.randomUUID().toString(),
+            clientId = clientId,
             attachment = AttachmentDto(
                 key = key,
                 url = url,
