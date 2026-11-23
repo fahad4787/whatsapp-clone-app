@@ -36,6 +36,9 @@ data class LocalChat(
     val wallpaper: String? = null,
     val peerLastSeenAt: String? = null,
     val peerPresenceVisible: Boolean = true,
+    /** Last message was sent by me (list shows ticks). */
+    val lastMine: Boolean = false,
+    val lastStatus: MessageDeliveryStatus? = null,
 ) {
     val isGroupAdmin: Boolean get() = myRole.equals("admin", ignoreCase = true)
     val isMuted: Boolean

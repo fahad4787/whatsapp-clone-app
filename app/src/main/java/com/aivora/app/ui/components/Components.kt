@@ -539,6 +539,7 @@ fun PersonRow(
     subtitle: String? = null,
     onClick: () -> Unit,
     trailing: @Composable (() -> Unit)? = null,
+    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     Row(
@@ -553,7 +554,14 @@ fun PersonRow(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(name)
+        if (leadingIcon != null) {
+            Box(
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(AivoraColors.Primary),
+                contentAlignment = Alignment.Center,
+            ) { Icon(leadingIcon, contentDescription = null, tint = Color.White) }
+        } else {
+            Avatar(name)
+        }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)

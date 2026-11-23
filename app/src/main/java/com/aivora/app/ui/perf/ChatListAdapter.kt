@@ -128,6 +128,25 @@ class ChatListAdapter(
                 if (chat.isMuted) append(" 🔇")
             }
             preview.text = chat.preview
+            val tickRes = when {
+                !chat.lastMine || chat.lastStatus == null -> 0
+                chat.lastStatus == com.aivora.app.data.local.MessageDeliveryStatus.Sending -> com.aivora.app.ui.icons.AivoraIcons.Clock
+                chat.lastStatus == com.aivora.app.data.local.MessageDeliveryStatus.Sent -> com.aivora.app.ui.icons.AivoraIcons.SingleTick
+                else -> com.aivora.app.ui.icons.AivoraIcons.DoubleTick
+            }
+            if (tickRes == 0) {
+                preview.setCompoundDrawablesRelative(null, null, null, null)
+            } else {
+                val dr = androidx.core.content.ContextCompat.getDrawable(preview.context, tickRes)?.mutate()
+                val dd = preview.resources.displayMetrics.density
+                dr?.setBounds(0, 0, (17 * dd).toInt(), (12 * dd).toInt())
+                dr?.setTint(
+                    if (chat.lastStatus == com.aivora.app.data.local.MessageDeliveryStatus.Read) NativeColors.TickRead
+                    else NativeColors.TextSecondary,
+                )
+                preview.setCompoundDrawablesRelative(dr, null, null, null)
+                preview.compoundDrawablePadding = (4 * dd).toInt()
+            }
             time.text = chat.time
             time.setTextColor(if (chat.unread > 0) NativeColors.Primary else NativeColors.TextSecondary)
             if (chat.unread > 0) {
@@ -167,6 +186,8 @@ class ChatListAdapter(
             override fun areContentsTheSame(a: LocalChat, b: LocalChat) =
                 a.title == b.title &&
                     a.preview == b.preview &&
+                    a.lastMine == b.lastMine &&
+                    a.lastStatus == b.lastStatus &&
                     a.time == b.time &&
                     a.unread == b.unread &&
                     a.pinned == b.pinned &&

@@ -288,6 +288,16 @@ object InMemoryChatStore {
                 if (next == msg.status) msg else msg.copy(status = next)
             }
         }
+        val last = messageFlow(chatId).value.lastOrNull()
+        if (last != null && last.mine) {
+            _chats.update { list ->
+                list.map { c ->
+                    if (c.id == chatId && (c.lastStatus != last.status || !c.lastMine)) {
+                        c.copy(lastMine = true, lastStatus = last.status)
+                    } else c
+                }
+            }
+        }
     }
 
     private fun maxStatus(a: MessageDeliveryStatus, b: MessageDeliveryStatus): MessageDeliveryStatus {
@@ -453,6 +463,8 @@ object InMemoryChatStore {
                     time = time,
                     unread = unread,
                     archived = if (unarchive) false else current.archived,
+                    lastMine = if (!alreadyHad || isLatest) after.lastOrNull()?.mine ?: message.mine else current.lastMine,
+                    lastStatus = if (!alreadyHad || isLatest) after.lastOrNull()?.status ?: message.status else current.lastStatus,
                 ),
             ) + list.filterNot { it.id == chatId }
         }
@@ -476,6 +488,8 @@ object InMemoryChatStore {
                 preview = if (message.mine) preview else preview,
                 time = "Now",
                 unread = if (message.mine) 0 else current.unread + 1,
+                lastMine = message.mine,
+                lastStatus = message.status,
             )
             listOf(updated) + list.filterNot { it.id == chatId }
         }

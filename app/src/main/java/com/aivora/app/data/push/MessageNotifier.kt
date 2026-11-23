@@ -144,7 +144,7 @@ object MessageNotifier {
         val text = if (prefs.showPreview) body else "New message"
         val vibrateKey = if (isGroup) prefs.groupVibrate else prefs.msgVibrate
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_aivora)
             .setContentTitle(title.ifBlank { "Aivora" })
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -154,6 +154,7 @@ object MessageNotifier {
                 if (prefs.highPriority) NotificationCompat.PRIORITY_HIGH
                 else NotificationCompat.PRIORITY_DEFAULT,
             )
+            .setColor(0xFF00BE3C.toInt())
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
 
         val customSound = prefs.msgSoundUri?.let { runCatching { Uri.parse(it) }.getOrNull() }
@@ -222,7 +223,7 @@ object MessageNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val builder = NotificationCompat.Builder(context, CALLS_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_aivora)
             .setContentTitle(title.ifBlank { "Incoming call" })
             .setContentText(body)
             .setAutoCancel(true)

@@ -14,6 +14,11 @@ fun ConversationDto.toLocalChat(): LocalChat {
         peer?.phone?.isNotBlank() == true -> peer!!.phone!!
         else -> "Chat"
     }
+    val myId = runCatching {
+        com.aivora.app.data.local.SessionStore.userId(com.aivora.app.AivoraApp.instance)
+    }.getOrNull()
+    val lastMine = lastMessage != null && myId != null && lastMessage?.senderId == myId
+    val lastStatus = if (lastMine) lastMessage?.toLocalMessage(myId!!)?.status else null
     val preview = lastMessage?.text?.takeIf { it.isNotBlank() } ?: "Say hello"
     return LocalChat(
         id = id.orEmpty(),
@@ -41,6 +46,8 @@ fun ConversationDto.toLocalChat(): LocalChat {
         wallpaper = wallpaper,
         peerLastSeenAt = peer?.lastSeenAt,
         peerPresenceVisible = peer?.presenceVisible ?: true,
+        lastMine = lastMine,
+        lastStatus = lastStatus,
     )
 }
 

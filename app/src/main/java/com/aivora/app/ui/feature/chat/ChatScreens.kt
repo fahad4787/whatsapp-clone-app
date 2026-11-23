@@ -2577,17 +2577,23 @@ private fun PlainTextBubble(
 
 @Composable
 private fun DeliveryTicks(status: MessageDeliveryStatus) {
-    Text(
-        text = when (status) {
-            MessageDeliveryStatus.Sending -> "○"
-            MessageDeliveryStatus.Sent -> "✓"
-            else -> "✓✓"
+    val res = when (status) {
+        MessageDeliveryStatus.Sending -> com.aivora.app.ui.icons.AivoraIcons.Clock
+        MessageDeliveryStatus.Sent -> com.aivora.app.ui.icons.AivoraIcons.SingleTick
+        else -> com.aivora.app.ui.icons.AivoraIcons.DoubleTick
+    }
+    Icon(
+        painter = painterResource(res),
+        contentDescription = when (status) {
+            MessageDeliveryStatus.Sending -> "Sending"
+            MessageDeliveryStatus.Sent -> "Sent"
+            MessageDeliveryStatus.Delivered -> "Delivered"
+            else -> "Read"
         },
-        fontSize = 11.sp,
-        color = when (status) {
+        modifier = Modifier.size(width = 17.dp, height = 12.dp),
+        tint = when (status) {
             MessageDeliveryStatus.Read -> Color(0xFF53BDEB)
-            MessageDeliveryStatus.Delivered -> AivoraColors.TextSecondary
-            else -> AivoraColors.TextSecondary.copy(alpha = 0.55f)
+            else -> AivoraColors.TextSecondary
         },
     )
 }

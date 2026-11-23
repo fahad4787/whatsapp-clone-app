@@ -84,6 +84,7 @@ fun NewChatScreen(
                     name = "New group",
                     subtitle = "Create a group with friends",
                     onClick = { onNavigate(Routes.NewGroup) },
+                    leadingIcon = com.aivora.app.ui.icons.AppIcons.GroupAdd,
                 )
             },
         )

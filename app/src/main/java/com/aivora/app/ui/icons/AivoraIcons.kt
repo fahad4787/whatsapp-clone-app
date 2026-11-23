@@ -23,6 +23,8 @@ object AivoraIcons {
     @DrawableRes val Palette = R.drawable.ic_aivora_palette
     @DrawableRes val Storage = R.drawable.ic_aivora_storage
     @DrawableRes val DoubleTick = R.drawable.ic_aivora_double_tick
+    @DrawableRes val SingleTick = R.drawable.ic_aivora_single_tick
+    @DrawableRes val Clock = R.drawable.ic_aivora_clock
 
     @DrawableRes val NavChatsSelected = R.drawable.ic_aivora_nav_chats
     @DrawableRes val NavChatsIdle = R.drawable.ic_aivora_nav_chats_idle

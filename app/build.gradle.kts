@@ -20,8 +20,6 @@ android {
         versionName = "1.0.0-dev"
         buildConfigField("String", "API_BASE_URL", "\"https://whatsapp-clone-backend-hep1.onrender.com/\"")
         buildConfigField("String", "WS_BASE_URL", "\"wss://whatsapp-clone-backend-hep1.onrender.com/ws/\"")
-        // OTP stays for release / final; debug auto-verifies with 000000 (server OTP_DEV_BYPASS).
-        buildConfigField("boolean", "DEV_AUTO_OTP", "false")
         // Wave 23: arm64-only sideload (Mate/Vivo). Dropping armeabi-v7a saves ~8MB WebRTC.
         // Emulator x86 / 32-bit: local override — abiFilters += "x86_64" or "armeabi-v7a".
         ndk {
@@ -49,12 +47,10 @@ android {
         debug {
             // Keep debug unminified — R8 debug slowed iteration; release still minifies.
             isMinifyEnabled = false
-            buildConfigField("boolean", "DEV_AUTO_OTP", "true")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            buildConfigField("boolean", "DEV_AUTO_OTP", "false")
             signingConfig = signingConfigs.getByName(if (hasReleaseKey) "release" else "debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

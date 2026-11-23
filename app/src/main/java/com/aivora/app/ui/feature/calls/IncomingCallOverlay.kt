@@ -31,6 +31,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -80,6 +83,14 @@ fun IncomingCallOverlay(
     }
 
     CallSystemBars()
+
+    // The keyboard from an open chat would otherwise cover Accept / Decline.
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(call.id) {
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
+    }
 
     val ringtone = remember {
         runCatching {

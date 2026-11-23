@@ -17,7 +17,7 @@ data class AppConfigDto(
     @SerialName("max_group_call_participants") val maxGroupCallParticipants: Int = 32,
     @SerialName("upload_limit_mb") val uploadLimitMb: Int = 100,
     @SerialName("sms_enabled") val smsEnabled: Boolean = false,
-    @SerialName("otp_dev_bypass") val otpDevBypass: Boolean = true,
+    @SerialName("otp_via_admin") val otpViaAdmin: Boolean = false,
     @SerialName("countries") val countries: List<AppCountryDto> = emptyList(),
 )
 

@@ -46,7 +46,6 @@ import com.aivora.app.ui.feature.settings.SettingsAccountAddScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountChangeNumberScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountDeletedScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountEmailScreen
-import com.aivora.app.ui.feature.settings.SettingsAccountPasskeysScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountRequestInfoScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountScreen
 import com.aivora.app.ui.feature.settings.SettingsAccountSecurityNotificationsScreen
@@ -265,11 +264,13 @@ fun AivoraNavHost(
             LoginScreen(
                 onNavigate = go,
                 onVerified = {
-                    // Always offer profile setup after OTP; screen skips itself if name already set.
-                    navController.navigateClearing(Routes.ProfileSetup, Routes.Login, inclusive = false)
-                },
-                onSkipHome = {
-                    navController.navigateClearing(Routes.Home, Routes.Login, inclusive = true)
+                    // Existing users go straight home; new users complete their profile first.
+                    com.aivora.app.ui.feature.home.HomeShellState.selectedTab = 0
+                    if (com.aivora.app.ui.feature.auth.LoginHandoff.hasProfile) {
+                        navController.navigateClearing(Routes.Home, Routes.Login, inclusive = true)
+                    } else {
+                        navController.navigateClearing(Routes.ProfileSetup, Routes.Login, inclusive = false)
+                    }
                 },
             )
         }
@@ -350,8 +351,9 @@ fun AivoraNavHost(
                 onBack = back,
                 // Replace the form with the new chat so Back returns to the list, not an empty form.
                 onNavigate = { route ->
+                    val hasNewChat = runCatching { navController.getBackStackEntry(Routes.NewChat) }.isSuccess
                     navController.navigate(route) {
-                        popUpTo(Routes.NewGroup) { inclusive = true }
+                        popUpTo(if (hasNewChat) Routes.NewChat else Routes.NewGroup) { inclusive = true }
                     }
                 },
             )
@@ -393,7 +395,19 @@ fun AivoraNavHost(
         composable(
             route = Routes.SettingsAccount,
         ) {
-            SettingsAccountScreen(onBack = back, onNavigate = go)
+            SettingsAccountScreen(
+                onBack = back,
+                onNavigate = { route ->
+                    if (route == Routes.Login) {
+                        navController.navigate(Routes.Login) {
+                            popUpTo(navController.graph.id) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    } else {
+                        go(route)
+                    }
+                },
+            )
         }
         composable(Routes.SettingsAccountAdd) {
             SettingsAccountAddScreen(
@@ -419,9 +433,6 @@ fun AivoraNavHost(
         }
         composable(Routes.SettingsAccountEmail) {
             SettingsAccountEmailScreen(onBack = back, onNavigate = go)
-        }
-        composable(Routes.SettingsAccountPasskeys) {
-            SettingsAccountPasskeysScreen(onBack = back, onNavigate = go)
         }
         composable(Routes.SettingsAccountRequestInfo) {
             SettingsAccountRequestInfoScreen(onBack = back, onNavigate = go)

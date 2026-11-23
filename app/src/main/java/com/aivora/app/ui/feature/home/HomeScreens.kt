@@ -631,7 +631,7 @@ private fun ChatsTab(
         val lockedFooter = remember {
             LockedChatsFooterAdapter { navigateState.value(Routes.LockedChats) }
         }
-        lockedFooter.visible = filter == ChatFilter.All && customListId == null && debouncedQuery.isBlank()
+        lockedFooter.visible = filter == ChatFilter.All && customListId == null && debouncedQuery.isBlank() && allChats.any { it.locked }
         val homeConcat = remember { ConcatAdapter(chatAdapter, lockedFooter) }
         when {
             showSkeleton && chats.isEmpty() -> {
@@ -644,7 +644,17 @@ private fun ChatsTab(
                     color = AivoraColors.TextSecondary,
                 )
             }
-            else -> {
+            else -> Box(Modifier.fillMaxSize()) {
+                if (chats.isEmpty() && debouncedQuery.isBlank()) {
+                    Text(
+                        "No chats yet.\nTap the pencil button to start a conversation.",
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = 40.dp),
+                        color = AivoraColors.TextSecondary,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
                 RecyclerHost(
                     modifier = Modifier.fillMaxSize(),
                     onRecyclerReady = { rv ->
@@ -654,7 +664,7 @@ private fun ChatsTab(
                     },
                     update = { rv ->
                         if (rv.adapter !== homeConcat) rv.adapter = homeConcat
-                        lockedFooter.visible = filter == ChatFilter.All && customListId == null && debouncedQuery.isBlank()
+                        lockedFooter.visible = filter == ChatFilter.All && customListId == null && debouncedQuery.isBlank() && allChats.any { it.locked }
                         chatAdapter.submitList(chats)
                     },
                 )

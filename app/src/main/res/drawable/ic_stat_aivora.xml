@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Monochrome chat bubble with three dots (status-bar safe) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M12,2C6.48,2 2,6.03 2,11c0,2.4 1.05,4.58 2.75,6.2L3.8,21.4c-0.1,0.45 0.37,0.8 0.77,0.57l4.3,-2.4c0.37,0.07 0.75,0.11 1.13,0.13 L12,19.7c5.52,0 10,-4.03 10,-8.7C22,6.03 17.52,2 12,2zM7.5,12.3a1.3,1.3 0,1 0,0 -2.6,1.3 1.3,0 0,0 0,2.6zM12,12.3a1.3,1.3 0,1 0,0 -2.6,1.3 1.3,0 0,0 0,2.6zM16.5,12.3a1.3,1.3 0,1 0,0 -2.6,1.3 1.3,0 0,0 0,2.6z" />
+</vector>

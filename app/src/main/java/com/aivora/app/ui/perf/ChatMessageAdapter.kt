@@ -252,7 +252,8 @@ class ChatMessageAdapter(
             // Figma Photo bubble: 8px pad, shared photo ~196h, 12dp radius.
             mediaImage.layoutParams = FrameLayout.LayoutParams(maxW - dp(8), dp(196))
 
-            if (msg.mine) {
+            // WhatsApp: peer avatars only inside groups.
+            if (msg.mine || !isGroup) {
                 avatarFrame.visibility = View.GONE
                 avatarJob?.cancel()
                 avatarJob = null
@@ -773,23 +774,20 @@ class ChatMessageAdapter(
             meta.visibility = if (isVoice) View.GONE else View.VISIBLE
 
             val status = if (forceSingleTick) MessageDeliveryStatus.Sent else msg.status
-            val tickStr = when (status) {
-                MessageDeliveryStatus.Sending -> "○"
-                MessageDeliveryStatus.Sent -> "✓"
-                else -> "✓✓"
+            val tickRes = when (status) {
+                MessageDeliveryStatus.Sending -> AivoraIcons.Clock
+                MessageDeliveryStatus.Sent -> AivoraIcons.SingleTick
+                else -> AivoraIcons.DoubleTick
             }
             val tickColor = when (status) {
                 MessageDeliveryStatus.Read -> NativeColors.TickRead
-                MessageDeliveryStatus.Delivered -> NativeColors.TextSecondary
-                else -> 0x8C727272.toInt()
+                else -> NativeColors.TextSecondary
             }
             if (msg.mine) {
                 ticks.visibility = View.VISIBLE
-                ticks.text = tickStr
-                ticks.setTextColor(tickColor)
+                applyTick(ticks, tickRes, tickColor)
                 voiceTicks.visibility = if (isVoice) View.VISIBLE else View.GONE
-                voiceTicks.text = tickStr
-                voiceTicks.setTextColor(tickColor)
+                applyTick(voiceTicks, tickRes, tickColor)
             } else {
                 ticks.visibility = View.GONE
                 voiceTicks.visibility = View.GONE
@@ -803,6 +801,14 @@ class ChatMessageAdapter(
             // Children with their own tap handlers would otherwise swallow the long press.
             listOf(mapBlock, viewOnceRow, fileRow, mediaFrame, richBlock, linkBlock, voicePlay, waveform, voiceSpeed)
                 .forEach { it.setOnLongClickListener(longPress) }
+        }
+
+        /** Tick glyphs are vector drawables (crisp, aligned) rather than "✓" text. */
+        private fun applyTick(view: TextView, @androidx.annotation.DrawableRes res: Int, color: Int) {
+            val d = ContextCompat.getDrawable(view.context, res)?.mutate() ?: return
+            DrawableCompat.setTint(d, color)
+            view.text = ""
+            view.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, d, null)
         }
 
         private fun setPlayIcon(playing: Boolean) {

@@ -247,7 +247,7 @@ fun SettingsProfileScreen(
     val sections = listOf(
         null to listOf(
             SettingsItem("Edit profile", "Name, about, avatar, username", AppIcons.Person, onClick = { onNavigate(Routes.YourDetails) }),
-            SettingsItem("Account", "Security, email, passkeys, number", AppIcons.AccountCircle, onClick = { onNavigate(Routes.SettingsAccount) }),
+            SettingsItem("Account", "Security, email, number", AppIcons.AccountCircle, onClick = { onNavigate(Routes.SettingsAccount) }),
             SettingsItem("Privacy", "Last seen, profile photo, calls, locks", iconRes = AivoraIcons.Lock, onClick = { onNavigate(Routes.SettingsPrivacy) }),
             SettingsItem("Chats", "Theme, backup, history, transfer", iconRes = AivoraIcons.Chat, onClick = { onNavigate(Routes.SettingsChats) }),
             SettingsItem("Lists", "Filter chats into custom lists", AppIcons.Menu, onClick = { onNavigate(Routes.SettingsListsReorder) }),
@@ -292,22 +292,47 @@ fun SettingsAccountScreen(
         )
     }
     var twoStepTrailing by remember { mutableStateOf("…") }
+    var emailTrailing by remember { mutableStateOf("…") }
+    var confirmLogout by remember { mutableStateOf(false) }
+    if (confirmLogout) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmLogout = false },
+            title = { Text("Log out?") },
+            text = { Text("You will need to verify your number again to sign back in. Your chats stay safe on the server.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        confirmLogout = false
+                        com.aivora.app.data.realtime.RealtimeClient.stop()
+                        com.aivora.app.data.local.SessionStore.clear(context)
+                        onNavigate(Routes.Login)
+                    },
+                ) { Text("Log out") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirmLogout = false }) { Text("Cancel") }
+            },
+        )
+    }
     LaunchedEffect(Unit) {
         runCatching { api.getMeTwoStep() }
-            .onSuccess { twoStepTrailing = if (it.enabled) "On" else "Off" }
+            .onSuccess {
+                twoStepTrailing = if (it.enabled) "On" else "Off"
+                emailTrailing = it.email?.takeIf { e -> e.isNotBlank() } ?: "Not added"
+            }
             .onFailure { twoStepTrailing = "Off" }
     }
     val sections = listOf(
         "Security" to listOf(
             SettingsItem("Security notifications", onClick = { onNavigate(Routes.SettingsAccountSecurityNotifications) }),
-            SettingsItem("Passkeys", onClick = { onNavigate(Routes.SettingsAccountPasskeys) }),
-            SettingsItem("Email address", trailing = "Not added", onClick = { onNavigate(Routes.SettingsAccountEmail) }),
+            SettingsItem("Email address", trailing = emailTrailing, onClick = { onNavigate(Routes.SettingsAccountEmail) }),
             SettingsItem("Two-step verification", trailing = twoStepTrailing, onClick = { onNavigate(Routes.SettingsTwoStep) }),
         ),
         "Account" to listOf(
             SettingsItem("Change number", onClick = { onNavigate(Routes.SettingsAccountChangeNumber) }),
             SettingsItem("Request account info", onClick = { onNavigate(Routes.SettingsAccountRequestInfo) }),
             SettingsItem("Add account", onClick = { onNavigate(Routes.SettingsAccountAdd) }),
+            SettingsItem("Log out", onClick = { confirmLogout = true }),
             SettingsItem("Delete account", danger = true, onClick = { onNavigate(Routes.SettingsDeleteAccount) }),
         ),
     )
@@ -2698,7 +2723,7 @@ fun SettingsAccountAddScreen(
         SettingsHeroIntro(
             icon = AppIcons.PersonAdd,
             title = "One account per install",
-            body = "You can’t keep two Aivora accounts signed in at once yet. To use a different number, sign out of this one first. Passkeys and email below are for securing this account — not a second login.",
+            body = "You can’t keep two Aivora accounts signed in at once yet. To use a different number, sign out of this one first. Email below is for securing this account — not a second login.",
         )
         SettingsList(
             listOf(
@@ -2708,12 +2733,6 @@ fun SettingsAccountAddScreen(
                         "Signs out of this account, then opens verification",
                         iconRes = AivoraIcons.Call,
                         onClick = { confirmSwitch = true },
-                    ),
-                    SettingsItem(
-                        "Passkeys",
-                        "Not available yet — opens the passkeys note",
-                        AppIcons.Fingerprint,
-                        onClick = { onNavigate(Routes.SettingsAccountPasskeys) },
                     ),
                     SettingsItem(
                         "Email for this account",
@@ -2810,7 +2829,7 @@ fun SettingsAccountChangeNumberScreen(
                             )
                         }.onSuccess { res ->
                             e164 = res.phone ?: "+${dial.filter { it.isDigit() }}$phone"
-                            devHint = res.otpDevBypass
+                            devHint = res.otpViaAdmin
                             step = 1
                         }.onFailure { error = it.message ?: "Could not send code" }
                         busy = false
@@ -2825,7 +2844,7 @@ fun SettingsAccountChangeNumberScreen(
                 body = "Sent to ${e164 ?: "$dial $phone"}",
             )
             if (devHint) {
-                InfoBanner("Dev: use 000000 or the code from the server/admin OTP log.")
+                InfoBanner("Your code is sent by Aivora support. Contact them if it doesn’t arrive.")
             }
             SettingsMutedCard {
                 OutlinedTextField(
@@ -3009,7 +3028,7 @@ fun SettingsAccountEmailScreen(
                 Spacer(Modifier.height(8.dp))
                 Text(
                     if (useBypassHint) {
-                        "Staging: use code 000000 (or admin OTP log)."
+                        "Your code is sent by Aivora support."
                     } else {
                         "Check your inbox for the verification code."
                     },
@@ -3095,7 +3114,7 @@ fun SettingsAccountEmailScreen(
                             )
                         }.onSuccess {
                             awaitingCode = true
-                            useBypassHint = it.otpDevBypass
+                            useBypassHint = it.otpViaAdmin
                         }.onFailure { error = it.message ?: "Could not send code" }
                         busy = false
                     }
@@ -3107,25 +3126,6 @@ fun SettingsAccountEmailScreen(
 }
 
 
-@Composable
-fun SettingsAccountPasskeysScreen(
-    onBack: (() -> Unit)? = null,
-    onNavigate: (String) -> Unit = {},
-) {
-    AivoraScaffold(title = "Passkeys", onBack = onBack) {
-        SettingsHeroIntro(
-            iconRes = AivoraIcons.Key,
-            title = "Passkeys coming later",
-            body = "FIDO2 passkeys are not available yet. Use two-step verification, app lock, or email sign-in for account security today.",
-        )
-        Spacer(Modifier.weight(1f))
-        PrimaryButton(
-            text = "Open app lock",
-            onClick = { onNavigate(Routes.SettingsPrivacyAppLock) },
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-        )
-    }
-}
 
 
 @Composable

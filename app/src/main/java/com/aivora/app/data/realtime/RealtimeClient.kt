@@ -10,6 +10,7 @@ import com.aivora.app.data.local.MessageDeliveryStatus
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.CallDto
 import com.aivora.app.data.model.MessageDto
+import com.aivora.app.data.toLocalChat
 import com.aivora.app.data.toLocalMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -270,19 +271,43 @@ object RealtimeClient {
                     ackDelivered(listOfNotNull(dto.id))
                     if (!InMemoryChatStore.isViewing(chatId) && app != null) {
                         val preview = when {
+                            local.mediaKind == com.aivora.app.data.local.LocalMediaKind.Image -> "Photo"
+                            local.mediaKind == com.aivora.app.data.local.LocalMediaKind.Audio -> "Voice message"
+                            local.mediaKind == com.aivora.app.data.local.LocalMediaKind.Video -> "Video"
+                            local.mediaKind == com.aivora.app.data.local.LocalMediaKind.File ->
+                                local.body.ifBlank { "Document" }
                             !local.mediaUri.isNullOrBlank() -> "Photo"
                             local.body.isNotBlank() -> local.body
                             else -> "New message"
                         }
-                        val chat = InMemoryChatStore.chat(chatId)
-                        val title = chat.title.ifBlank { "Aivora" }
-                        com.aivora.app.data.push.MessageNotifier.show(
-                            app,
-                            title,
-                            preview,
-                            chatId,
-                            isGroup = chat.isGroup,
-                        )
+                        val notify = {
+                            val chat = InMemoryChatStore.chat(chatId)
+                            com.aivora.app.data.push.MessageNotifier.show(
+                                app,
+                                chat.title.ifBlank { "Aivora" },
+                                if (chat.isGroup && !local.senderName.isNullOrBlank()) "${local.senderName}: $preview" else preview,
+                                chatId,
+                                isGroup = chat.isGroup,
+                            )
+                        }
+                        // First message from someone new: the home row is only a placeholder
+                        // titled "Chat" — resolve the real peer name before notifying.
+                        val resolved = InMemoryChatStore.chats.value
+                            .any { it.id == chatId && it.title != "Chat" }
+                        if (resolved) {
+                            notify()
+                        } else {
+                            scope.launch {
+                                runCatching {
+                                    val remote = NetworkModule.api().getConversationsId(chatId)
+                                    InMemoryChatStore.upsertChat(
+                                        remote.toLocalChat(),
+                                        promote = false,
+                                    )
+                                }
+                                notify()
+                            }
+                        }
                     }
                 }
             }

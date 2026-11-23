@@ -230,7 +230,7 @@ private fun InCallContent(
         name = peerName,
         callTypeLabel = if (enableVideo) "Video call" else "Audio call",
         connectedLabel = connectedLabel,
-        elapsedLabel = if (isLive) formatElapsed(elapsedSec) else statusLine.takeIf { !isLive },
+        elapsedLabel = if (isLive) formatElapsed(elapsedSec) else null,
         showSpeaking = isLive && !muted,
         videoMode = enableVideo,
         muted = muted,

@@ -1,6 +1,8 @@
 package com.aivora.app.ui.feature.auth
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -58,11 +60,22 @@ fun ProfileSetupScreen(
         loading = false
     }
 
-    AivoraScaffold(title = "Profile setup", onBack = onBack) {
-        if (loading) {
-            Text("Loading…", modifier = Modifier.padding(16.dp))
-            return@AivoraScaffold
+    if (loading) {
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(com.aivora.app.ui.theme.AivoraColors.LightBackground),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.material3.CircularProgressIndicator(
+                color = com.aivora.app.ui.theme.AivoraColors.Primary,
+                strokeWidth = 3.dp,
+            )
         }
+        return
+    }
+
+    AivoraScaffold(title = "Profile setup", onBack = onBack) {
         InfoBanner("Add your name and a profile photo so friends can recognize you.")
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),

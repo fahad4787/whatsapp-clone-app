@@ -34,10 +34,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,7 +44,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.window.DialogProperties
 import com.aivora.app.data.model.AppCountryDto
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,7 +78,6 @@ private val FieldShape = RoundedCornerShape(AivoraDimens.RadiusMd)
 fun LoginScreen(
     onNavigate: (String) -> Unit = {},
     onVerified: () -> Unit = {},
-    onSkipHome: () -> Unit = {},
     onBack: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -109,7 +105,7 @@ fun LoginScreen(
     var otp by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var twoStepChallenge by remember { mutableStateOf<String?>(null) }
-    var otpDevBypass by remember { mutableStateOf(true) }
+    var otpViaAdmin by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var emailMode by remember { mutableStateOf(false) }
@@ -126,7 +122,7 @@ fun LoginScreen(
                 country = match.name ?: country
                 dial = match.dial?.takeIf { it.isNotBlank() } ?: dial
             }
-            otpDevBypass = cfg.otpDevBypass
+            otpViaAdmin = cfg.otpViaAdmin
             if (BuildConfig.VERSION_CODE < cfg.minAndroidVersionCode) {
                 forceUpdateUrl = cfg.downloadUrl
             }
@@ -134,20 +130,44 @@ fun LoginScreen(
     }
 
     if (pickCountry && countries.isNotEmpty()) {
-        AlertDialog(
-            onDismissRequest = { pickCountry = false },
-            properties = DialogProperties(usePlatformDefaultWidth = true),
-            title = { Text("Country") },
-            text = {
+        var countryQuery by remember { mutableStateOf("") }
+        val shown = remember(countryQuery, countries) {
+            val q = countryQuery.trim()
+            if (q.isEmpty()) countries
+            else countries.filter {
+                it.name.orEmpty().contains(q, ignoreCase = true) ||
+                    it.dial.orEmpty().contains(q.removePrefix("+"), ignoreCase = true)
+            }
+        }
+        com.aivora.app.ui.components.AivoraBottomSheet(
+            onDismiss = { pickCountry = false },
+            title = "Select country",
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                com.aivora.app.ui.components.SearchField(
+                    value = countryQuery,
+                    onValueChange = { countryQuery = it },
+                    placeholder = "Search country or code",
+                )
+                Spacer(Modifier.height(8.dp))
                 AivoraNoOverscroll {
                     Column(
                         modifier = Modifier
-                            .height(280.dp)
+                            .fillMaxWidth()
+                            .height(320.dp)
                             .verticalScroll(rememberScrollState()),
                     ) {
-                        countries.forEach { row ->
+                        if (shown.isEmpty()) {
                             Text(
-                                "${row.name} (${row.dial})",
+                                "No matching country",
+                                modifier = Modifier.padding(vertical = 20.dp),
+                                fontSize = 15.sp,
+                                color = AivoraColors.TextSecondary,
+                            )
+                        }
+                        shown.forEach { row ->
+                            val selected = row.name.equals(country, ignoreCase = true)
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
@@ -155,25 +175,46 @@ fun LoginScreen(
                                         dial = row.dial?.takeIf { it.isNotBlank() } ?: dial
                                         pickCountry = false
                                     }
-                                    .padding(vertical = 12.dp),
-                                fontSize = 16.sp,
-                                color = AivoraColors.Ink,
-                            )
+                                    .padding(vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    row.name.orEmpty(),
+                                    modifier = Modifier.weight(1f),
+                                    fontSize = 16.sp,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = AivoraColors.Ink,
+                                )
+                                Text(
+                                    row.dial.orEmpty(),
+                                    fontSize = 15.sp,
+                                    color = AivoraColors.TextSecondary,
+                                )
+                                if (selected) {
+                                    Spacer(Modifier.width(10.dp))
+                                    Icon(
+                                        AppIcons.Check,
+                                        contentDescription = "Selected",
+                                        tint = AivoraColors.Primary,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { pickCountry = false }) { Text("Close") }
-            },
-        )
+                Spacer(Modifier.height(8.dp))
+            }
+        }
     }
 
     suspend fun finishLogin(access: String, refresh: String, targetPhone: String): String? {
         SessionStore.save(context, access, refresh, targetPhone)
+        LoginHandoff.hasProfile = false
         try {
             val me = api.getMe()
             me.id?.let { SessionStore.saveUserId(context, it) }
+            LoginHandoff.hasProfile = !me.displayName.isNullOrBlank()
         } catch (_: Exception) { /* optional */ }
         com.aivora.app.data.push.PushRegistrar.refresh(context)
         return null
@@ -396,7 +437,7 @@ fun LoginScreen(
                                             ),
                                         )
                                         otp = ""
-                                        otpDevBypass = result.otpDevBypass || otpDevBypass
+                                        otpViaAdmin = result.otpViaAdmin
                                         step = 1
                                     } catch (e: Exception) {
                                         error = com.aivora.app.data.api.ApiErrors.auth(e, "Could not send code")
@@ -421,11 +462,7 @@ fun LoginScreen(
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            if (BuildConfig.DEV_AUTO_OTP) {
-                                "Dev build: enter phone and continue — OTP is skipped (still required in release)."
-                            } else {
-                                "We’ll text you a code to confirm it’s you."
-                            },
+                            "We’ll send you a code to confirm it’s you.",
                             fontSize = 14.sp,
                             color = AivoraColors.TextSecondary,
                             lineHeight = 18.sp,
@@ -467,12 +504,7 @@ fun LoginScreen(
 
                         Spacer(Modifier.height(22.dp))
                         PrimaryButton(
-                            text = when {
-                                busy && BuildConfig.DEV_AUTO_OTP -> "Signing in…"
-                                busy -> "Sending…"
-                                BuildConfig.DEV_AUTO_OTP -> "Continue"
-                                else -> "Send code"
-                            },
+                            text = if (busy) "Sending…" else "Send code",
                             enabled = !busy,
                             onClick = {
                                 if (phone.length < 7) {
@@ -493,19 +525,8 @@ fun LoginScreen(
                                             ?: "+${dial.filter { it.isDigit() }}$phone"
                                         e164Phone = verifiedPhone
                                         otp = ""
-                                        otpDevBypass = result.otpDevBypass || otpDevBypass
-                                        if (BuildConfig.DEV_AUTO_OTP) {
-                                            // Server OTP_DEV_BYPASS accepts 000000; OTP flow stays for release.
-                                            val fail = completeVerify(verifiedPhone, "000000")
-                                            if (fail != null) {
-                                                error = fail
-                                                step = 1
-                                            } else if (twoStepChallenge == null) {
-                                                onVerified()
-                                            }
-                                        } else {
-                                            step = 1
-                                        }
+                                        otpViaAdmin = result.otpViaAdmin
+                                        step = 1
                                     } catch (e: Exception) {
                                         val http = e as? retrofit2.HttpException
                                         val body = if (http?.code() == 429)
@@ -528,9 +549,6 @@ fun LoginScreen(
                         )
 
                         Spacer(Modifier.height(18.dp))
-                        AuthTextLink("Sign in with a passkey") {
-                            onNavigate(Routes.SettingsAccountPasskeys)
-                        }
                         AuthTextLink("Use email instead") {
                             emailMode = true
                             step = 0
@@ -553,10 +571,10 @@ fun LoginScreen(
                             fontSize = 14.sp,
                             color = AivoraColors.TextSecondary,
                         )
-                        if (otpDevBypass) {
+                        if (otpViaAdmin) {
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                "Dev: use 000000 or the code in server logs",
+                                "Your code is sent by Aivora support. Contact them if it doesn’t arrive.",
                                 fontSize = 12.sp,
                                 color = AivoraColors.TextTertiary,
                             )
@@ -610,7 +628,7 @@ fun LoginScreen(
                                             email = loginEmail,
                                         ),
                                     )
-                                    otpDevBypass = result.otpDevBypass || otpDevBypass
+                                    otpViaAdmin = result.otpViaAdmin
                                     otp = ""
                                 } catch (e: Exception) {
                                     error = com.aivora.app.data.api.ApiErrors.auth(e, "Could not resend")
@@ -636,10 +654,10 @@ fun LoginScreen(
                             fontSize = 14.sp,
                             color = AivoraColors.TextSecondary,
                         )
-                        if (otpDevBypass) {
+                        if (otpViaAdmin) {
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                "Dev: copy code from admin OTP log, or use 000000",
+                                "Your code is sent by Aivora support. Contact them if it doesn’t arrive.",
                                 fontSize = 12.sp,
                                 color = AivoraColors.TextTertiary,
                             )
@@ -700,7 +718,7 @@ fun LoginScreen(
                                         ),
                                     )
                                     e164Phone = result.phone
-                                    otpDevBypass = result.otpDevBypass || otpDevBypass
+                                    otpViaAdmin = result.otpViaAdmin
                                     otp = ""
                                 } catch (e: Exception) {
                                     error = com.aivora.app.data.api.ApiErrors.auth(e, "Could not resend")
@@ -773,7 +791,6 @@ fun LoginScreen(
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
             Spacer(Modifier.height(8.dp))
-            AuthTextLink("Skip to home (dev)", muted = true, onClick = onSkipHome)
             Spacer(Modifier.height(20.dp))
         }
     }
@@ -921,4 +938,10 @@ private fun AuthTextLink(
             .padding(vertical = 6.dp)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
     )
+}
+
+
+/** Result of the profile lookup done during login, so existing users skip the profile-setup screen. */
+object LoginHandoff {
+    @Volatile var hasProfile: Boolean = false
 }

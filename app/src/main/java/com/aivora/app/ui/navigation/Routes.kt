@@ -40,7 +40,6 @@ object Routes {
     const val SettingsAccountChangeNumber = "settings/account/change-number"
     const val SettingsAccountDeleted = "settings/account/deleted"
     const val SettingsAccountEmail = "settings/account/email"
-    const val SettingsAccountPasskeys = "settings/account/passkeys"
     const val SettingsAccountRequestInfo = "settings/account/request-info"
     const val SettingsAccountSecurityNotifications = "settings/account/security-notifications"
     const val SettingsAccountTwoStepNewPin = "settings/account/two-step/new-pin"
