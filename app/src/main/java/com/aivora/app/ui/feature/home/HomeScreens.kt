@@ -1108,6 +1108,7 @@ private fun StatusTab(
             StatusRow(
                 name = status.authorName,
                 userId = status.authorId,
+                avatarUrl = status.authorAvatarUrl,
                 time = if (authorItems.size > 1) {
                     "${authorItems.size} updates · ${status.timeLabel}"
                 } else {
@@ -1137,6 +1138,7 @@ private fun StatusTab(
                 StatusRow(
                     name = status.authorName,
                     userId = status.authorId,
+                    avatarUrl = status.authorAvatarUrl,
                     time = status.timeLabel,
                     unseen = false,
                     segmentCount = authorItems.size,
@@ -1191,6 +1193,7 @@ private fun StatusActionPill(
 private fun StatusRow(
     name: String,
     userId: String? = null,
+    avatarUrl: String? = null,
     time: String,
     unseen: Boolean,
     segmentCount: Int = 1,
@@ -1206,6 +1209,7 @@ private fun StatusRow(
         StatusRingAvatar(
             name = name,
             userId = userId,
+            imageUrl = avatarUrl,
             hasUnseen = unseen,
             segmentCount = segmentCount,
             size = 52.dp,

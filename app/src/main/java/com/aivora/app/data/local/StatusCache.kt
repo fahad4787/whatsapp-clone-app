@@ -27,6 +27,7 @@ object StatusCache {
         val viewed: Boolean = false,
         val viewCount: Int = 0,
         val createdAtMs: Long = 0L,
+        val authorAvatarUrl: String? = null,
     )
 
     fun load(context: Context): List<LocalStatus> {
@@ -46,6 +47,7 @@ object StatusCache {
                     viewed = it.viewed,
                     viewCount = it.viewCount,
                     createdAtMs = it.createdAtMs,
+                    authorAvatarUrl = it.authorAvatarUrl,
                 )
             }
         }.getOrDefault(emptyList())
@@ -65,6 +67,7 @@ object StatusCache {
                 viewed = it.viewed,
                 viewCount = it.viewCount,
                 createdAtMs = it.createdAtMs,
+                authorAvatarUrl = it.authorAvatarUrl,
             )
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

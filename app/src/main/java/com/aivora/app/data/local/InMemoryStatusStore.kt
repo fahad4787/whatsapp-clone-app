@@ -29,6 +29,7 @@ data class LocalStatus(
     val viewCount: Int = 0,
     /** Epoch millis for chronological viewing (oldest → newest like WhatsApp). */
     val createdAtMs: Long = 0L,
+    val authorAvatarUrl: String? = null,
 )
 
 /**
@@ -107,7 +108,8 @@ object InMemoryStatusStore {
             val x = a[i]
             val y = b[i]
             if (x.id != y.id || x.viewed != y.viewed || x.viewCount != y.viewCount ||
-                x.text != y.text || x.mediaUri != y.mediaUri || x.authorName != y.authorName
+                x.text != y.text || x.mediaUri != y.mediaUri || x.authorName != y.authorName ||
+                x.authorAvatarUrl != y.authorAvatarUrl
             ) {
                 return false
             }
@@ -183,6 +185,7 @@ object InMemoryStatusStore {
                 viewed = item.seen || mine,
                 viewCount = item.viewCount,
                 createdAtMs = parseCreatedAtMs(item.createdAt),
+                authorAvatarUrl = row.user.avatarUrl,
             )
         }
         if (incoming.isEmpty()) return
@@ -221,6 +224,7 @@ object InMemoryStatusStore {
                         viewed = item.seen || mine,
                         viewCount = item.viewCount,
                         createdAtMs = parseCreatedAtMs(item.createdAt),
+                        authorAvatarUrl = row.user.avatarUrl,
                     ),
                 )
             }
