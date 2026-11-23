@@ -66,8 +66,21 @@ object InMemoryChatStore {
         }
     }
 
+    /** True once the server has answered with the chat list (even if it is empty). */
+    private val _remoteLoaded = MutableStateFlow(false)
+    val remoteLoaded: StateFlow<Boolean> = _remoteLoaded.asStateFlow()
+
+    /** Sign-out: drop the previous account's chats so the next login starts with a clean load. */
+    fun reset() {
+        usingRemote = false
+        _remoteLoaded.value = false
+        _chats.value = emptyList()
+        messageFlows.clear()
+    }
+
     fun replaceFromRemote(remote: List<LocalChat>) {
         usingRemote = true
+        _remoteLoaded.value = true
         // Drop any leftover seed chats/messages.
         messageFlows.keys.retainAll(remote.map { it.id }.toSet())
         _chats.value = remote

@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /** Clear process-lifetime list caches on logout. */
 fun clearInMemoryListCaches() {
+    InMemoryChatStore.reset()
     InMemoryPeopleStore.clear()
     InMemoryScheduledCallsStore.clear()
     InMemoryMediaGalleryStore.clear()

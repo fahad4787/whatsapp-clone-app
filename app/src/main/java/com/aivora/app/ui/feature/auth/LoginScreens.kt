@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -381,12 +382,35 @@ fun LoginScreen(
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "Use the recovery email you verified in Settings.",
+                            "We’ll send a one-time code to your email.",
                             fontSize = 14.sp,
                             color = AivoraColors.TextSecondary,
                             lineHeight = 18.sp,
                         )
-                        Spacer(Modifier.height(20.dp))
+                        Spacer(Modifier.height(14.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(AivoraColors.Primary.copy(alpha = 0.08f))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.Top,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(
+                                imageVector = AppIcons.Info,
+                                contentDescription = null,
+                                tint = AivoraColors.Primary,
+                                modifier = Modifier.size(18.dp).padding(top = 1.dp),
+                            )
+                            Text(
+                                "Only for accounts that added a verified email after signing in with a phone number. New here? Sign in with your phone first.",
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
+                                color = AivoraColors.Ink,
+                            )
+                        }
+                        Spacer(Modifier.height(18.dp))
                         AuthFieldLabel("Email")
                         Box(
                             modifier = Modifier

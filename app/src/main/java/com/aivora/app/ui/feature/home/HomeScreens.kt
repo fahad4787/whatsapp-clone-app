@@ -542,6 +542,10 @@ private fun ChatsTab(
     LaunchedEffect(allChats) {
         if (allChats.isNotEmpty()) showSkeleton = false
     }
+    // First server answer (even an empty list) ends the skeleton — never show "No chats" before it.
+    LaunchedEffect(Unit) {
+        InMemoryChatStore.remoteLoaded.collect { if (it) showSkeleton = false }
+    }
     LaunchedEffect(useRemote) {
         if (!useRemote) {
             showSkeleton = false
@@ -638,21 +642,22 @@ private fun ChatsTab(
                 SkeletonChatList(modifier = Modifier.fillMaxSize())
             }
             chats.isEmpty() && filter != ChatFilter.All -> {
-                Text(
-                    "No chats here",
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-                    color = AivoraColors.TextSecondary,
+                ChatsEmptyState(
+                    icon = AppIcons.Chat,
+                    title = "No chats here",
+                    subtitle = "Chats that match this filter will show up here.",
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
             else -> Box(Modifier.fillMaxSize()) {
                 if (chats.isEmpty() && debouncedQuery.isBlank()) {
-                    Text(
-                        "No chats yet.\nTap the pencil button to start a conversation.",
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(horizontal = 40.dp),
-                        color = AivoraColors.TextSecondary,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    ChatsEmptyState(
+                        icon = AppIcons.Chat,
+                        title = "No chats yet",
+                        subtitle = "Start a conversation with someone from your contacts.",
+                        actionLabel = "Start a chat",
+                        onAction = { onNavigate(Routes.NewChat) },
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
                 RecyclerHost(
@@ -720,6 +725,81 @@ private fun ChatsTab(
             )
             Spacer(Modifier.height(8.dp))
         }
+    }
+}
+
+/** Friendly empty state: tinted icon badge, title, subtitle and an optional primary action. */
+@Composable
+private fun ChatsEmptyState(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .clip(CircleShape)
+                .background(AivoraColors.Primary.copy(alpha = 0.10f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = AivoraColors.Primary,
+                modifier = Modifier.size(44.dp),
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+        Text(
+            title,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = AivoraColors.Ink,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            subtitle,
+            fontSize = 15.sp,
+            lineHeight = 21.sp,
+            color = AivoraColors.TextSecondary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        if (actionLabel != null && onAction != null) {
+            Spacer(Modifier.height(28.dp))
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(AivoraColors.Primary)
+                    .clickable(onClick = onAction)
+                    .padding(horizontal = 24.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = AppIcons.Edit,
+                    contentDescription = null,
+                    tint = androidx.compose.ui.graphics.Color.White,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    actionLabel,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = androidx.compose.ui.graphics.Color.White,
+                )
+            }
+        }
+        // Keep the group optically centred above the bottom bar / FAB.
+        Spacer(Modifier.height(56.dp))
     }
 }
 
