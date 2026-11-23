@@ -650,16 +650,6 @@ private fun ChatsTab(
                 )
             }
             else -> Box(Modifier.fillMaxSize()) {
-                if (chats.isEmpty() && debouncedQuery.isBlank()) {
-                    ChatsEmptyState(
-                        icon = AppIcons.Chat,
-                        title = "No chats yet",
-                        subtitle = "Start a conversation with someone from your contacts.",
-                        actionLabel = "Start a chat",
-                        onAction = { onNavigate(Routes.NewChat) },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
                 RecyclerHost(
                     modifier = Modifier.fillMaxSize(),
                     onRecyclerReady = { rv ->
@@ -673,6 +663,17 @@ private fun ChatsTab(
                         chatAdapter.submitList(chats)
                     },
                 )
+                // Drawn after (above) the RecyclerView: the AndroidView would otherwise swallow the button's taps.
+                if (chats.isEmpty() && debouncedQuery.isBlank()) {
+                    ChatsEmptyState(
+                        icon = AppIcons.Chat,
+                        title = "No chats yet",
+                        subtitle = "Start a conversation with someone from your contacts.",
+                        actionLabel = "Start a chat",
+                        onAction = { onNavigate(Routes.NewChat) },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
     }

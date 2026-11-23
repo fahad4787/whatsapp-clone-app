@@ -15,7 +15,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import com.aivora.app.data.ChatRepository
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.model.DirectBody
@@ -55,8 +59,8 @@ fun NewChatScreen(
             ) { Icon(AppIcons.Add, contentDescription = null) }
         },
     ) {
-        InfoBanner("All registered users — tap to chat, or filter with search")
-        SearchField(query, { query = it }, "Search name or phone")
+        InfoBanner("Find anyone by their full phone number. Recent contacts are listed below.")
+        SearchField(query, { query = it }, "Search name or phone number")
         val err = error ?: search.error
         if (err != null) {
             Text(err, color = AivoraColors.Danger, fontSize = 13.sp)
@@ -86,6 +90,25 @@ fun NewChatScreen(
                     onClick = { onNavigate(Routes.NewGroup) },
                     leadingIcon = com.aivora.app.ui.icons.AppIcons.GroupAdd,
                 )
+            },
+            footer = {
+                if (search.people.isEmpty() && !search.loading && err == null) {
+                    val digits = query.count { it.isDigit() }
+                    Text(
+                        when {
+                            query.isBlank() -> "No contacts yet.\nEnter a phone number above to find someone."
+                            digits in 1..6 -> "Type the full phone number to find someone."
+                            else -> "No one found. Check the number and try again."
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 32.dp, vertical = 32.dp),
+                        color = AivoraColors.TextSecondary,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
+                }
             },
         )
     }

@@ -55,6 +55,7 @@ fun rememberPeopleSearch(query: String, excludeIds: Set<String> = emptySet()): P
         mutableStateOf(seed.filter { it.id !in excludeIds })
     }
     var error by remember { mutableStateOf<String?>(null) }
+    var loading by remember(query) { mutableStateOf(seed.isEmpty()) }
     val api = remember { ChatRepository.api() }
     LaunchedEffect(query, excludeIds) {
         val q = query.trim()
@@ -62,6 +63,7 @@ fun rememberPeopleSearch(query: String, excludeIds: Set<String> = emptySet()): P
             ?: if (q.isEmpty()) InMemoryPeopleStore.directory.value.takeIf { it.isNotEmpty() } else null
         if (cached != null) {
             people = cached.filter { it.id !in excludeIds }
+            loading = false
         }
         // Debounce typing; blank directory can fetch immediately when cold.
         if (q.isNotEmpty()) delay(220)
@@ -71,16 +73,19 @@ fun rememberPeopleSearch(query: String, excludeIds: Set<String> = emptySet()): P
             InMemoryPeopleStore.put(q, list)
             people = list.filter { it.id !in excludeIds }
             error = null
+            loading = false
         }.onFailure {
             if (people.isEmpty()) error = it.message ?: "Could not load people"
+            loading = false
         }
     }
-    return PeopleSearchState(people, error)
+    return PeopleSearchState(people, error, loading)
 }
 
 data class PeopleSearchState(
     val people: List<UserDto>,
     val error: String?,
+    val loading: Boolean = false,
 )
 
 fun UserDto.displayLabel(): String =
@@ -146,6 +151,7 @@ fun PeopleTapList(
     people: List<UserDto>,
     onPersonClick: (UserDto) -> Unit,
     header: (@Composable () -> Unit)? = null,
+    footer: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     AivoraNoOverscroll {
@@ -160,6 +166,7 @@ fun PeopleTapList(
                     )
                 }
             }
+            footer?.invoke()
         }
     }
 }
