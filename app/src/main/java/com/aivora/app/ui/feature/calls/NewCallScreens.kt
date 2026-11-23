@@ -159,7 +159,7 @@ fun NewCallScreen(
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Avatar(name, size = 44)
+                        Avatar(name, size = 44, imageUrl = person.avatarUrl)
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)

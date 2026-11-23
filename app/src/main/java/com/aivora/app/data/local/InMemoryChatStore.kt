@@ -72,19 +72,35 @@ object InMemoryChatStore {
 
     /** Sign-out: drop the previous account's chats so the next login starts with a clean load. */
     fun reset() {
+        pendingDirect.clear()
         usingRemote = false
         _remoteLoaded.value = false
         _chats.value = emptyList()
         messageFlows.clear()
     }
 
+    /**
+     * Direct chats just opened from New chat / QR. The server hides a 1:1 chat from the list until
+     * its first message, so keep it locally (otherwise the open chat loses its title on refresh).
+     */
+    private val pendingDirect = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    fun openNewDirect(chat: LocalChat) {
+        pendingDirect.add(chat.id)
+        upsertChat(chat)
+    }
+
     fun replaceFromRemote(remote: List<LocalChat>) {
         usingRemote = true
         _remoteLoaded.value = true
+        val remoteIds = remote.map { it.id }.toSet()
+        pendingDirect.removeAll(remoteIds)
+        val kept = _chats.value.filter { it.id in pendingDirect }
+        val merged = kept + remote
         // Drop any leftover seed chats/messages.
-        messageFlows.keys.retainAll(remote.map { it.id }.toSet())
-        _chats.value = remote
-        remote.forEach { messageFlows.getOrPut(it.id) { MutableStateFlow(emptyList()) } }
+        messageFlows.keys.retainAll(merged.map { it.id }.toSet())
+        _chats.value = merged
+        merged.forEach { messageFlows.getOrPut(it.id) { MutableStateFlow(emptyList()) } }
     }
 
     /** Instant paint from disk before network returns (session cold start). */
@@ -119,6 +135,20 @@ object InMemoryChatStore {
      * @param promote when true (new activity), move row to top. Open-chat refresh must pass
      * false — otherwise the 2nd chat jumps to #1 under the transition for a second.
      */
+    /** A contact changed their name / about / photo: patch every direct chat with them. */
+    fun applyPeerProfile(userId: String, displayName: String?, about: String?, avatarUrl: String?) {
+        _chats.update { list ->
+            list.map { c ->
+                if (c.isGroup || c.peerUserId != userId) c
+                else c.copy(
+                    title = displayName?.takeIf { it.isNotBlank() } ?: c.title,
+                    peerAbout = about?.takeIf { it.isNotBlank() },
+                    avatarUrl = avatarUrl?.takeIf { it.isNotBlank() },
+                )
+            }
+        }
+    }
+
     fun upsertChat(chat: LocalChat, promote: Boolean = true) {
         _chats.update { list ->
             if (promote) {

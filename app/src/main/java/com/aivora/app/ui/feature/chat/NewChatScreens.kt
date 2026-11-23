@@ -74,7 +74,7 @@ fun NewChatScreen(
                 scope.launch {
                     try {
                         val conv = api.postConversationsDirect(DirectBody(userId = peerId))
-                        InMemoryChatStore.upsertChat(conv.toLocalChat())
+                        InMemoryChatStore.openNewDirect(conv.toLocalChat())
                         onNavigate(Routes.ChatId.replace("{id}", conv.id.orEmpty()))
                     } catch (e: Exception) {
                         error = com.aivora.app.data.api.ApiErrors.message(e, "Could not start chat")

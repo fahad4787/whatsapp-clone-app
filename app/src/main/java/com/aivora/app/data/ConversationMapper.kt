@@ -37,9 +37,11 @@ fun ConversationDto.toLocalChat(): LocalChat {
         peerUserId = peer?.id,
         peerPhone = peer?.phoneDisplay?.takeIf { it.isNotBlank() }
             ?: peer?.phone?.takeIf { it.isNotBlank() },
+        peerAbout = peer?.about?.takeIf { it.isNotBlank() },
         myRole = myRole,
         description = description,
-        avatarUrl = avatarUrl ?: avatarThumb,
+        avatarUrl = (avatarUrl ?: avatarThumb)?.takeIf { it.isNotBlank() }
+            ?: (peer?.avatarUrl ?: peer?.avatarThumb)?.takeIf { it.isNotBlank() },
         onlyAdminsCanSend = onlyAdminsCanSend,
         onlyAdminsCanEditInfo = onlyAdminsCanEditInfo,
         disappearingSeconds = disappearingSeconds,

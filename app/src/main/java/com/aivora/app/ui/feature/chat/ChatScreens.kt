@@ -602,6 +602,7 @@ fun ChatIdScreen(
             ) {
                 ChatHeader(
                     title = chat.title,
+                    avatarUrl = chat.avatarUrl,
                     subtitle = subtitle,
                     showTyping = peerTyping,
                     muted = chat.isMuted,
@@ -1969,6 +1970,7 @@ private fun MessageActionOverlay(
 @Composable
 private fun ChatHeader(
     title: String,
+    avatarUrl: String? = null,
     subtitle: String,
     showTyping: Boolean,
     muted: Boolean = false,
@@ -2003,7 +2005,7 @@ private fun ChatHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box {
-                Avatar(title, size = 40)
+                Avatar(title, size = 40, imageUrl = avatarUrl)
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)

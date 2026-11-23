@@ -870,7 +870,7 @@ private fun HomeChatRow(
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-        Avatar(chat.title, size = 52)
+        Avatar(chat.title, size = 52, imageUrl = chat.avatarUrl)
         Spacer(modifier = Modifier.width(14.dp))
                             Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1440,8 +1440,12 @@ private fun ProfileTab(
     onNavigate: (String) -> Unit,
 ) {
     val profileOwner = LocalLifecycleOwner.current
-    var profileName by remember { mutableStateOf("") }
-    var profileAvatar by remember { mutableStateOf<String?>(null) }
+    val cachedMe = com.aivora.app.data.local.InMemoryMeStore.me
+    var profileName by remember { mutableStateOf(cachedMe?.displayName.orEmpty()) }
+    var profileAvatar by remember { mutableStateOf(cachedMe?.avatarUrl) }
+    var profileAbout by remember { mutableStateOf(cachedMe?.about.orEmpty()) }
+    var showStatusSheet by remember { mutableStateOf(false) }
+    val statusScope = rememberCoroutineScope()
     LaunchedEffect(profileOwner) {
         // Re-fetch every time this tab is resumed so edits made in Edit profile show up.
         profileOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -1449,8 +1453,30 @@ private fun ProfileTab(
                 profileName = me.displayName?.takeIf { it.isNotBlank() } ?: profileName
                 com.aivora.app.data.local.InMemoryMeStore.replace(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
                 profileAvatar = me.avatarUrl
+                profileAbout = me.about.orEmpty()
             }
         }
+    }
+    if (showStatusSheet) {
+        ProfileStatusSheet(
+            current = profileAbout,
+            onDismiss = { showStatusSheet = false },
+            onSave = { value ->
+                showStatusSheet = false
+                val previous = profileAbout
+                profileAbout = value
+                statusScope.launch {
+                    val ok = runCatching {
+                        ChatRepository.api().putMe(com.aivora.app.data.model.MeUpdateBody(about = value))
+                    }.getOrNull()
+                    if (ok != null) {
+                        com.aivora.app.data.local.InMemoryMeStore.replace(ok.displayName, ok.about, ok.phoneDisplay ?: ok.phone, ok.avatarUrl)
+                    } else {
+                        profileAbout = previous
+                    }
+                }
+            },
+        )
     }
     val filteredSections = remember(query) {
         val all = listOf(
@@ -1572,18 +1598,21 @@ private fun ProfileTab(
                 .align(Alignment.CenterHorizontally)
                 .clip(RoundedCornerShape(AivoraDimens.RadiusFull))
                 .background(AivoraColors.SurfaceMuted)
-                .clickable { }
+                .clickable { showStatusSheet = true }
                 .padding(horizontal = 14.dp, vertical = AivoraDimens.Space2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Right now I’m…",
+                profileAbout.ifBlank { "Right now I’m…" },
                 style = MaterialTheme.typography.bodyMedium,
-                color = AivoraColors.TextSecondary,
+                color = if (profileAbout.isBlank()) AivoraColors.TextSecondary else AivoraColors.Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
             Spacer(modifier = Modifier.width(AivoraDimens.Space2))
             Icon(
-                painter = painterResource(AivoraIcons.Add),
+                painter = painterResource(if (profileAbout.isBlank()) AivoraIcons.Add else AivoraIcons.Edit),
                 contentDescription = null,
                 tint = AivoraColors.TextSecondary,
                 modifier = Modifier.size(16.dp),
@@ -1595,18 +1624,7 @@ private fun ProfileTab(
                 .padding(vertical = AivoraDimens.Space4),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                // Initials underneath so a slow/failed photo never leaves a blank gap.
-                Avatar(profileName.ifBlank { "You" }, size = 96)
-                if (!profileAvatar.isNullOrBlank()) {
-                    coil3.compose.AsyncImage(
-                        model = profileAvatar,
-                        contentDescription = null,
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                        modifier = Modifier.size(96.dp).clip(CircleShape),
-                    )
-                }
-            }
+            Avatar(profileName.ifBlank { "You" }, size = 96, imageUrl = profileAvatar)
             Spacer(modifier = Modifier.height(10.dp))
             Text(
                 profileName.ifBlank { " " },
@@ -1616,5 +1634,55 @@ private fun ProfileTab(
             )
         }
         SettingsList(filteredSections, modifier = Modifier.weight(1f))
+    }
+}
+
+
+@Composable
+private fun ProfileStatusSheet(
+    current: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var text by remember { mutableStateOf(current) }
+    val presets = listOf(
+        "Available", "Busy", "At school", "At the movies", "At work",
+        "Battery about to die", "In a meeting", "At the gym", "Sleeping", "Urgent calls only",
+    )
+    AivoraBottomSheet(onDismiss = onDismiss, title = "Your status") {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { if (it.length <= 139) text = it },
+            placeholder = { Text("Right now I’m…") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        presets.forEach { p ->
+            Text(
+                p,
+                style = MaterialTheme.typography.bodyLarge,
+                color = AivoraColors.Ink,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { text = p }
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            androidx.compose.material3.OutlinedButton(
+                onClick = { onSave("") },
+                modifier = Modifier.weight(1f),
+            ) { Text("Clear") }
+            androidx.compose.material3.Button(
+                onClick = { onSave(text.trim()) },
+                modifier = Modifier.weight(1f),
+            ) { Text("Save") }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }

@@ -380,21 +380,7 @@ fun YourDetailsScreen(
 
 @Composable
 internal fun ProfileAvatar(name: String, avatarUrl: String?, size: Int) {
-    var failed by remember(avatarUrl) { mutableStateOf(false) }
-    if (!avatarUrl.isNullOrBlank() && !failed) {
-        AsyncImage(
-            model = avatarUrl,
-            contentDescription = null,
-            onError = { failed = true },
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(size.dp)
-                .clip(CircleShape)
-                .background(AivoraColors.PrimarySoft),
-        )
-    } else {
-        Avatar(name, size = size)
-    }
+    Avatar(name, size = size, imageUrl = avatarUrl)
 }
 
 @Composable

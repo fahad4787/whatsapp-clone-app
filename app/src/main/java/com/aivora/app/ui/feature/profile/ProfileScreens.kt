@@ -3,7 +3,11 @@ package com.aivora.app.ui.feature.profile
 import com.aivora.app.ui.icons.AppIcons
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import com.aivora.app.ui.theme.AivoraColors
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aivora.app.data.ChatRepository
+import com.aivora.app.data.toLocalChat
 import com.aivora.app.data.call.ActiveCallSession
 import com.aivora.app.data.local.InMemoryChatStore
 import com.aivora.app.data.local.SessionStore
@@ -62,6 +67,14 @@ fun ProfileIdScreen(
     val chats by InMemoryChatStore.chats.collectAsState()
     val chat = remember(profileId, chats) {
         InMemoryChatStore.chat(profileId.ifBlank { "1" })
+    }
+    // Always show the contact's latest photo / status, even if the cached list is old.
+    androidx.compose.runtime.LaunchedEffect(profileId) {
+        if (useRemote && profileId.isNotBlank()) {
+            runCatching { api.getConversationsId(profileId) }.getOrNull()?.let { dto ->
+                InMemoryChatStore.upsertChat(dto.toLocalChat(), promote = false)
+            }
+        }
     }
     var showDisappearing by remember { mutableStateOf(false) }
     var showWallpaper by remember { mutableStateOf(false) }
@@ -116,13 +129,26 @@ fun ProfileIdScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Avatar(chat.title, size = 96)
+            Avatar(chat.title, size = 96, imageUrl = chat.avatarUrl)
             Spacer(Modifier.height(12.dp))
             Text(chat.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text(
                 chat.peerPhone?.takeIf { it.isNotBlank() } ?: "Phone hidden",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            chat.peerAbout?.let { about ->
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    about,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = AivoraColors.Ink,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AivoraColors.SurfaceMuted)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                )
+            }
         }
         SettingsList(
             listOf(

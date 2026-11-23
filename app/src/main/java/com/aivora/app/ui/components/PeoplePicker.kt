@@ -127,7 +127,7 @@ fun PeopleSelectList(
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Avatar(name, size = 40)
+                            Avatar(name, size = 40, imageUrl = user.avatarUrl)
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
@@ -163,6 +163,7 @@ fun PeopleTapList(
                         name = user.displayLabel(),
                         subtitle = user.phoneDisplay ?: user.phone ?: "",
                         onClick = { onPersonClick(user) },
+                        avatarUrl = user.avatarUrl,
                     )
                 }
             }

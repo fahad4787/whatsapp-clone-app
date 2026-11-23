@@ -209,7 +209,7 @@ fun SettingsQrScanScreen(
             runCatching {
                 api.getUsersId(userId)
                 val conv = api.postConversationsDirect(DirectBody(userId = userId))
-                InMemoryChatStore.upsertChat(conv.toLocalChat())
+                InMemoryChatStore.openNewDirect(conv.toLocalChat())
                 conv.id.orEmpty()
             }.onSuccess { chatId ->
                 busy = false
@@ -444,7 +444,7 @@ fun OpenUserLinkScreen(
         runCatching {
             api.getUsersId(userId)
             val conv = api.postConversationsDirect(DirectBody(userId = userId))
-            InMemoryChatStore.upsertChat(conv.toLocalChat())
+            InMemoryChatStore.openNewDirect(conv.toLocalChat())
             conv.id.orEmpty()
         }.onSuccess { chatId ->
             if (chatId.isBlank()) {

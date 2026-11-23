@@ -25,6 +25,8 @@ data class LocalChat(
     val peerUserId: String? = null,
     /** Peer phone for contact info (display). */
     val peerPhone: String? = null,
+    /** Peer's profile status ("about"), shown on Contact info. */
+    val peerAbout: String? = null,
     /** Group: "admin" | "member". */
     val myRole: String? = null,
     val description: String? = null,

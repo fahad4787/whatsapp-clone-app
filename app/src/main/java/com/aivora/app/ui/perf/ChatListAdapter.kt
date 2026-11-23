@@ -6,11 +6,15 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import coil3.dispose
+import coil3.load
 import com.aivora.app.data.local.LocalChat
 
 class ChatListAdapter(
@@ -39,7 +43,22 @@ class ChatListAdapter(
             setTextColor(NativeColors.White)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
             typeface = Typeface.DEFAULT_BOLD
+            layoutParams = FrameLayout.LayoutParams(dp(52), dp(52))
+        }
+        val avatarImage = ImageView(ctx).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            layoutParams = FrameLayout.LayoutParams(dp(52), dp(52))
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setOval(0, 0, view.width, view.height)
+                }
+            }
+            clipToOutline = true
+        }
+        val avatarBox = FrameLayout(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(dp(52), dp(52))
+            addView(avatar)
+            addView(avatarImage)
         }
         val mid = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
@@ -92,10 +111,10 @@ class ChatListAdapter(
             lp.topMargin = dp(6)
             layoutParams = lp
         })
-        row.addView(avatar)
+        row.addView(avatarBox)
         row.addView(mid)
         row.addView(end)
-        return Holder(row, avatar, title, preview, time, badge)
+        return Holder(row, avatar, avatarImage, title, preview, time, badge)
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
@@ -105,6 +124,7 @@ class ChatListAdapter(
     class Holder(
         itemView: View,
         private val avatar: TextView,
+        private val avatarImage: ImageView,
         private val title: TextView,
         private val preview: TextView,
         private val time: TextView,
@@ -121,6 +141,16 @@ class ChatListAdapter(
             avatar.background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(avatarColor(chat.title))
+            }
+            avatarImage.setImageDrawable(null)
+            val url = chat.avatarUrl
+            if (!url.isNullOrBlank()) {
+                val px = (104 * d).toInt()
+                avatarImage.load(url) {
+                    size(px, px)
+                }
+            } else {
+                avatarImage.dispose()
             }
             title.text = buildString {
                 append(chat.title)
@@ -185,6 +215,7 @@ class ChatListAdapter(
             override fun areItemsTheSame(a: LocalChat, b: LocalChat) = a.id == b.id
             override fun areContentsTheSame(a: LocalChat, b: LocalChat) =
                 a.title == b.title &&
+                    a.avatarUrl == b.avatarUrl &&
                     a.preview == b.preview &&
                     a.lastMine == b.lastMine &&
                     a.lastStatus == b.lastStatus &&

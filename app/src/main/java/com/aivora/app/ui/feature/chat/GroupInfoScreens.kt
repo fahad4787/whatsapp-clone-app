@@ -150,7 +150,7 @@ fun GroupInfoScreen(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Avatar(title, size = 96)
+                Avatar(title, size = 96, imageUrl = conv?.avatarUrl ?: conv?.avatarThumb ?: InMemoryChatStore.chat(chatId).avatarUrl)
                 Spacer(Modifier.height(12.dp))
                 Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text(
@@ -277,7 +277,7 @@ fun GroupInfoScreen(
                         .padding(horizontal = 24.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(name, size = 44)
+                    Avatar(name, size = 44, imageUrl = member.user?.avatarUrl)
                     Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
                         Text(name, fontWeight = FontWeight.Medium)
                         if (role.equals("admin", ignoreCase = true)) {

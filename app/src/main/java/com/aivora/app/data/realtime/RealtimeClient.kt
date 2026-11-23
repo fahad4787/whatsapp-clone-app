@@ -356,6 +356,16 @@ object RealtimeClient {
                     }
                 }
             }
+            "profile" -> {
+                val obj = frame.data?.jsonObject ?: return
+                val userId = obj.string("user_id") ?: return
+                com.aivora.app.data.local.InMemoryChatStore.applyPeerProfile(
+                    userId = userId,
+                    displayName = obj.string("display_name"),
+                    about = obj.string("about"),
+                    avatarUrl = obj.string("avatar_url"),
+                )
+            }
             "presence_snapshot" -> {
                 val obj = frame.data?.jsonObject ?: return
                 val conversationId = obj.string("conversation_id") ?: return

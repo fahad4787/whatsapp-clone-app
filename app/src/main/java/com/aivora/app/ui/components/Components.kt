@@ -49,7 +49,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -509,16 +512,31 @@ fun Avatar(
     size: Int = 48,
     color: Color = AivoraColors.Primary,
     modifier: Modifier = Modifier,
+    /** Profile photo. While it loads we show a plain soft circle (never initials that then swap). */
+    imageUrl: String? = null,
 ) {
     val brush = remember(name) { avatarBrush(name.ifBlank { "A" }) }
+    var failed by remember(imageUrl) { mutableStateOf(false) }
+    val showImage = !imageUrl.isNullOrBlank() && !failed
     Box(
         modifier = modifier
             .size(size.dp)
             .clip(CircleShape)
-            .background(brush),
+            .then(
+                if (showImage) Modifier.background(AivoraColors.PrimarySoft)
+                else Modifier.background(brush),
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        if (name.isBlank()) {
+        if (showImage) {
+            coil3.compose.AsyncImage(
+                model = imageUrl,
+                contentDescription = null,
+                onError = { failed = true },
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (name.isBlank()) {
             Icon(AppIcons.Person, contentDescription = null, tint = Color.White)
         } else {
             Text(
@@ -540,6 +558,7 @@ fun PersonRow(
     onClick: () -> Unit,
     trailing: @Composable (() -> Unit)? = null,
     leadingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    avatarUrl: String? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     Row(
@@ -560,7 +579,7 @@ fun PersonRow(
                 contentAlignment = Alignment.Center,
             ) { Icon(leadingIcon, contentDescription = null, tint = Color.White) }
         } else {
-            Avatar(name)
+            Avatar(name, imageUrl = avatarUrl)
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
