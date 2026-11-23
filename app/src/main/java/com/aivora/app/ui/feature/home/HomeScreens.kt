@@ -1655,21 +1655,15 @@ private fun ProfileStatusSheet(
             onValueChange = { if (it.length <= 139) text = it },
             placeholder = { Text("Right now I’m…") },
             singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+            ),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                onDone = { onSave(text.trim()) },
+            ),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        presets.forEach { p ->
-            Text(
-                p,
-                style = MaterialTheme.typography.bodyLarge,
-                color = AivoraColors.Ink,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { text = p }
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1682,6 +1676,18 @@ private fun ProfileStatusSheet(
                 onClick = { onSave(text.trim()) },
                 modifier = Modifier.weight(1f),
             ) { Text("Save") }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        presets.forEach { p ->
+            Text(
+                p,
+                style = MaterialTheme.typography.bodyLarge,
+                color = AivoraColors.Ink,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { text = p }
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+            )
         }
         Spacer(modifier = Modifier.height(12.dp))
     }

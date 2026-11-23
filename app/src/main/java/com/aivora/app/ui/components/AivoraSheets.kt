@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -68,6 +69,7 @@ fun aivoraSystemNavClearance(): Dp {
  * Bottom sheet in the *activity* window (Popup), so [WindowInsets.navigationBars]
  * match the bottom nav. Dialog windows report 0 insets and cover system nav.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AivoraBottomSheet(
     onDismiss: () -> Unit,
@@ -93,12 +95,15 @@ fun AivoraBottomSheet(
         }
     }
 
+    // While the keyboard is up, Back should only hide the keyboard (like WhatsApp),
+    // not close the sheet and lose what was typed.
+    val imeVisible = androidx.compose.foundation.layout.WindowInsets.isImeVisible
     Popup(
         onDismissRequest = onDismiss,
         popupPositionProvider = positionProvider,
         properties = PopupProperties(
             focusable = true,
-            dismissOnBackPress = true,
+            dismissOnBackPress = !imeVisible,
             dismissOnClickOutside = true,
             clippingEnabled = false,
         ),
