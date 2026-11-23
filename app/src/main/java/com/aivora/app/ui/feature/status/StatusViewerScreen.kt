@@ -502,7 +502,7 @@ fun StatusViewerScreen(
                                     .padding(horizontal = 8.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Avatar(name = name, size = 44)
+                                Avatar(name = name, size = 44, imageUrl = v.user?.avatarUrl, userId = v.user?.id)
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(

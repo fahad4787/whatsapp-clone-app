@@ -190,7 +190,7 @@ fun IncomingCallOverlay(
                         .clip(CircleShape)
                         .background(AivoraColors.Primary.copy(alpha = 0.08f)),
                 )
-                Avatar(name, size = 160)
+                Avatar(name, size = 160, imageUrl = call.caller?.avatarUrl)
             }
             Spacer(Modifier.height(28.dp))
             Text(

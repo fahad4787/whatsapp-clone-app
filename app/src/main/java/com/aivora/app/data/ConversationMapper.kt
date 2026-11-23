@@ -59,7 +59,7 @@ internal fun chatListTime(iso: String?): String = runCatching {
     val z = java.time.Instant.parse(iso).atZone(java.time.ZoneId.systemDefault())
     val today = java.time.LocalDate.now(z.zone)
     when (z.toLocalDate()) {
-        today -> java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(z)
+        today -> com.aivora.app.data.ClockFormat.format(z)
         today.minusDays(1) -> "Yesterday"
         else -> java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy").format(z)
     }

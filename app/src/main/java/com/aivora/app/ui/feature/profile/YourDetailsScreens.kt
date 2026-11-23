@@ -1,5 +1,6 @@
 package com.aivora.app.ui.feature.profile
 
+import androidx.activity.compose.BackHandler
 import com.aivora.app.ui.icons.AppIcons
 
 import android.net.Uri
@@ -157,6 +158,7 @@ fun YourDetailsScreen(
         applyUser(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
     }
 
+    BackHandler(enabled = showCrop && !saving) { showCrop = false }
     if (showCrop) {
         EditPhotoCropScreen(
             name = name.ifBlank { "A" },

@@ -49,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -278,22 +279,21 @@ fun SettingsCard(
 fun SettingsList(
     sections: List<Pair<String?, List<SettingsItem>>>,
     modifier: Modifier = Modifier,
+    header: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     // Settings sections are short — Column scroll (F11) beats LazyColumn recycle on Mate.
     AivoraScrollColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(
-                horizontal = AivoraDimens.CardHorizontal,
-                vertical = AivoraDimens.Space2,
-            ),
+            .padding(vertical = AivoraDimens.Space2),
         verticalArrangement = Arrangement.spacedBy(AivoraDimens.Space2),
     ) {
-        sections.forEach { (header, items) ->
-            Column {
-                if (header != null) {
+        header?.invoke(this)
+        sections.forEach { (sectionTitle, items) ->
+            Column(modifier = Modifier.padding(horizontal = AivoraDimens.CardHorizontal)) {
+                if (sectionTitle != null) {
                     Text(
-                        header,
+                        sectionTitle,
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.SemiBold,
@@ -506,6 +506,27 @@ private fun avatarBrush(name: String): Brush {
     return Brush.linearGradient(listOf(pair.first, pair.second))
 }
 
+/**
+ * Finds a profile photo we already know about (chat list, my profile) so every screen that only
+ * has a name or user id still shows the real picture instead of an initial.
+ */
+@Composable
+fun rememberKnownAvatarUrl(explicit: String?, userId: String?, name: String): String? {
+    if (!explicit.isNullOrBlank()) return explicit
+    val chats by com.aivora.app.data.local.InMemoryChatStore.chats.collectAsState()
+    val me = com.aivora.app.data.local.InMemoryMeStore.me
+    return remember(chats, me, userId, name) {
+        val n = name.trim()
+        when {
+            me != null && !me.avatarUrl.isNullOrBlank() &&
+                (n.equals("You", true) || (n.isNotEmpty() && n.equals(me.displayName.trim(), true))) -> me.avatarUrl
+            !userId.isNullOrBlank() -> chats.firstOrNull { it.peerUserId == userId && !it.avatarUrl.isNullOrBlank() }?.avatarUrl
+            n.isNotEmpty() -> chats.firstOrNull { it.title.trim().equals(n, true) && !it.avatarUrl.isNullOrBlank() }?.avatarUrl
+            else -> null
+        }
+    }
+}
+
 @Composable
 fun Avatar(
     name: String,
@@ -514,10 +535,14 @@ fun Avatar(
     modifier: Modifier = Modifier,
     /** Profile photo. While it loads we show a plain soft circle (never initials that then swap). */
     imageUrl: String? = null,
+    /** Optional user id, used to find a known photo when [imageUrl] is not passed. */
+    userId: String? = null,
 ) {
     val brush = remember(name) { avatarBrush(name.ifBlank { "A" }) }
-    var failed by remember(imageUrl) { mutableStateOf(false) }
-    val showImage = !imageUrl.isNullOrBlank() && !failed
+    val known = rememberKnownAvatarUrl(imageUrl, userId, name)
+    val photo = imageUrl?.takeIf { it.isNotBlank() } ?: known
+    var failed by remember(photo) { mutableStateOf(false) }
+    val showImage = !photo.isNullOrBlank() && !failed
     Box(
         modifier = modifier
             .size(size.dp)
@@ -530,7 +555,7 @@ fun Avatar(
     ) {
         if (showImage) {
             coil3.compose.AsyncImage(
-                model = imageUrl,
+                model = photo,
                 contentDescription = null,
                 onError = { failed = true },
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
@@ -632,6 +657,7 @@ fun PrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     @DrawableRes iconRes: Int? = null,
+    destructive: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     Button(
@@ -643,7 +669,7 @@ fun PrimaryButton(
             .height(52.dp)
             .pressScale(interaction, pressedScale = 0.98f),
         colors = ButtonDefaults.buttonColors(
-            containerColor = AivoraColors.Primary,
+            containerColor = if (destructive) AivoraColors.Danger else AivoraColors.Primary,
             contentColor = AivoraColors.OnPrimary,
             disabledContainerColor = if (AivoraColors.isDark) Color(0xFF2A3139) else Color(0xFFE9ECEA),
             disabledContentColor = AivoraColors.TextTertiary,
@@ -680,3 +706,19 @@ fun InfoBanner(text: String) {
     )
 }
 
+
+
+/** Themed loading indicator used in place of plain "Loading…" text. */
+@Composable
+fun LoadingState(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.fillMaxWidth().heightIn(min = 160.dp).padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.CircularProgressIndicator(
+            color = AivoraColors.Primary,
+            strokeWidth = 3.dp,
+            modifier = Modifier.size(32.dp),
+        )
+    }
+}

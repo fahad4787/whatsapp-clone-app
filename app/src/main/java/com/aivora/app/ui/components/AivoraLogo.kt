@@ -121,6 +121,8 @@ fun StatusRingAvatar(
     size: Dp = 52.dp,
     segmentCount: Int = 1,
     modifier: Modifier = Modifier,
+    userId: String? = null,
+    imageUrl: String? = null,
 ) {
     val ring = if (hasUnseen) AivoraColors.Primary else Color.Gray.copy(alpha = 0.35f)
     val stroke = (size.value * 0.06f).dp
@@ -137,7 +139,7 @@ fun StatusRingAvatar(
                     .padding(stroke),
                 contentAlignment = Alignment.Center,
             ) {
-                Avatar(name = name, size = (size.value * 0.78f).toInt())
+                Avatar(name = name, size = (size.value * 0.78f).toInt(), imageUrl = imageUrl, userId = userId)
             }
         } else {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -156,7 +158,7 @@ fun StatusRingAvatar(
                     start += sweep + gapDeg
                 }
             }
-            Avatar(name = name, size = (size.value * 0.72f).toInt())
+            Avatar(name = name, size = (size.value * 0.72f).toInt(), imageUrl = imageUrl, userId = userId)
         }
     }
 }

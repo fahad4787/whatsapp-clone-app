@@ -2,6 +2,7 @@ package com.aivora.app.ui.feature.chat
 
 import com.aivora.app.ui.icons.AppIcons
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -128,7 +129,37 @@ fun MessageInfoChatMessageScreen(
                 CircularProgressIndicator(color = AivoraColors.Primary)
             }
             else -> {
+                val local = remember(chatId, messageId) {
+                    com.aivora.app.data.local.InMemoryChatStore.messages(chatId).value
+                        .firstOrNull { it.id == messageId }
+                }
                 AivoraScrollColumn(modifier = Modifier.fillMaxSize()) {
+                    if (local != null) {
+                        val preview = local.body.ifBlank { local.fileName ?: "Media" }
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            contentAlignment = Alignment.CenterEnd,
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .background(
+                                        AivoraColors.Primary.copy(alpha = 0.12f),
+                                        RoundedCornerShape(14.dp),
+                                    )
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                            ) {
+                                Text(preview, color = AivoraColors.Ink, maxLines = 4)
+                                Text(
+                                    local.time,
+                                    color = AivoraColors.TextSecondary,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.align(Alignment.End).padding(top = 4.dp),
+                                )
+                            }
+                        }
+                    }
                     ReceiptSection("Read by", "No one has read this yet", loaded.read)
                     ReceiptSection("Delivered to", "Not delivered to anyone yet", loaded.delivered)
                 }
@@ -159,7 +190,7 @@ private fun ReceiptSection(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Avatar(name, size = 40)
+                Avatar(name, size = 40, userId = r.userId)
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(name, fontWeight = FontWeight.SemiBold, color = AivoraColors.Ink)
                     formatReceiptTime(r.at)?.let {

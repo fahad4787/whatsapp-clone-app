@@ -106,7 +106,7 @@ fun ChannelsScreen(
             "Search channels",
         )
         when {
-            loading -> EmptyState("Loading…", "Fetching channels")
+            loading -> com.aivora.app.ui.components.LoadingState()
             error != null && channels.isEmpty() -> EmptyState("Couldn’t load", error!!)
             channels.isEmpty() -> EmptyState("No channels match.", "Try a different search.")
             else -> AivoraScrollColumn(modifier = Modifier.fillMaxSize()) {

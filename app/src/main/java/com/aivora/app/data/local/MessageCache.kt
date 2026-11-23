@@ -261,7 +261,7 @@ object MessageCache {
         body = body,
         time = createdAtIso?.takeIf { it.length >= 16 }?.let { iso ->
             runCatching {
-                java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(
+                com.aivora.app.data.ClockFormat.format(
                     java.time.Instant.parse(iso).atZone(java.time.ZoneId.systemDefault()),
                 )
             }.getOrNull()

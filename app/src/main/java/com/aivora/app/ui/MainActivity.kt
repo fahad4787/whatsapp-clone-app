@@ -130,6 +130,8 @@ fun AivoraAppRoot(
                     IncomingCallOverlay(
                         onNavigate = { route -> navController.navigate(route) },
                     )
+                    com.aivora.app.ui.feature.chat.MuteDurationHost()
+            com.aivora.app.ui.feature.chat.ConfirmActionHost()
                 }
             }
         }

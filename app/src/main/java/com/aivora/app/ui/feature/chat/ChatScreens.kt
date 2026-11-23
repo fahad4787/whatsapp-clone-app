@@ -89,7 +89,10 @@ import android.content.Intent
 import android.media.MediaPlayer
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Photo
@@ -221,6 +224,14 @@ fun ChatIdScreen(
     // restart header / menus / composer / dialogs.
     var searchQuery by remember(chatId) { mutableStateOf("") }
     var showSearch by remember(chatId) { mutableStateOf(false) }
+    val searchFocus = remember { FocusRequester() }
+    BackHandler(enabled = showSearch) {
+        showSearch = false
+        searchQuery = ""
+    }
+    LaunchedEffect(showSearch) {
+        if (showSearch) runCatching { searchFocus.requestFocus() }
+    }
     var peerTyping by remember(chatId) { mutableStateOf(false) }
     var showAttach by remember { mutableStateOf(false) }
     var showStickers by remember { mutableStateOf(false) }
@@ -605,6 +616,7 @@ fun ChatIdScreen(
                     avatarUrl = chat.avatarUrl,
                     subtitle = subtitle,
                     showTyping = peerTyping,
+                    online = peerOnline,
                     muted = chat.isMuted,
                     menuExpanded = showChatMenu,
                     onMenuExpandedChange = { showChatMenu = it },
@@ -718,6 +730,7 @@ fun ChatIdScreen(
                             onValueChange = { searchQuery = it },
                             modifier = Modifier
                                 .weight(1f)
+                                .focusRequester(searchFocus)
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(AivoraColors.ComposerFill)
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -1973,6 +1986,7 @@ private fun ChatHeader(
     avatarUrl: String? = null,
     subtitle: String,
     showTyping: Boolean,
+    online: Boolean = false,
     muted: Boolean = false,
     menuExpanded: Boolean,
     onMenuExpandedChange: (Boolean) -> Unit,
@@ -2006,15 +2020,17 @@ private fun ChatHeader(
         ) {
             Box {
                 Avatar(title, size = 40, imageUrl = avatarUrl)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 1.dp, bottom = 1.dp)
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(AivoraColors.Primary)
-                        .border(1.5.dp, Color.White, CircleShape),
-                )
+                if (online) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 1.dp, bottom = 1.dp)
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(AivoraColors.Primary)
+                            .border(1.5.dp, Color.White, CircleShape),
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -2042,7 +2058,7 @@ private fun ChatHeader(
                     Text(
                         subtitle,
                         style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-                        color = if (showTyping) AivoraColors.Primary else AivoraColors.Online,
+                        color = if (showTyping || online) AivoraColors.Primary else AivoraColors.TextSecondary,
                         maxLines = 1,
                         softWrap = false,
                         overflow = TextOverflow.Ellipsis,
@@ -3358,11 +3374,7 @@ private fun StickerPickerSheet(
     }
     AivoraBottomSheet(onDismiss = onDismiss, title = "Stickers") {
         when {
-            loading -> Text(
-                "Loading…",
-                color = AivoraColors.TextSecondary,
-                modifier = Modifier.padding(16.dp),
-            )
+            loading -> com.aivora.app.ui.components.LoadingState()
             packs.isEmpty() -> Text(
                 "No stickers",
                 color = AivoraColors.TextSecondary,

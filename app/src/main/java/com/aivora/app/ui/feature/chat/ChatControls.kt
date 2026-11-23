@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -103,22 +104,34 @@ object ChatControls {
         }.isSuccess
     }
 
+    class ConfirmRequest(
+        val title: String,
+        val message: String,
+        val confirmLabel: String,
+        val destructive: Boolean,
+        val onConfirm: () -> Unit,
+    )
+
+    /** Pending confirmation (block / report); rendered by [ConfirmActionHost] at the app root. */
+    val confirmRequest = androidx.compose.runtime.mutableStateOf<ConfirmRequest?>(null)
+
+    fun confirm(
+        title: String,
+        message: String,
+        confirmLabel: String,
+        destructive: Boolean = true,
+        onConfirm: () -> Unit,
+    ) {
+        confirmRequest.value = ConfirmRequest(title, message, confirmLabel, destructive, onConfirm)
+    }
+
+    /** Pending mute-duration request; rendered by [MuteDurationHost] at the app root. */
+    val muteRequest = androidx.compose.runtime.mutableStateOf<((Long) -> Unit)?>(null)
+
     /** WhatsApp-style duration picker; [onPick] gets seconds (Long.MAX_VALUE = always). */
+    @Suppress("UNUSED_PARAMETER")
     fun pickMuteDuration(context: android.content.Context, onPick: (Long) -> Unit) {
-        val labels = arrayOf("8 hours", "1 week", "Always")
-        val secs = longArrayOf(8 * 3600L, 7 * 24 * 3600L, Long.MAX_VALUE)
-        android.app.AlertDialog.Builder(
-            context,
-            if (com.aivora.app.ui.theme.AivoraColors.isDark) {
-                android.R.style.Theme_DeviceDefault_Dialog_Alert
-            } else {
-                android.R.style.Theme_DeviceDefault_Light_Dialog_Alert
-            },
-        )
-            .setTitle("Mute notifications")
-            .setItems(labels) { _, i -> onPick(secs[i]) }
-            .setNegativeButton("Cancel", null)
-            .show()
+        muteRequest.value = onPick
     }
 
     /** Mute (with [durationSec]) when currently unmuted, otherwise unmute. */
@@ -415,13 +428,19 @@ object ChatControls {
                 add(
                     AivoraSheetAction("Block", AppIcons.Block, danger = true) {
                         onDismiss()
-                        scope.launch {
-                            val ok = block(api, useRemote, chat)
-                            Toast.makeText(
-                                context,
-                                if (ok) "Contact blocked" else "Could not block",
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                        confirm(
+                            "Block ${chat.title}?",
+                            "Blocked contacts can't message or call you.",
+                            "Block",
+                        ) {
+                            scope.launch {
+                                val ok = block(api, useRemote, chat)
+                                Toast.makeText(
+                                    context,
+                                    if (ok) "Contact blocked" else "Could not block",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
                         }
                     },
                 )
@@ -644,6 +663,84 @@ fun ChatWallpaperDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
+                Text("Cancel", color = AivoraColors.TextSecondary)
+            }
+        },
+    )
+}
+
+@Composable
+fun MuteDurationHost() {
+    val request = ChatControls.muteRequest.value ?: return
+    val themeMode by com.aivora.app.data.local.AppearancePrefs.themeFlow.collectAsState()
+    val dark = com.aivora.app.data.local.AppearancePrefs.resolveDark(themeMode, isSystemInDarkTheme())
+    val ink = if (dark) Color.White else AivoraColors.Ink
+    val close = { ChatControls.muteRequest.value = null }
+    val options = listOf(
+        "8 hours" to 8 * 3600L,
+        "1 week" to 7 * 24 * 3600L,
+        "Always" to Long.MAX_VALUE,
+    )
+    AlertDialog(
+        onDismissRequest = close,
+        shape = RoundedCornerShape(20.dp),
+        containerColor = if (dark) AivoraColors.DarkSurface else AivoraColors.LightSurface,
+        title = { Text("Mute notifications", fontWeight = FontWeight.Bold, color = ink) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                options.forEach { (label, secs) ->
+                    Text(
+                        label,
+                        color = ink,
+                        fontSize = 16.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                close()
+                                request(secs)
+                            }
+                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = close) {
+                Text("Cancel", color = AivoraColors.TextSecondary)
+            }
+        },
+    )
+}
+
+@Composable
+fun ConfirmActionHost() {
+    val request = ChatControls.confirmRequest.value ?: return
+    val themeMode by com.aivora.app.data.local.AppearancePrefs.themeFlow.collectAsState()
+    val dark = com.aivora.app.data.local.AppearancePrefs.resolveDark(themeMode, isSystemInDarkTheme())
+    val ink = if (dark) Color.White else AivoraColors.Ink
+    val close = { ChatControls.confirmRequest.value = null }
+    AlertDialog(
+        onDismissRequest = close,
+        shape = RoundedCornerShape(20.dp),
+        containerColor = if (dark) AivoraColors.DarkSurface else AivoraColors.LightSurface,
+        title = { Text(request.title, fontWeight = FontWeight.Bold, color = ink) },
+        text = { Text(request.message, color = AivoraColors.TextSecondary, fontSize = 15.sp) },
+        confirmButton = {
+            TextButton(onClick = {
+                close()
+                request.onConfirm()
+            }) {
+                Text(
+                    request.confirmLabel,
+                    color = if (request.destructive) androidx.compose.material3.MaterialTheme.colorScheme.error else AivoraColors.Primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = close) {
                 Text("Cancel", color = AivoraColors.TextSecondary)
             }
         },

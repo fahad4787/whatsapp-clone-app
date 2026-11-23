@@ -271,7 +271,7 @@ fun GroupInfoScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(enabled = isAdmin && uid != null && uid != myId) {
+                        .clickable(enabled = uid != null && uid != myId) {
                             memberTarget = member
                         }
                         .padding(horizontal = 24.dp, vertical = 12.dp),
@@ -397,6 +397,23 @@ fun GroupInfoScreen(
             AivoraSheetActionList(
                 actions = buildList {
                     add(
+                        AivoraSheetAction("Message $name", AppIcons.Chat) {
+                            memberTarget = null
+                            scope.launch {
+                                runCatching {
+                                    api.postConversationsDirect(
+                                        com.aivora.app.data.model.DirectBody(userId = uid),
+                                    )
+                                }.onSuccess { conv ->
+                                    com.aivora.app.data.local.InMemoryChatStore.openNewDirect(conv.toLocalChat())
+                                    onNavigate(Routes.ChatId.replace("{id}", conv.id.orEmpty()))
+                                }.onFailure {
+                                    Toast.makeText(context, "Could not open chat", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                    )
+                    if (isAdmin) add(
                         AivoraSheetAction(
                             if (isTargetAdmin) "Dismiss as admin" else "Make group admin",
                             AppIcons.Edit,
@@ -416,7 +433,7 @@ fun GroupInfoScreen(
                             }
                         },
                     )
-                    add(
+                    if (isAdmin) add(
                         AivoraSheetAction("Remove from group", AppIcons.Delete, danger = true) {
                             memberTarget = null
                             scope.launch {

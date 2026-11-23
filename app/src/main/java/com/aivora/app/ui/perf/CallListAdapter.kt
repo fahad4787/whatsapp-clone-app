@@ -6,7 +6,14 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
+import androidx.core.widget.ImageViewCompat
+import coil3.dispose
+import coil3.load
+import coil3.request.crossfade
+import com.aivora.app.R
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -19,6 +26,7 @@ data class CallListItem(
     val missed: Boolean,
     val video: Boolean,
     val time: String,
+    val avatarUrl: String? = null,
 )
 
 class CallListAdapter(
@@ -46,7 +54,22 @@ class CallListAdapter(
             setTextColor(NativeColors.White)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             typeface = Typeface.DEFAULT_BOLD
+            layoutParams = FrameLayout.LayoutParams(dp(44), dp(44))
+        }
+        val avatarImage = ImageView(ctx).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            layoutParams = FrameLayout.LayoutParams(dp(44), dp(44))
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setOval(0, 0, view.width, view.height)
+                }
+            }
+            clipToOutline = true
+        }
+        val avatarBox = FrameLayout(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+            addView(avatar)
+            addView(avatarImage)
         }
         val mid = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
@@ -72,28 +95,35 @@ class CallListAdapter(
         val end = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.END
+            minimumWidth = dp(64)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
         }
         val time = TextView(ctx).apply {
             setTextColor(NativeColors.TextSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            maxLines = 1
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).also { it.gravity = Gravity.END }
         }
-        val icon = TextView(ctx).apply {
-            setTextColor(NativeColors.Primary)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        val icon = ImageView(ctx).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
         }
         end.addView(time)
         end.addView(icon.apply {
-            val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
+            val lp = LinearLayout.LayoutParams(dp(22), dp(22))
+            lp.gravity = Gravity.END
             lp.topMargin = dp(4)
             layoutParams = lp
         })
-        row.addView(avatar)
+        row.addView(avatarBox)
         row.addView(mid)
         row.addView(end)
-        return Holder(row, avatar, name, detail, time, icon)
+        return Holder(row, avatar, avatarImage, name, detail, time, icon)
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
@@ -103,10 +133,11 @@ class CallListAdapter(
     class Holder(
         itemView: View,
         private val avatar: TextView,
+        private val avatarImage: ImageView,
         private val name: TextView,
         private val detail: TextView,
         private val time: TextView,
-        private val icon: TextView,
+        private val icon: ImageView,
     ) : RecyclerView.ViewHolder(itemView) {
         fun bind(item: CallListItem, onClick: (CallListItem) -> Unit) {
             val letter = item.name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
@@ -115,11 +146,25 @@ class CallListAdapter(
                 shape = GradientDrawable.OVAL
                 setColor(NativeColors.Primary)
             }
+            val url = item.avatarUrl?.takeIf { it.isNotBlank() }
+            avatarImage.setImageDrawable(null)
+            if (url != null) {
+                avatarImage.load(url) {
+                    crossfade(false)
+                    size((44 * itemView.resources.displayMetrics.density).toInt())
+                }
+            } else {
+                avatarImage.dispose()
+            }
             name.text = item.name
             name.setTextColor(if (item.missed) NativeColors.Danger else NativeColors.Ink)
             detail.text = item.detail
             time.text = item.time
-            icon.text = if (item.video) "📹" else "📞"
+            icon.setImageResource(if (item.video) R.drawable.ic_aivora_video else R.drawable.ic_aivora_call)
+            ImageViewCompat.setImageTintList(
+                icon,
+                android.content.res.ColorStateList.valueOf(if (item.missed) NativeColors.Danger else NativeColors.Primary),
+            )
             itemView.setOnClickListener { onClick(item) }
         }
     }

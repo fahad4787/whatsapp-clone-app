@@ -2,6 +2,7 @@ package com.aivora.app.ui.feature.settings
 
 import com.aivora.app.ui.icons.AppIcons
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
@@ -1185,11 +1186,7 @@ fun SettingsStarredScreen(
     AivoraScaffold(title = "Starred messages", onBack = onBack) {
         when {
             loading -> {
-                Text(
-                    "Loading…",
-                    color = AivoraColors.TextSecondary,
-                    modifier = Modifier.padding(24.dp),
-                )
+                com.aivora.app.ui.components.LoadingState()
             }
             starred.isEmpty() -> {
                 EmptyState(
@@ -1815,7 +1812,7 @@ fun SettingsTwoStepScreen(
         SettingsHeroIntro(
             iconRes = AivoraIcons.Lock,
             title = when {
-                loading -> "Loading…"
+                loading -> "Two-step verification"
                 enabled -> "Two-step verification is enabled"
                 else -> "Protect your account"
             },
@@ -1922,11 +1919,7 @@ fun SettingsBlockedScreen(
         Spacer(Modifier.height(8.dp))
         when {
             loading -> {
-                Text(
-                    "Loading…",
-                    color = AivoraColors.TextSecondary,
-                    modifier = Modifier.padding(24.dp),
-                )
+                com.aivora.app.ui.components.LoadingState()
             }
             blocked.isEmpty() -> {
                 EmptyState(
@@ -1950,6 +1943,7 @@ fun SettingsBlockedScreen(
                             ?: "Contact"
                         PersonRow(
                             name = name,
+                            avatarUrl = item.user?.avatarUrl,
                             subtitle = "Blocked · Tap to unblock",
                             onClick = {
                                 val id = item.id ?: return@PersonRow
@@ -2021,11 +2015,7 @@ fun SettingsDevicesScreen(
             ),
         )
         when {
-            loading -> Text(
-                "Loading…",
-                color = AivoraColors.TextSecondary,
-                modifier = Modifier.padding(24.dp),
-            )
+            loading -> com.aivora.app.ui.components.LoadingState()
             error != null && devices.isEmpty() -> Text(
                 error!!,
                 color = AivoraColors.Danger,
@@ -2479,11 +2469,7 @@ fun SettingsCommunitiesScreen(
     AivoraScaffold(title = "Communities", onBack = onBack) {
         InfoBanner("A community keeps related groups together with one announcement group.")
         when {
-            loading -> Text(
-                "Loading…",
-                color = AivoraColors.TextSecondary,
-                modifier = Modifier.padding(24.dp),
-            )
+            loading -> com.aivora.app.ui.components.LoadingState()
             else -> SettingsList(
                 listOf(
                     null to buildList {
@@ -2653,7 +2639,13 @@ fun SettingsDeleteAccountScreen(
         }
         PrimaryButton(
             text = if (busy) "Deleting…" else "Delete my account",
+            destructive = true,
             onClick = {
+              com.aivora.app.ui.feature.chat.ChatControls.confirm(
+                "Delete your account?",
+                "This permanently deletes your account, chats and data. It cannot be undone.",
+                "Delete",
+              ) {
                 busy = true
                 error = null
                 scope.launch {
@@ -2677,6 +2669,7 @@ fun SettingsDeleteAccountScreen(
                     }.onFailure { error = it.message ?: "Delete failed" }
                     busy = false
                 }
+              }
             },
             enabled = canDelete,
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
@@ -2992,6 +2985,7 @@ fun SettingsAccountEmailScreen(
                     awaitingCode = false
                 },
                 enabled = !verified && !busy && !loading,
+                placeholder = { Text("name@example.com", color = AivoraColors.TextTertiary) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 modifier = Modifier.fillMaxWidth(),
@@ -3103,6 +3097,7 @@ fun SettingsAccountEmailScreen(
         } else {
             PrimaryButton(
                 text = if (busy) "Sending…" else "Send verification",
+                enabled = !busy && email.contains("@") && email.substringAfter("@").contains("."),
                 onClick = {
                     if (busy || !email.contains("@")) return@PrimaryButton
                     busy = true
@@ -3844,6 +3839,7 @@ fun SettingsChatsExportScreen(
     var selectedId by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     val selected = chats.firstOrNull { it.id == selectedId }
+    BackHandler(enabled = selected != null) { selectedId = null }
 
     fun runExport(includeMedia: Boolean) {
         val chat = selected ?: return
@@ -5154,16 +5150,10 @@ fun SettingsPrivacyLiveLocationScreen(
     LaunchedEffect(Unit) { reload() }
 
     AivoraScaffold(title = "Live location", onBack = onBack) {
-        InfoBanner(
-            if (items.isEmpty()) "You’re not sharing live location right now."
-            else "Active shares update while the app is open.",
-        )
+        if (items.isNotEmpty()) InfoBanner("Active shares update while the app is open.")
         when {
-            loading -> Text(
-                "Loading…",
-                color = AivoraColors.TextSecondary,
-                modifier = Modifier.padding(24.dp),
-            )
+            loading -> com.aivora.app.ui.components.LoadingState()
+            items.isEmpty() -> EmptyState("No active live location", "Share it from the attach menu inside a chat.")
             else -> SettingsList(
                 listOf(
                     null to buildList {

@@ -440,7 +440,20 @@ class ChatMessageAdapter(
                 }
                 msg.mediaKind == LocalMediaKind.File -> {
                     fileRow.visibility = View.VISIBLE
-                    fileName.text = msg.fileName ?: msg.body.ifBlank { "Document" }
+                    val docName = msg.fileName ?: msg.body.ifBlank { "Document" }
+                    val docExt = docName.substringAfterLast('.', "").uppercase()
+                    fileName.text = android.text.SpannableStringBuilder(docName).also { sb ->
+                        if (docExt.isNotEmpty() && docExt.length <= 5) {
+                            sb.append('\n')
+                            val from = sb.length
+                            sb.append("$docExt document")
+                            sb.setSpan(android.text.style.RelativeSizeSpan(0.82f), from, sb.length, 0)
+                            sb.setSpan(
+                                android.text.style.ForegroundColorSpan(NativeColors.TextSecondary),
+                                from, sb.length, 0,
+                            )
+                        }
+                    }
                     fileRow.setOnClickListener {
                         val url = msg.mediaUri ?: return@setOnClickListener
                         runCatching {
@@ -1254,7 +1267,7 @@ class ChatMessageAdapter(
                         setColor(0x2600BE3C)
                     }
                     setPadding(dp(8), dp(8), dp(8), dp(8))
-                    val ad = ContextCompat.getDrawable(ctx, AivoraIcons.Attach)?.mutate()
+                    val ad = ContextCompat.getDrawable(ctx, com.aivora.app.R.drawable.ic_aivora_document)?.mutate()
                     if (ad != null) {
                         DrawableCompat.setTint(ad, NativeColors.Primary)
                         setImageDrawable(ad)

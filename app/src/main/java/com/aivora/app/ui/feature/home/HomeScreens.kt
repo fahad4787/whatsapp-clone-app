@@ -699,21 +699,27 @@ private fun ChatsTab(
                         onNavigate(Routes.ProfileId.replace("{id}", live.id))
                     },
                     onReport = {
-                        scope.launch {
-                            runCatching {
-                                api.postReports(
-                                    ReportRequestBody(
-                                        targetUserId = live.peerUserId,
-                                        targetConversationId = live.id,
-                                        reason = "Reported from chats list",
-                                        messageIds = emptyList(),
-                                        block = false,
-                                    ),
-                                )
-                            }.onSuccess {
-                                Toast.makeText(context, "Report sent", Toast.LENGTH_SHORT).show()
-                            }.onFailure {
-                                Toast.makeText(context, "Could not send report", Toast.LENGTH_SHORT).show()
+                        ChatControls.confirm(
+                            "Report ${live.title}?",
+                            "Our team will review this contact. They won't be told you reported them.",
+                            "Report",
+                        ) {
+                            scope.launch {
+                                runCatching {
+                                    api.postReports(
+                                        ReportRequestBody(
+                                            targetUserId = live.peerUserId,
+                                            targetConversationId = live.id,
+                                            reason = "Reported from chats list",
+                                            messageIds = emptyList(),
+                                            block = false,
+                                        ),
+                                    )
+                                }.onSuccess {
+                                    Toast.makeText(context, "Report sent", Toast.LENGTH_SHORT).show()
+                                }.onFailure {
+                                    Toast.makeText(context, "Could not send report", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
                     },
@@ -1024,6 +1030,7 @@ private fun StatusTab(
             ) {
                 StatusRingAvatar(
                     name = myName,
+                    imageUrl = com.aivora.app.data.local.InMemoryMeStore.me?.avatarUrl,
                     hasUnseen = mine.isNotEmpty(),
                     segmentCount = mine.size.coerceAtLeast(1),
                     size = 52.dp,
@@ -1071,16 +1078,18 @@ private fun StatusTab(
                     onClick = { onNavigate(Routes.NewStatus) },
                 )
             }
-            Text(
-                "Recent",
-                modifier = Modifier.padding(
-                    horizontal = AivoraDimens.ScreenHorizontal,
-                    vertical = AivoraDimens.Space3,
-                ),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = AivoraColors.Ink,
-            )
+            if (recent.isNotEmpty() || viewed.isEmpty()) {
+                Text(
+                    "Recent",
+                    modifier = Modifier.padding(
+                        horizontal = AivoraDimens.ScreenHorizontal,
+                        vertical = AivoraDimens.Space3,
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AivoraColors.Ink,
+                )
+            }
             if (recent.isEmpty() && viewed.isEmpty()) {
                 Text(
                     "Status updates from people you have saved appear here for 24 hours.",
@@ -1098,6 +1107,7 @@ private fun StatusTab(
                 ?: status.id
             StatusRow(
                 name = status.authorName,
+                userId = status.authorId,
                 time = if (authorItems.size > 1) {
                     "${authorItems.size} updates · ${status.timeLabel}"
                 } else {
@@ -1126,6 +1136,7 @@ private fun StatusTab(
                 val authorItems = InMemoryStatusStore.statusesForAuthor(status.authorId, mine = false)
                 StatusRow(
                     name = status.authorName,
+                    userId = status.authorId,
                     time = status.timeLabel,
                     unseen = false,
                     segmentCount = authorItems.size,
@@ -1179,6 +1190,7 @@ private fun StatusActionPill(
 @Composable
 private fun StatusRow(
     name: String,
+    userId: String? = null,
     time: String,
     unseen: Boolean,
     segmentCount: Int = 1,
@@ -1193,6 +1205,7 @@ private fun StatusRow(
     ) {
         StatusRingAvatar(
             name = name,
+            userId = userId,
             hasUnseen = unseen,
             segmentCount = segmentCount,
             size = 52.dp,
@@ -1368,9 +1381,11 @@ private fun CallsTab(
             onSelect = { onFilterChange(CallFilter.entries[it]) },
         )
         Spacer(Modifier.height(4.dp))
-        val callItems = remember(filtered) {
+        val chatsForAvatars by com.aivora.app.data.local.InMemoryChatStore.chats.collectAsState()
+        val callItems = remember(filtered, chatsForAvatars) {
             filtered.map {
                 CallListItem(
+                    avatarUrl = it.conversationId?.let { cid -> chatsForAvatars.firstOrNull { c -> c.id == cid }?.avatarUrl },
                     id = it.id.ifBlank { it.name + it.time },
                     name = it.name,
                     detail = it.detail,
@@ -1389,11 +1404,7 @@ private fun CallsTab(
             CallListAdapter { item -> clickRef[0](item) }
         }
         when {
-            loading -> Text(
-                "Loading…",
-                modifier = Modifier.padding(AivoraDimens.ScreenHorizontal, 24.dp),
-                color = AivoraColors.TextSecondary,
-            )
+            loading -> com.aivora.app.ui.components.LoadingState()
             filtered.isEmpty() -> Text(
                 "No calls yet",
                 modifier = Modifier.padding(AivoraDimens.ScreenHorizontal, 24.dp),
@@ -1506,7 +1517,6 @@ private fun ProfileTab(
                 SettingsItem(
                     title = "Chats",
                     iconRes = AivoraIcons.Chat,
-                    badge = "1",
                     onClick = { onNavigate(Routes.SettingsChats) },
                 ),
                 SettingsItem(
@@ -1551,89 +1561,105 @@ private fun ProfileTab(
             onValueChange = onQueryChange,
             placeholder = "Search profile, settings",
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space2),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "My Profile",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = AivoraColors.Ink,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(
-                onClick = { onNavigate(Routes.SettingsQr) },
+        SettingsList(
+            filteredSections,
+            modifier = Modifier.weight(1f),
+            header = {
+            Row(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(AivoraColors.SurfaceMuted),
+                    .fillMaxWidth()
+                    .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space2),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                Text(
+                    "My Profile",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AivoraColors.Ink,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = { onNavigate(Routes.SettingsQr) },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(AivoraColors.SurfaceMuted),
+                ) {
+                    Icon(
+                        painter = painterResource(AivoraIcons.Qr),
+                        contentDescription = "QR code",
+                        tint = AivoraColors.Ink,
+                    )
+                }
+                Spacer(modifier = Modifier.width(AivoraDimens.Space2))
+                IconButton(
+                    onClick = { onNavigate(Routes.YourDetails) },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(AivoraColors.PrimarySoft),
+                ) {
+                    Icon(
+                        painter = painterResource(AivoraIcons.Edit),
+                        contentDescription = "Edit",
+                        tint = AivoraColors.Primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .clip(RoundedCornerShape(AivoraDimens.RadiusFull))
+                    .background(AivoraColors.SurfaceMuted)
+                    .clickable { showStatusSheet = true }
+                    .padding(horizontal = 14.dp, vertical = AivoraDimens.Space2),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    profileAbout.ifBlank { "Right now I’m…" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (profileAbout.isBlank()) AivoraColors.TextSecondary else AivoraColors.Ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(modifier = Modifier.width(AivoraDimens.Space2))
                 Icon(
-                    painter = painterResource(AivoraIcons.Qr),
-                    contentDescription = "QR code",
-                    tint = AivoraColors.Ink,
+                    painter = painterResource(if (profileAbout.isBlank()) AivoraIcons.Add else AivoraIcons.Edit),
+                    contentDescription = null,
+                    tint = AivoraColors.TextSecondary,
+                    modifier = Modifier.size(16.dp),
                 )
             }
-            Spacer(modifier = Modifier.width(AivoraDimens.Space2))
-            IconButton(
-                onClick = { onNavigate(Routes.YourDetails) },
+            Column(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(AivoraColors.PrimarySoft),
+                    .fillMaxWidth()
+                    .padding(vertical = AivoraDimens.Space4),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(
-                    painter = painterResource(AivoraIcons.Edit),
-                    contentDescription = "Edit",
-                    tint = AivoraColors.Primary,
-                    modifier = Modifier.size(18.dp),
+                Avatar(profileName.ifBlank { "You" }, size = 96, imageUrl = profileAvatar)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    profileName.ifBlank { " " },
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AivoraColors.Ink,
                 )
             }
-        }
-        Row(
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .clip(RoundedCornerShape(AivoraDimens.RadiusFull))
-                .background(AivoraColors.SurfaceMuted)
-                .clickable { showStatusSheet = true }
-                .padding(horizontal = 14.dp, vertical = AivoraDimens.Space2),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                profileAbout.ifBlank { "Right now I’m…" },
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (profileAbout.isBlank()) AivoraColors.TextSecondary else AivoraColors.Ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            Spacer(modifier = Modifier.width(AivoraDimens.Space2))
-            Icon(
-                painter = painterResource(if (profileAbout.isBlank()) AivoraIcons.Add else AivoraIcons.Edit),
-                contentDescription = null,
-                tint = AivoraColors.TextSecondary,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = AivoraDimens.Space4),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Avatar(profileName.ifBlank { "You" }, size = 96, imageUrl = profileAvatar)
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                profileName.ifBlank { " " },
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = AivoraColors.Ink,
-            )
-        }
-        SettingsList(filteredSections, modifier = Modifier.weight(1f))
+            if (query.isNotBlank() && filteredSections.all { it.second.isEmpty() }) {
+                Text(
+                    "No settings match “${query.trim()}”",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AivoraColors.TextSecondary,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space4),
+                )
+            }
+            },
+        )
     }
 }
 

@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -94,10 +95,15 @@ fun NewStatusScreen(
         NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
     }
 
+    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) {
         PendingMedia.consume()?.let {
             mediaUri = it
             showColors = false
+        }
+        // Text status: open the keyboard straight away, like WhatsApp.
+        if (mediaUri == null) {
+            runCatching { focusRequester.requestFocus() }
         }
     }
 
@@ -170,7 +176,8 @@ fun NewStatusScreen(
                 .align(Alignment.Center)
                 .fillMaxWidth()
                 .padding(horizontal = 32.dp)
-                .padding(vertical = 96.dp),
+                .padding(vertical = 96.dp)
+                .focusRequester(focusRequester),
             textStyle = TextStyle(
                 color = Color.White,
                 fontSize = if (isTextOnly) 32.sp else 20.sp,

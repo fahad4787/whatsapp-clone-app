@@ -257,30 +257,45 @@ fun ProfileIdScreen(
                         })
                     } else {
                         SettingsItem("Block", null, AppIcons.Block, danger = true, onClick = {
-                            scope.launch {
-                                val ok = ChatControls.block(api, useRemote, chat)
-                                Toast.makeText(
-                                    context,
-                                    if (ok) "Contact blocked" else "Could not block",
-                                    Toast.LENGTH_SHORT,
-                                ).show()
+                            ChatControls.confirm(
+                                "Block ${chat.title}?",
+                                "Blocked contacts can't message or call you.",
+                                "Block",
+                            ) {
+                                scope.launch {
+                                    val ok = ChatControls.block(api, useRemote, chat)
+                                    Toast.makeText(
+                                        context,
+                                        if (ok) "Contact blocked" else "Could not block",
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
                             }
                         })
                     },
                     SettingsItem("Report", null, AppIcons.Info, danger = true, onClick = {
-                        scope.launch {
-                            runCatching {
-                                api.postReports(
-                                    com.aivora.app.data.model.ReportRequestBody(
-                                        targetUserId = chat.peerUserId,
-                                        targetConversationId = chat.id,
-                                        reason = "Reported from contact info",
-                                        messageIds = emptyList(),
-                                        block = false,
-                                    ),
-                                )
+                        ChatControls.confirm(
+                            "Report ${chat.title}?",
+                            "Our team will review this contact. They won't be told you reported them.",
+                            "Report",
+                        ) {
+                            scope.launch {
+                                runCatching {
+                                    api.postReports(
+                                        com.aivora.app.data.model.ReportRequestBody(
+                                            targetUserId = chat.peerUserId,
+                                            targetConversationId = chat.id,
+                                            reason = "Reported from contact info",
+                                            messageIds = emptyList(),
+                                            block = false,
+                                        ),
+                                    )
+                                }.onSuccess {
+                                    Toast.makeText(context, "Report sent", Toast.LENGTH_SHORT).show()
+                                }.onFailure {
+                                    Toast.makeText(context, "Could not send report", Toast.LENGTH_SHORT).show()
+                                }
                             }
-                            Toast.makeText(context, "Report sent", Toast.LENGTH_SHORT).show()
                         }
                     }),
                 ),

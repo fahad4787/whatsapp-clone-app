@@ -46,7 +46,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val TimeFmt = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
 private val EventFmt = DateTimeFormatter.ofPattern("EEE, MMM d · h:mm a", Locale.getDefault())
 private val DayFmt = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
 
@@ -61,8 +60,8 @@ internal fun formatLastSeen(iso: String): String = runCatching {
     val today = LocalDate.now(zoned.zone)
     // Compact so chat header stays one line next to call/video (Figma Contact controls).
     when (zoned.toLocalDate()) {
-        today -> "last seen today at ${TimeFmt.format(zoned)}"
-        today.minusDays(1) -> "last seen yesterday at ${TimeFmt.format(zoned)}"
+        today -> "last seen today at ${com.aivora.app.data.ClockFormat.format(zoned)}"
+        today.minusDays(1) -> "last seen yesterday at ${com.aivora.app.data.ClockFormat.format(zoned)}"
         else -> "last seen ${DayFmt.format(zoned)}"
     }
 }.getOrDefault("")

@@ -8,6 +8,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -23,7 +26,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -125,9 +128,8 @@ fun ChatMediaScreen(
     }
 
     AivoraScaffold(title = "Media, links, and docs", onBack = onBack) {
-        ScrollableTabRow(
+        TabRow(
             selectedTabIndex = tab,
-            edgePadding = 12.dp,
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
             tabs.forEachIndexed { i, label ->
@@ -139,18 +141,24 @@ fun ChatMediaScreen(
             }
         }
         when {
-            loading -> Text(
-                "Loading…",
-                modifier = Modifier.padding(24.dp),
-                color = AivoraColors.TextSecondary,
-            )
-            items.isEmpty() -> Text(
-                "Nothing here yet",
-                modifier = Modifier.padding(24.dp),
-                color = AivoraColors.TextSecondary,
-            )
+            loading -> com.aivora.app.ui.components.LoadingState()
+            items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    when (tab) {
+                        0 -> "No media yet"
+                        1 -> "No documents yet"
+                        else -> "No links yet"
+                    },
+                    color = AivoraColors.TextSecondary,
+                )
+            }
             tab == 1 || tab == 2 -> {
-                Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
                     items.forEach { msg ->
                         val title = when (tab) {
                             1 -> msg.fileName ?: msg.body
@@ -248,29 +256,44 @@ private fun RowDoc(
     isDoc: Boolean,
     onClick: () -> Unit,
 ) {
-    Column(
+    val ext = title.substringAfterLast('.', "").uppercase().takeIf { isDoc && it.length in 1..5 }
+    androidx.compose.foundation.layout.Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp, horizontal = 4.dp),
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (subtitle.isNotBlank() && subtitle != title) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(AivoraColors.PrimarySoft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (isDoc) AppIcons.Description else AppIcons.Link,
+                contentDescription = null,
+                tint = AivoraColors.Primary,
+            )
+        }
+        Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
             Text(
-                subtitle,
-                style = MaterialTheme.typography.labelMedium,
-                color = AivoraColors.TextSecondary,
+                title,
+                style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-        if (isDoc) {
-            // keep layout stable
+            val sub = ext?.let { "$it document" } ?: subtitle.takeIf { it.isNotBlank() && it != title }
+            if (sub != null) {
+                Text(
+                    sub,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = AivoraColors.TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

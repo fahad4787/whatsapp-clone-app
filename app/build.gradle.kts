@@ -17,7 +17,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0.0-dev"
+        versionName = "1.0.0"
         buildConfigField("String", "API_BASE_URL", "\"https://whatsapp-clone-backend-hep1.onrender.com/\"")
         buildConfigField("String", "WS_BASE_URL", "\"wss://whatsapp-clone-backend-hep1.onrender.com/ws/\"")
         // Wave 23: arm64-only sideload (Mate/Vivo). Dropping armeabi-v7a saves ~8MB WebRTC.

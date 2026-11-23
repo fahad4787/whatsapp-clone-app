@@ -3,6 +3,7 @@ package com.aivora.app.ui.feature.calls
 import com.aivora.app.ui.icons.AppIcons
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -172,6 +173,9 @@ fun ScheduledCallsScreen(
         CallLog.d("scheduled list upcoming=${up.size} past=${pa.size}")
     }
 
+    BackHandler(enabled = scheduling || selected != null) {
+        if (scheduling) scheduling = false else selected = null
+    }
     if (scheduling) {
         ScheduleCallForm(
             onBack = { scheduling = false },
@@ -217,7 +221,7 @@ fun ScheduledCallsScreen(
             when {
                 loading -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Loading…", color = AivoraColors.TextSecondary)
+                        com.aivora.app.ui.components.LoadingState()
                     }
                 }
                 items.isEmpty() -> EmptyScheduleState()
@@ -518,6 +522,7 @@ private fun ScheduleCallForm(onBack: () -> Unit, onDone: () -> Unit) {
         ?: "$durationMinutes minutes"
     val canReview = title.isNotBlank() && selectedPeople.isNotEmpty() && !saving
 
+    BackHandler(enabled = picking) { picking = false }
     if (picking) {
         ParticipantPicker(
             selected = selectedPeople,
@@ -667,30 +672,31 @@ private fun ScheduleCallForm(onBack: () -> Unit, onDone: () -> Unit) {
                 placeholder = false,
                 onClick = { showReminder = true },
             )
+            if (!canReview) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(FieldShape)
+                    .background(AivoraColors.SoftMint)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Icon(
+                    AppIcons.Info,
+                    contentDescription = null,
+                    tint = AivoraColors.InfoGreen,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "Add a title and participants, then choose a date and time to continue. Invitations are sent after you confirm.",
+                    color = AivoraColors.InfoGreen,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                )
+            }
+            }
             Spacer(Modifier.height(8.dp))
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AivoraDimens.CardHorizontal)
-                .clip(FieldShape)
-                .background(AivoraColors.SoftMint)
-                .padding(16.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Icon(
-                AppIcons.Info,
-                contentDescription = null,
-                tint = AivoraColors.InfoGreen,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(
-                "Add a title and participants, then choose a date and time to continue. Invitations are sent after you confirm.",
-                color = AivoraColors.InfoGreen,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-            )
         }
         PrimaryButton(
             text = if (saving) "Scheduling…" else "Schedule call",

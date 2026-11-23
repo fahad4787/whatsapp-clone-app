@@ -56,6 +56,7 @@ import com.aivora.app.data.local.DeviceContact
 import com.aivora.app.data.local.DeviceContacts
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.ui.components.AivoraBottomSheet
+import com.aivora.app.ui.components.PrimaryButton
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.AivoraScrollColumn
 import com.aivora.app.ui.components.AivoraSheetAction
@@ -492,6 +493,30 @@ fun InviteFriendScreen(
                             color = AivoraColors.TextSecondary,
                             modifier = Modifier.padding(16.dp),
                         )
+                        PrimaryButton(
+                            text = "Allow contacts access",
+                            onClick = {
+                                // After two denials Android won't show the prompt again, so open app settings.
+                                val activity = context as? android.app.Activity
+                                val canAsk = activity != null &&
+                                    androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(
+                                        activity, android.Manifest.permission.READ_CONTACTS,
+                                    )
+                                if (canAsk) {
+                                    permission.launch(android.Manifest.permission.READ_CONTACTS)
+                                } else {
+                                    runCatching {
+                                        context.startActivity(
+                                            android.content.Intent(
+                                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                                android.net.Uri.parse("package:" + context.packageName),
+                                            ),
+                                        )
+                                    }
+                                }
+                            },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
                     }
                     contacts.isEmpty() -> {
                         Text(
@@ -553,7 +578,7 @@ fun LegalDocumentScreen(
     kind: String,
     onBack: (() -> Unit)? = null,
 ) {
-    var body by remember { mutableStateOf("Loading…") }
+    var body by remember { mutableStateOf<String?>(null) }
     val api = remember { NetworkModule.api() }
     LaunchedEffect(kind) {
         body = withContext(Dispatchers.IO) {
@@ -574,8 +599,9 @@ fun LegalDocumentScreen(
                 .padding(horizontal = 24.dp, vertical = 16.dp)
                 .padding(bottom = 24.dp),
         ) {
-            Text(
-                body,
+            val text = body
+            if (text == null) com.aivora.app.ui.components.LoadingState() else Text(
+                text,
                 style = MaterialTheme.typography.bodyMedium,
                 color = AivoraColors.Ink,
             )
