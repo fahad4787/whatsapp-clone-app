@@ -206,7 +206,7 @@ private fun formatReceiptTime(iso: String?): String? {
     val at = runCatching { java.time.Instant.parse(iso) }.getOrNull() ?: return null
     val zone = java.time.ZoneId.systemDefault()
     val time = at.atZone(zone)
-    val clock = java.time.format.DateTimeFormatter.ofPattern("h:mm a").format(time)
+    val clock = com.aivora.app.data.ClockFormat.format(time)
     return if (time.toLocalDate() == java.time.LocalDate.now(zone)) {
         "Today, $clock"
     } else {

@@ -73,6 +73,11 @@ class ChatListAdapter(
             typeface = Typeface.DEFAULT_BOLD
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
+            // Wrap so the muted icon sits right after the name.
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
         }
         val preview = TextView(ctx).apply {
             setTextColor(NativeColors.TextSecondary)
@@ -152,12 +157,20 @@ class ChatListAdapter(
             } else {
                 avatarImage.dispose()
             }
-            title.text = buildString {
-                append(chat.title)
-                if (chat.pinned) append(" 📌")
-                if (chat.isMuted) append(" 🔇")
+            title.text = chat.title
+            val dd0 = itemView.resources.displayMetrics.density
+            fun tinted(res: Int, sizeDp: Int): android.graphics.drawable.Drawable? =
+                androidx.core.content.ContextCompat.getDrawable(itemView.context, res)?.mutate()?.also {
+                    it.setBounds(0, 0, (sizeDp * dd0).toInt(), (sizeDp * dd0).toInt())
+                    it.setTint(NativeColors.TextSecondary)
+                }
+            if (chat.isMuted) {
+                title.setCompoundDrawablesRelative(null, null, tinted(com.aivora.app.R.drawable.ic_chat_mute, 15), null)
+                title.compoundDrawablePadding = (6 * dd0).toInt()
+            } else {
+                title.setCompoundDrawablesRelative(null, null, null, null)
             }
-            preview.text = chat.preview
+            preview.text = chat.listPreview
             val tickRes = when {
                 !chat.lastMine || chat.lastStatus == null -> 0
                 chat.lastStatus == com.aivora.app.data.local.MessageDeliveryStatus.Sending -> com.aivora.app.ui.icons.AivoraIcons.Clock
@@ -187,8 +200,16 @@ class ChatListAdapter(
                     cornerRadius = 10f * d
                     setColor(NativeColors.Primary)
                 }
+                badge.setCompoundDrawablesRelative(null, null, null, null)
+            } else if (chat.pinned) {
+                // Pinned with nothing unread: grey pin in the badge slot, like WhatsApp.
+                badge.visibility = View.VISIBLE
+                badge.text = ""
+                badge.background = null
+                badge.setCompoundDrawablesRelative(tinted(com.aivora.app.R.drawable.ic_chat_pin, 16), null, null, null)
             } else {
                 badge.visibility = View.GONE
+                badge.setCompoundDrawablesRelative(null, null, null, null)
             }
             itemView.setOnClickListener { onOpen(chat.id) }
             itemView.setOnLongClickListener {
@@ -216,7 +237,7 @@ class ChatListAdapter(
             override fun areContentsTheSame(a: LocalChat, b: LocalChat) =
                 a.title == b.title &&
                     a.avatarUrl == b.avatarUrl &&
-                    a.preview == b.preview &&
+                    a.listPreview == b.listPreview &&
                     a.lastMine == b.lastMine &&
                     a.lastStatus == b.lastStatus &&
                     a.time == b.time &&

@@ -1,5 +1,8 @@
 package com.aivora.app.ui.components
 
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import com.aivora.app.ui.icons.AppIcons
 
 import androidx.compose.foundation.background
@@ -280,6 +283,8 @@ fun SettingsList(
     sections: List<Pair<String?, List<SettingsItem>>>,
     modifier: Modifier = Modifier,
     header: (@Composable ColumnScope.() -> Unit)? = null,
+    /** Scrolls with the sections; the list fills the screen, so nothing can be placed after it. */
+    footer: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     // Settings sections are short — Column scroll (F11) beats LazyColumn recycle on Mate.
     AivoraScrollColumn(
@@ -320,6 +325,7 @@ fun SettingsList(
                 }
             }
         }
+        footer?.invoke(this)
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -383,6 +389,34 @@ fun RadioGroup(
                 )
             }
         }
+    }
+}
+
+/** One option in a pop-up list: radio button plus label, with the whole row tappable. */
+@Composable
+fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AivoraDimens.RadiusSm))
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = null,
+            colors = RadioButtonDefaults.colors(
+                selectedColor = AivoraColors.Primary,
+                unselectedColor = AivoraColors.IconSecondary,
+            ),
+        )
+        Spacer(Modifier.width(16.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -486,11 +520,27 @@ fun SearchField(
         onValueChange = onValueChange,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        placeholder = { Text(placeholder) },
-        leadingIcon = { Icon(AppIcons.Search, contentDescription = null) },
+            .padding(horizontal = AivoraDimens.ScreenHorizontal, vertical = AivoraDimens.Space2)
+            .height(AivoraDimens.SearchHeight),
+        placeholder = { Text(placeholder, fontSize = 14.sp) },
+        leadingIcon = {
+            Icon(
+                AppIcons.Search,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = AivoraColors.TextTertiary,
+            )
+        },
         singleLine = true,
-        shape = RoundedCornerShape(24.dp),
+        textStyle = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+        // Same filled look as the search bar on the Home tabs.
+        shape = RoundedCornerShape(AivoraDimens.RadiusSm),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = AivoraColors.SearchFill.copy(alpha = 0.7f),
+            unfocusedContainerColor = AivoraColors.SearchFill.copy(alpha = 0.7f),
+            focusedBorderColor = AivoraColors.Primary.copy(alpha = 0.25f),
+            unfocusedBorderColor = Color.Transparent,
+        ),
     )
 }
 
@@ -640,12 +690,18 @@ fun EmptyState(
             )
             Spacer(modifier = Modifier.height(16.dp))
         }
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             body,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
     }
 }

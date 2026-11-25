@@ -1,5 +1,6 @@
 package com.aivora.app.ui.feature.chat
 
+import androidx.compose.foundation.basicMarquee
 import com.aivora.app.ui.icons.AppIcons
 
 import androidx.compose.animation.AnimatedVisibility
@@ -481,6 +482,7 @@ fun ChatIdScreen(
     val groupOnlineCount by RealtimeClient.observeRoomOnlineCount(chatId, myUserId)
         .collectAsState(initial = RealtimeClient.onlineCountInChat(chatId, myUserId))
     val peerOnline = !hidePresence && !chat.isGroup && chat.peerPresenceVisible && peerOnlineRaw
+    var groupMemberNames by remember(chatId) { mutableStateOf<List<String>>(emptyList()) }
     var lastSeenLocal by remember(chatId) { mutableStateOf(chat.peerLastSeenAt) }
     LaunchedEffect(chat.peerLastSeenAt) { lastSeenLocal = chat.peerLastSeenAt }
     LaunchedEffect(chatId, useRemote) {
@@ -496,6 +498,7 @@ fun ChatIdScreen(
         hidePresence -> ""
         peerTyping -> "typing…"
         chat.isGroup -> when {
+            groupMemberNames.isNotEmpty() -> groupMemberNames.joinToString(", ")
             groupOnlineCount > 0 -> "$groupOnlineCount online · tap for info"
             else -> "tap for group info"
         }
@@ -553,6 +556,14 @@ fun ChatIdScreen(
             val remote = api.getConversationsId(chatId)
             // Don't bump this chat to #1 on the home list while opening.
             InMemoryChatStore.upsertChat(remote.toLocalChat(), promote = false)
+            if (remote.type == "group" || chat.isGroup) {
+                groupMemberNames = remote.members.orEmpty()
+                    .mapNotNull { m ->
+                        if (m.user?.id == myUserId) "You"
+                        else m.user?.displayName?.takeIf { it.isNotBlank() }
+                    }
+                    .sortedBy { it == "You" } // WhatsApp lists "You" last
+            }
         }
     }
     LaunchedEffect(chatId, myUserId, useRemote) {
@@ -625,7 +636,11 @@ fun ChatIdScreen(
                         onBack?.invoke()
                     },
                     onCall = {
-                        if (!useRemote) {
+                        if (chat.blockedByMe) {
+                            Toast.makeText(context, "Unblock ${chat.title} to call", Toast.LENGTH_SHORT).show()
+                        } else if (com.aivora.app.ui.feature.calls.blockSecondCall(context)) {
+                            // Already on a call; the hint says how to get back to it.
+                        } else if (!useRemote) {
                             onNavigate(Routes.audioCall(chat.title))
                         } else {
                             scope.launch {
@@ -638,11 +653,7 @@ fun ChatIdScreen(
                                         ),
                                     )
                                 }.onFailure {
-                                    Toast.makeText(
-                                        context,
-                                        "Call failed: ${it.message ?: "error"}",
-                                        Toast.LENGTH_LONG,
-                                    ).show()
+                                    Toast.makeText(context, com.aivora.app.data.api.ApiErrors.call(it), Toast.LENGTH_LONG).show()
                                 }.getOrNull() ?: return@launch
                                 val token = result.token
                                 val url = result.livekitUrl
@@ -664,7 +675,11 @@ fun ChatIdScreen(
                         }
                     },
                     onVideo = {
-                        if (!useRemote) {
+                        if (chat.blockedByMe) {
+                            Toast.makeText(context, "Unblock ${chat.title} to call", Toast.LENGTH_SHORT).show()
+                        } else if (com.aivora.app.ui.feature.calls.blockSecondCall(context)) {
+                            // Already on a call; the hint says how to get back to it.
+                        } else if (!useRemote) {
                             onNavigate(Routes.videoCall(chat.title))
                         } else {
                             scope.launch {
@@ -677,11 +692,7 @@ fun ChatIdScreen(
                                         ),
                                     )
                                 }.onFailure {
-                                    Toast.makeText(
-                                        context,
-                                        "Call failed: ${it.message ?: "error"}",
-                                        Toast.LENGTH_LONG,
-                                    ).show()
+                                    Toast.makeText(context, com.aivora.app.data.api.ApiErrors.call(it), Toast.LENGTH_LONG).show()
                                 }.getOrNull() ?: return@launch
                                 val token = result.token
                                 val url = result.livekitUrl
@@ -869,7 +880,7 @@ fun ChatIdScreen(
             ChatComposer(
                 chatId = chatId,
                 useRemote = useRemote,
-                placeholder = "Message $firstName…",
+                placeholder = "Message",
                 replyPreview = replyTo?.let { r ->
                     if (r.deletedForEveryone) "Original message was deleted" else r.body.ifBlank { "Message" }
                 },
@@ -1790,7 +1801,8 @@ internal fun AivoraAlertDialog(
     secondaryDanger: Boolean = false,
     onSecondary: (() -> Unit)? = null,
 ) {
-    val dark = isSystemInDarkTheme()
+    // The in-app theme choice, which can differ from the phone's.
+    val dark = AivoraColors.isDark
     val container = if (dark) AivoraColors.DarkSurface else AivoraColors.LightSurface
     val ink = if (dark) Color.White else AivoraColors.Ink
     val muted = AivoraColors.TextSecondary
@@ -1865,7 +1877,7 @@ private fun MessageActionOverlay(
     onMoreReactions: () -> Unit,
     actions: List<AivoraSheetAction>,
 ) {
-    val dark = isSystemInDarkTheme()
+    val dark = AivoraColors.isDark
     val surface = if (dark) AivoraColors.DarkSurface else Color.White
     val ink = if (dark) Color.White else AivoraColors.Ink
     val mine = target.mine
@@ -2004,7 +2016,7 @@ private fun ChatHeader(
             .height(64.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ChatHeaderIconButton(onClick = onBack, size = 40.dp) {
+        ChatHeaderIconButton(onClick = onBack, size = 36.dp) {
             Icon(
                 painter = painterResource(AivoraIcons.Back),
                 contentDescription = "Back",
@@ -2019,7 +2031,7 @@ private fun ChatHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box {
-                Avatar(title, size = 40, imageUrl = avatarUrl)
+                Avatar(title, size = 36, imageUrl = avatarUrl)
                 if (online) {
                     Box(
                         modifier = Modifier
@@ -2061,13 +2073,14 @@ private fun ChatHeader(
                         color = if (showTyping || online) AivoraColors.Primary else AivoraColors.TextSecondary,
                         maxLines = 1,
                         softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
+                        // A long "last seen …" line scrolls into view instead of being cut off.
+                        modifier = Modifier.basicMarquee(),
                     )
                 }
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ChatHeaderIconButton(onClick = onCall, size = 44.dp) {
+            ChatHeaderIconButton(onClick = onCall, size = 40.dp) {
                 Icon(
                     painter = painterResource(AivoraIcons.Call),
                     contentDescription = "Voice call",
@@ -2075,7 +2088,7 @@ private fun ChatHeader(
                     modifier = Modifier.size(24.dp),
                 )
             }
-            ChatHeaderIconButton(onClick = onVideo, size = 44.dp) {
+            ChatHeaderIconButton(onClick = onVideo, size = 40.dp) {
                 Icon(
                     painter = painterResource(AivoraIcons.Video),
                     contentDescription = "Video call",
@@ -2084,7 +2097,7 @@ private fun ChatHeader(
                 )
             }
             Box {
-                ChatHeaderIconButton(onClick = { onMenuExpandedChange(true) }, size = 36.dp) {
+                ChatHeaderIconButton(onClick = { onMenuExpandedChange(true) }, size = 28.dp) {
                     Icon(
                         painter = painterResource(AivoraIcons.More),
                         contentDescription = "More",
@@ -2103,7 +2116,7 @@ private fun ChatHeader(
     HorizontalDivider(color = AivoraColors.ChatDivider, thickness = 1.dp)
 }
 
-/** Figma call actions are 44×44 — avoid Material IconButton’s 48dp min that squeezes last-seen. */
+/** Compact action — avoids Material IconButton’s 48dp minimum, which squeezes the name and last seen. */
 @Composable
 private fun ChatHeaderIconButton(
     onClick: () -> Unit,

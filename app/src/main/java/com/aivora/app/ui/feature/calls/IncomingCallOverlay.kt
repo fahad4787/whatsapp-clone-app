@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,10 +51,17 @@ import androidx.compose.ui.unit.sp
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.call.ActiveCallSession
 import com.aivora.app.data.call.CallLog
+import com.aivora.app.data.call.LiveKitCallController
 import com.aivora.app.ui.components.Avatar
+import com.aivora.app.ui.components.blockTouchesBehind
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+
+private val endScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 /** Match Bolta Figma call chrome (light), not WhatsApp dark. */
 private val CallBg: Color get() = AivoraColors.LightBackground
@@ -82,7 +90,7 @@ fun IncomingCallOverlay(
         else -> "Incoming voice call"
     }
 
-    CallSystemBars()
+    CallSystemBars(lightContent = com.aivora.app.ui.theme.AivoraColors.isDark)
 
     // The keyboard from an open chat would otherwise cover Accept / Decline.
     val keyboard = LocalSoftwareKeyboardController.current
@@ -91,6 +99,9 @@ fun IncomingCallOverlay(
         focusManager.clearFocus(force = true)
         keyboard?.hide()
     }
+
+    // Back must not move around the hidden screen; the call needs Accept or Decline.
+    BackHandler { }
 
     val ringtone = remember {
         runCatching {
@@ -151,6 +162,15 @@ fun IncomingCallOverlay(
                 ActiveCallSession.clearIncoming()
                 return@launch
             }
+            val previous = ActiveCallSession.session.value?.callId
+            if (previous != null && previous != id) {
+                CallLog.i("ending callId=$previous to answer callId=$id")
+                LiveKitCallController.disconnect()
+                endScope.launch {
+                    runCatching { NetworkModule.api().postCallsIdAction(previous, "end") }
+                        .onFailure { CallLog.w("end api failed callId=$previous", it) }
+                }
+            }
             ActiveCallSession.setActive(
                 callId = id,
                 token = token,
@@ -167,6 +187,7 @@ fun IncomingCallOverlay(
         modifier = Modifier
             .fillMaxSize()
             .background(CallBg)
+            .blockTouchesBehind()
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
@@ -177,11 +198,7 @@ fun IncomingCallOverlay(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(20.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(AppIcons.Lock, null, tint = CallMuted, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.size(6.dp))
-                Text("End-to-end encrypted", color = CallMuted, fontSize = 13.sp)
-            }
+            Text("Aivora", color = CallMuted, fontSize = 13.sp)
             Spacer(Modifier.height(48.dp))
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(224.dp)) {
                 Box(

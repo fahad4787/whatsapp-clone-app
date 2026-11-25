@@ -258,7 +258,7 @@ object MessageCache {
     private fun CachedMessage.toLocal() = LocalMessage(
         id = id,
         mine = mine,
-        body = body,
+        body = if (system || looksLikeSystemNotice(body)) callNoticeForViewer(body, mine) else body,
         time = createdAtIso?.takeIf { it.length >= 16 }?.let { iso ->
             runCatching {
                 com.aivora.app.data.ClockFormat.format(
@@ -316,6 +316,17 @@ object MessageCache {
             )
         },
     )
+}
+
+/**
+ * The server words an unanswered call for the person who was called. The caller did not
+ * miss anything, so their own copy says nobody answered.
+ */
+internal fun callNoticeForViewer(body: String, mine: Boolean): String = when {
+    !mine -> body
+    body.equals("Missed video call", ignoreCase = true) -> "Video call · No answer"
+    body.equals("Missed voice call", ignoreCase = true) -> "Voice call · No answer"
+    else -> body
 }
 
 /** Recover centered notices from older caches that omitted [CachedMessage.system]. */

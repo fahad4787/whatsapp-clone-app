@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import livekit.org.webrtc.PeerConnection
 import livekit.org.webrtc.RendererCommon
 
@@ -39,6 +41,14 @@ object LiveKitCallController {
     private var eventsJob: Job? = null
     private var appContext: Context? = null
     private var connectGeneration = 0
+
+    /** Call the room belongs to, so coming back to a minimised call doesn't reconnect it. */
+    private var connectedCallId: String? = null
+    private var isVideoCall = false
+    private var minimised = false
+
+    /** Publishing is serialised so the latest mute / camera choice always wins. */
+    private val publishLock = Mutex()
 
     /** Enable video after connect if [enableMedia] raced ahead of publisher setup. */
     private var pendingEnableVideo: Boolean? = null
@@ -61,6 +71,12 @@ object LiveKitCallController {
 
     private val _cameraOff = MutableStateFlow(false)
     val cameraOff: StateFlow<Boolean> = _cameraOff.asStateFlow()
+
+    /** Camera turned off by the user; answering the call must not turn it back on. */
+    private var userCameraOff = false
+
+    /** Speaker choice made by the user; finishing the connect must not override it. */
+    private var userSpeaker: Boolean? = null
 
     /** Voice = earpiece (false); video = speaker. Never auto-flip on accept. */
     private val _speakerOn = MutableStateFlow(false)
@@ -88,10 +104,41 @@ object LiveKitCallController {
     }
 
     /**
+     * Connects the room for [callId] once. It runs in this controller's scope, so leaving the
+     * call screen doesn't drop the call.
+     *
      * @param waitForPeer when true (audio caller), keep mic unpublished until peer joins.
      */
-    suspend fun connect(
+    fun ensureConnected(
         context: Context,
+        callId: String,
+        url: String,
+        token: String,
+        enableVideo: Boolean,
+        waitForPeer: Boolean,
+    ) {
+        if (connectedCallId == callId) return
+        val appCtx = context.applicationContext
+        scope.launch {
+            runCatching { connect(appCtx, callId, url, token, enableVideo, waitForPeer) }
+                .onFailure {
+                    CallLog.e("in-call connect failed callId=$callId", it)
+                    // Opening the call screen again retries.
+                    if (connectedCallId == callId) connectedCallId = null
+                }
+        }
+    }
+
+    /** The camera pauses while the call screen is hidden, so nobody is filmed unaware. */
+    fun setMinimised(value: Boolean) {
+        if (minimised == value) return
+        minimised = value
+        if (isVideoCall && !userCameraOff && _roomConnected.value) enableMedia(true)
+    }
+
+    private suspend fun connect(
+        appCtx: Context,
+        callId: String,
         url: String,
         token: String,
         enableVideo: Boolean,
@@ -99,7 +146,8 @@ object LiveKitCallController {
     ) {
         disconnect()
         val gen = ++connectGeneration
-        val appCtx = context.applicationContext
+        connectedCallId = callId
+        isVideoCall = enableVideo
         appContext = appCtx
         CallLog.i("livekit connect video=$enableVideo waitForPeer=$waitForPeer gen=$gen")
 
@@ -199,12 +247,17 @@ object LiveKitCallController {
             // Video: publish camera while ringing so self-preview works.
             enableVideo -> publishMedia(true)
             waitForPeer && !_remoteJoined.value -> {
-                _muted.value = false
                 _cameraOff.value = true
             }
             else -> publishMedia(false)
         }
-        setSpeaker(appCtx, enableVideo)
+        setSpeaker(appCtx, userSpeaker ?: enableVideo)
+    }
+
+    fun toggleSpeaker(context: Context) {
+        val on = !_speakerOn.value
+        userSpeaker = on
+        setSpeaker(context, on)
     }
 
     fun enableMedia(enableVideo: Boolean) {
@@ -227,6 +280,7 @@ object LiveKitCallController {
     }
 
     fun setCameraOff(off: Boolean) {
+        userCameraOff = off
         _cameraOff.value = off
         scope.launch {
             runCatching {
@@ -281,28 +335,34 @@ object LiveKitCallController {
         _localVideo.value = null
         _muted.value = false
         _cameraOff.value = false
+        userCameraOff = false
+        userSpeaker = null
         _speakerOn.value = false
+        connectedCallId = null
+        isVideoCall = false
+        minimised = false
     }
 
-    private suspend fun publishMedia(enableVideo: Boolean) {
+    private suspend fun publishMedia(enableVideo: Boolean) = publishLock.withLock {
+        publishMediaLocked(enableVideo)
+    }
+
+    private suspend fun publishMediaLocked(enableVideo: Boolean) {
         repeat(8) { attempt ->
             val lp = room?.localParticipant
             if (lp == null || !_roomConnected.value) {
                 pendingEnableVideo = enableVideo
                 return
             }
+            // Keep whatever the user chose while ringing (mute / camera off).
+            val camera = enableVideo && !userCameraOff && !minimised
             val result = runCatching {
-                lp.setMicrophoneEnabled(true)
-                if (enableVideo) {
-                    lp.setCameraEnabled(true)
-                } else {
-                    lp.setCameraEnabled(false)
-                }
+                lp.setMicrophoneEnabled(!_muted.value)
+                lp.setCameraEnabled(camera)
             }
             if (result.isSuccess) {
-                _muted.value = false
-                _cameraOff.value = !enableVideo
-                if (enableVideo) {
+                _cameraOff.value = !camera
+                if (camera) {
                     // Publication can lag a frame after setCameraEnabled.
                     repeat(6) {
                         refreshLocalVideo()

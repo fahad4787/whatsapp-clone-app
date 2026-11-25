@@ -32,9 +32,11 @@ object NetworkModule {
         OkHttpClient.Builder()
             .proxySelector(com.aivora.app.data.local.ProxyPrefs.selector)
             .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
+            // The server swaps the refresh token before it answers, so giving up while a sleeping
+            // server wakes up (about a minute) would leave us holding a dead token.
+            .readTimeout(90, TimeUnit.SECONDS)
             .writeTimeout(20, TimeUnit.SECONDS)
-            .callTimeout(45, TimeUnit.SECONDS)
+            .callTimeout(110, TimeUnit.SECONDS)
             .build()
     }
 
@@ -87,10 +89,16 @@ object NetworkModule {
 
     /**
      * Synchronously rotate tokens. Returns new access token, or null if session is dead.
+     * [rejectedAccess] is the token a request just failed with: if another request replaced it
+     * while this one waited for the lock, that newer token is returned without rotating again.
      */
     @Synchronized
-    fun refreshAccessBlocking(): String? {
+    fun refreshAccessBlocking(rejectedAccess: String? = null): String? {
         val app = runCatching { AivoraApp.instance }.getOrNull() ?: return null
+        if (rejectedAccess != null) {
+            val current = SessionStore.accessToken(app)
+            if (!current.isNullOrBlank() && current != rejectedAccess) return current
+        }
         val refresh = SessionStore.refreshToken(app) ?: return null
         val body = json.encodeToString(RefreshBody.serializer(), RefreshBody(refresh = refresh))
         val request = Request.Builder()
@@ -101,7 +109,7 @@ object NetworkModule {
         return runCatching {
             refreshClient.newCall(request).execute().use { resp ->
                 if (!resp.isSuccessful) {
-                    if (resp.code == 401) SessionStore.clear(app)
+                    if (resp.code == 401) SessionStore.expire(app)
                     return null
                 }
                 val raw = resp.body?.string().orEmpty()
@@ -109,7 +117,7 @@ object NetworkModule {
                 val access = tokens.access
                 val newRefresh = tokens.refresh
                 if (access.isNullOrBlank() || newRefresh.isNullOrBlank()) {
-                    SessionStore.clear(app)
+                    SessionStore.expire(app)
                     return null
                 }
                 SessionStore.updateTokens(app, access, newRefresh)
@@ -123,7 +131,8 @@ object NetworkModule {
             if (responseCount(response) >= 2) return null
             if (response.request.url.encodedPath.contains("auth/refresh")) return null
             if (response.request.url.encodedPath.contains("auth/otp")) return null
-            val access = refreshAccessBlocking() ?: return null
+            val rejected = response.request.header("Authorization")?.removePrefix("Bearer ")
+            val access = refreshAccessBlocking(rejected) ?: return null
             return response.request.newBuilder()
                 .header("Authorization", "Bearer $access")
                 .build()

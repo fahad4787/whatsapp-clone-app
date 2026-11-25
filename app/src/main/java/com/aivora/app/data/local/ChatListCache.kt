@@ -40,6 +40,7 @@ object ChatListCache {
         val onlyAdminsCanSend: Boolean = false,
         val onlyAdminsCanEditInfo: Boolean = false,
         val wallpaper: String? = null,
+        val previewSender: String? = null,
     )
 
     fun load(context: Context): List<LocalChat> {
@@ -71,6 +72,7 @@ object ChatListCache {
                     onlyAdminsCanSend = it.onlyAdminsCanSend,
                     onlyAdminsCanEditInfo = it.onlyAdminsCanEditInfo,
                     wallpaper = it.wallpaper,
+                    previewSender = it.previewSender,
                 )
             }
         }.getOrDefault(emptyList())
@@ -102,6 +104,7 @@ object ChatListCache {
                 onlyAdminsCanSend = it.onlyAdminsCanSend,
                 onlyAdminsCanEditInfo = it.onlyAdminsCanEditInfo,
                 wallpaper = it.wallpaper,
+                previewSender = it.previewSender,
             )
         }
         runCatching {

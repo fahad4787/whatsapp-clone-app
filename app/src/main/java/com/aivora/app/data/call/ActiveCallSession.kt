@@ -1,5 +1,6 @@
 package com.aivora.app.data.call
 
+import android.os.SystemClock
 import com.aivora.app.data.model.CallDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,10 @@ object ActiveCallSession {
     private val _answered = MutableStateFlow(false)
     val answered: StateFlow<Boolean> = _answered.asStateFlow()
 
+    /** elapsedRealtime when both sides were first connected; every call timer counts from it. */
+    private val _liveSince = MutableStateFlow<Long?>(null)
+    val liveSince: StateFlow<Long?> = _liveSince.asStateFlow()
+
     /** Terminal event for in-call UI (rejected / ended / missed). */
     private val _endedReason = MutableStateFlow<String?>(null)
     val endedReason: StateFlow<String?> = _endedReason.asStateFlow()
@@ -42,6 +47,7 @@ object ActiveCallSession {
         _endedReason.value = null
         // Callee only reaches here after Accept → already answered.
         _answered.value = !asCaller
+        _liveSince.value = null
         _session.value = Session(
             callId = callId,
             token = token,
@@ -63,10 +69,17 @@ object ActiveCallSession {
         _answered.value = true
     }
 
+    fun markLive() {
+        if (_session.value != null && _liveSince.value == null) {
+            _liveSince.value = SystemClock.elapsedRealtime()
+        }
+    }
+
     fun clear() {
         val id = _session.value?.callId
         _session.value = null
         _answered.value = false
+        _liveSince.value = null
         if (id != null) CallLog.d("cleared session callId=$id")
     }
 
@@ -93,6 +106,7 @@ object ActiveCallSession {
         _incoming.value = null
         _session.value = null
         _answered.value = false
+        _liveSince.value = null
     }
 
     fun consumeEndedReason(): String? {

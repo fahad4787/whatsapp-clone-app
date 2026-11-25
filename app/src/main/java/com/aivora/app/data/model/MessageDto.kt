@@ -35,4 +35,6 @@ data class MessageDto(
     @SerialName("starred") val starred: Boolean = false,
     @SerialName("silenced") val silenced: Boolean = false,
     @SerialName("system") val system: Boolean = false,
+    /** Call notices: members who answered or declined the call. */
+    @SerialName("handled_by") val handledBy: List<String> = emptyList(),
 )

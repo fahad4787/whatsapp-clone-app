@@ -84,7 +84,7 @@ fun DisappearingMessagesDialog(
                                     runCatching {
                                         api.putConversationsIdDisappearing(chatId, DisappearingBody(seconds = seconds))
                                     }.onSuccess { dto ->
-                                        InMemoryChatStore.upsertChat(dto.toLocalChat())
+                                        InMemoryChatStore.upsertChat(dto.toLocalChat(), promote = false)
                                         val uid = SessionStore.userId(context)
                                         if (uid != null) {
                                             ChatRepository.refreshMessages(context, chatId, uid)

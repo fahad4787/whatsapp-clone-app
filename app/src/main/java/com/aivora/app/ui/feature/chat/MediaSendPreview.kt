@@ -49,6 +49,7 @@ import androidx.core.view.WindowInsetsCompat
 import coil3.compose.AsyncImage
 import com.aivora.app.ui.icons.AppIcons
 import com.aivora.app.ui.theme.AivoraColors
+import com.aivora.app.ui.components.blockTouchesBehind
 import kotlin.math.max
 
 /**
@@ -82,7 +83,8 @@ fun MediaSendPreview(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(Color.Black)
+            .blockTouchesBehind(),
     ) {
         AsyncImage(
             model = uri,

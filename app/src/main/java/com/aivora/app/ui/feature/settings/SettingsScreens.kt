@@ -103,6 +103,7 @@ import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.AivoraNoOverscroll
 import com.aivora.app.ui.components.AivoraScaffold
 import com.aivora.app.ui.components.AivoraScrollColumn
+import com.aivora.app.ui.components.ChoiceRow
 import com.aivora.app.ui.components.EmptyState
 import com.aivora.app.ui.components.InfoBanner
 import com.aivora.app.ui.components.LinkButton
@@ -350,24 +351,14 @@ fun SettingsChatsScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val composer by com.aivora.app.data.local.ChatComposerPrefs.flow.collectAsState()
     val themeMode by com.aivora.app.data.local.AppearancePrefs.themeFlow.collectAsState()
-    val defaultWp by com.aivora.app.data.local.AppearancePrefs.wallpaperFlow.collectAsState()
-    val fontScale by com.aivora.app.data.local.FontScaleStore.scaleFlow.collectAsState()
     val sections = listOf(
         "Display" to listOf(
+            // One entry: theme, wallpaper and font size are all set on the Appearance screen.
             SettingsItem(
-                "Theme",
-                subtitle = com.aivora.app.data.local.AppearancePrefs.themeLabel(themeMode),
+                "Appearance",
+                subtitle = "Theme, wallpaper, font size",
+                trailing = com.aivora.app.data.local.AppearancePrefs.themeLabel(themeMode),
                 onClick = { onNavigate(Routes.SettingsAppearance) },
-            ),
-            SettingsItem(
-                "Default chat theme",
-                subtitle = com.aivora.app.data.local.AppearancePrefs.wallpaperLabel(defaultWp),
-                onClick = { onNavigate(Routes.SettingsAppearance) },
-            ),
-            SettingsItem(
-                "Chat font size",
-                trailing = com.aivora.app.data.local.FontScaleStore.label(fontScale),
-                onClick = { onNavigate(Routes.SettingsChatsFontSize) },
             ),
         ),
         "Chat settings" to listOf(
@@ -1155,6 +1146,8 @@ fun SettingsStarredScreen(
     val myUserId = remember {
         com.aivora.app.data.local.SessionStore.userId(context).orEmpty()
     }
+    val allChats by com.aivora.app.data.local.InMemoryChatStore.chats
+        .collectAsState()
 
     androidx.compose.runtime.LaunchedEffect(useRemote) {
         if (!useRemote) {
@@ -1218,21 +1211,41 @@ fun SettingsStarredScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
-                                painter = painterResource(AivoraIcons.Star),
+                                imageVector = androidx.compose.material.icons.Icons.Filled.Star,
                                 contentDescription = null,
                                 tint = AivoraColors.Primary,
                                 modifier = Modifier.size(22.dp),
                             )
                             Spacer(Modifier.width(14.dp))
                             Column(modifier = Modifier.weight(1f)) {
+                                val chatTitle = allChats.firstOrNull { it.id == chatId }?.title
+                                if (!chatTitle.isNullOrBlank()) {
+                                    Text(
+                                        chatTitle,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = AivoraColors.Primary,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    )
+                                }
                                 Text(
-                                    msg.body.ifBlank { "Starred message" },
+                                    msg.body.ifBlank {
+                                        when {
+                                            msg.voiceDurationSec != null -> "Voice message"
+                                            !msg.fileName.isNullOrBlank() -> msg.fileName!!
+                                            msg.mediaKind != null -> "Photo / media"
+                                            else -> "Starred message"
+                                        }
+                                    },
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 2,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 )
                                 Text(
-                                    msg.time,
+                                    (if (msg.mine) "You" else msg.senderName ?: "") .let { who ->
+                                        if (who.isBlank()) msg.time else "$who · ${msg.time}"
+                                    },
                                     style = MaterialTheme.typography.labelMedium,
                                     color = AivoraColors.TextSecondary,
                                 )
@@ -1483,18 +1496,10 @@ fun SettingsProxyScreen(
                         com.aivora.app.data.local.ProxyPrefs.TYPE_SOCKS to "SOCKS5",
                         com.aivora.app.data.local.ProxyPrefs.TYPE_HTTP to "HTTP",
                     ).forEach { (key, label) ->
-                        Text(
-                            label,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    type = key
-                                    pickType = false
-                                }
-                                .padding(vertical = 12.dp),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (key == type) FontWeight.SemiBold else FontWeight.Normal,
-                        )
+                        ChoiceRow(label, selected = key == type) {
+                            type = key
+                            pickType = false
+                        }
                     }
                 }
             },
@@ -2002,61 +2007,61 @@ fun SettingsDevicesScreen(
     LaunchedEffect(Unit) { reload() }
 
     AivoraScaffold(title = "Linked devices", onBack = onBack) {
-        SettingsList(
-            listOf(
-        null to listOf(
-                    SettingsItem(
-                        "Link a device",
-                        "Enter the code from the other device",
-                        iconRes = AivoraIcons.Qr,
-                        onClick = { onNavigate(Routes.SettingsDevicesLink) },
-                    ),
-                ),
+        val linkSection: Pair<String?, List<SettingsItem>> = null to listOf(
+            SettingsItem(
+                "Link a device",
+                "Enter the code from the other device",
+                iconRes = AivoraIcons.Qr,
+                onClick = { onNavigate(Routes.SettingsDevicesLink) },
             ),
         )
-        when {
-            loading -> com.aivora.app.ui.components.LoadingState()
-            error != null && devices.isEmpty() -> Text(
-                error!!,
-                color = AivoraColors.Danger,
-                modifier = Modifier.padding(24.dp),
-            )
-            devices.isEmpty() -> Text(
-                "No devices yet. Sign in on another phone to see it here.",
-                color = AivoraColors.TextSecondary,
-                modifier = Modifier.padding(24.dp),
-            )
-            else -> {
-                val items = devices.map { d ->
-                    val name = d.deviceName?.takeIf { it.isNotBlank() }
-                        ?: d.platform?.replaceFirstChar { it.uppercase() }
-                        ?: "Device"
-                    val whenActive = d.lastActiveAt?.take(16)?.replace('T', ' ') ?: "unknown"
-                    val subtitle = buildString {
-                        append(d.platform ?: "device")
-                        append(" · last active ")
-                        append(whenActive)
-                        if (d.isCurrent) append(" · this device")
+        val deviceItems = devices.map { d ->
+            val name = d.deviceName?.takeIf { it.isNotBlank() }
+                ?: d.platform?.replaceFirstChar { it.uppercase() }
+                ?: "Device"
+            val subtitle = buildString {
+                append(d.platform?.replaceFirstChar { it.uppercase() } ?: "Device")
+                if (d.isCurrent) {
+                    append(" · This device")
+                } else {
+                    com.aivora.app.data.ClockFormat.dayAndTime(d.lastActiveAt)
+                        ?.let { append(" · Last active ").append(it) }
+                }
+            }
+            SettingsItem(
+                title = name,
+                subtitle = subtitle,
+                icon = AppIcons.Devices,
+                trailing = if (d.isCurrent) null else "Sign out",
+                onClick = {
+                    val id = d.id ?: return@SettingsItem
+                    if (d.isCurrent) return@SettingsItem
+                    scope.launch {
+                        runCatching { api.deleteMeDevicesId(id) }
+                            .onSuccess { reload() }
+                            .onFailure { error = it.message ?: "Revoke failed" }
                     }
-                    SettingsItem(
-                        title = name,
-                        subtitle = subtitle,
+                },
+            )
+        }
+        SettingsList(
+            sections = if (deviceItems.isEmpty()) {
+                listOf(linkSection)
+            } else {
+                listOf(linkSection, "Your devices" to deviceItems)
+            },
+            footer = {
+                when {
+                    loading -> com.aivora.app.ui.components.LoadingState()
+                    devices.isEmpty() -> EmptyState(
+                        title = if (error != null) "Couldn’t load devices" else "No linked devices",
+                        body = error ?: "Phones you sign in on will show up here.",
                         icon = AppIcons.Devices,
-                        trailing = if (d.isCurrent) null else "Sign out",
-                        onClick = {
-                            val id = d.id ?: return@SettingsItem
-                            if (d.isCurrent) return@SettingsItem
-                            scope.launch {
-                                runCatching { api.deleteMeDevicesId(id) }
-                                    .onSuccess { reload() }
-                                    .onFailure { error = it.message ?: "Revoke failed" }
-                            }
-                        },
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                SettingsList(listOf(null to items))
-            }
-        }
+            },
+        )
     }
 }
 
@@ -3192,8 +3197,8 @@ fun SettingsAccountSecurityNotificationsScreen(
     AivoraScaffold(title = "Security notifications", onBack = onBack) {
         SettingsHeroIntro(
             icon = AppIcons.Security,
-            title = "Your chats are end-to-end encrypted",
-            body = "End-to-end encryption keeps your personal messages and calls between you and the people you choose. Not even Aivora can read or listen to them.",
+            title = "Your connection is secured",
+            body = "Messages are sent to Aivora's servers over an encrypted connection. End-to-end encryption is not available yet.",
         )
         Column(
             modifier = Modifier
@@ -3214,7 +3219,7 @@ fun SettingsAccountSecurityNotificationsScreen(
             )
         }
         SettingsFootnote(
-            "Preference is saved on this device. Identity-key change alerts will use this setting when E2EE ships.",
+            "Saved on this device. Security alerts will start once end-to-end encryption is available.",
         )
     }
 }
@@ -3749,7 +3754,7 @@ fun SettingsChatsBackupOpenScreen(
                     ins.manifest?.format?.let { append(it) }
                     ins.manifest?.exportedAt?.let {
                         if (isNotEmpty()) append(" · ")
-                        append(it.take(19).replace('T', ' '))
+                        append(com.aivora.app.data.ClockFormat.dayAndTime(it) ?: it.take(10))
                     }
                     if (isEmpty()) append("${ins.chats.size} chats")
                     else append(" · ${ins.chats.size} chats")
@@ -5194,8 +5199,13 @@ fun SettingsPrivacyLiveLocationScreen(
                             if (mid != null) {
                                 add(
                                     SettingsItem(
-                                        "Live · ${share.conversationId?.takeLast(6) ?: "chat"}",
-                                        subtitle = share.expiresAt?.let { "Until $it" } ?: "Active",
+                                        "Live · " + (
+                                            share.conversationId?.let {
+                                                com.aivora.app.data.local.InMemoryChatStore.chat(it).title
+                                            } ?: "Chat"
+                                            ),
+                                        subtitle = com.aivora.app.data.ClockFormat.dayAndTime(share.expiresAt)
+                                            ?.let { "Until $it" } ?: "Active",
                                         icon = AppIcons.ShareLocation,
                                         onClick = {
                                             scope.launch {
@@ -5240,18 +5250,10 @@ fun SettingsAppearanceScreen(
                         com.aivora.app.data.local.AppearancePrefs.THEME_LIGHT to "Light",
                         com.aivora.app.data.local.AppearancePrefs.THEME_DARK to "Dark",
                     ).forEach { (key, label) ->
-                        Text(
-                            label,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    com.aivora.app.data.local.AppearancePrefs.setTheme(context, key)
-                                    pick = null
-                                }
-                                .padding(vertical = 12.dp),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (key == themeMode) FontWeight.SemiBold else FontWeight.Normal,
-                        )
+                        ChoiceRow(label, selected = key == themeMode) {
+                            com.aivora.app.data.local.AppearancePrefs.setTheme(context, key)
+                            pick = null
+                        }
                     }
                 }
             },
@@ -5351,27 +5353,28 @@ fun SettingsNotificationsScreen(
             com.aivora.app.data.local.NotificationPrefs.VIBRATE_LONG,
             com.aivora.app.data.local.NotificationPrefs.VIBRATE_OFF,
         )
+        val currentVibrate = when (pickVibrate) {
+            "msg" -> prefs.msgVibrate
+            "group" -> prefs.groupVibrate
+            else -> prefs.callVibrate
+        }
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { pickVibrate = null },
             title = { Text("Vibrate") },
             text = {
                 Column {
                     options.forEach { key ->
-                        Text(
+                        ChoiceRow(
                             com.aivora.app.data.local.NotificationPrefs.vibrateLabel(key),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    when (pickVibrate) {
-                                        "msg" -> com.aivora.app.data.local.NotificationPrefs.setMsgVibrate(context, key)
-                                        "group" -> com.aivora.app.data.local.NotificationPrefs.setGroupVibrate(context, key)
-                                        "call" -> com.aivora.app.data.local.NotificationPrefs.setCallVibrate(context, key)
-                                    }
-                                    pickVibrate = null
-                                }
-                                .padding(vertical = 12.dp),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
+                            selected = key == currentVibrate,
+                        ) {
+                            when (pickVibrate) {
+                                "msg" -> com.aivora.app.data.local.NotificationPrefs.setMsgVibrate(context, key)
+                                "group" -> com.aivora.app.data.local.NotificationPrefs.setGroupVibrate(context, key)
+                                "call" -> com.aivora.app.data.local.NotificationPrefs.setCallVibrate(context, key)
+                            }
+                            pickVibrate = null
+                        }
                     }
                 }
             },

@@ -1,5 +1,6 @@
 package com.aivora.app.ui.feature.calls
 
+import com.aivora.app.data.ClockFormat
 import com.aivora.app.ui.icons.AppIcons
 
 import android.widget.Toast
@@ -98,8 +99,7 @@ import java.util.Locale
 
 private val FieldShape = RoundedCornerShape(AivoraDimens.RadiusSm)
 private val DateLabelFmt = DateTimeFormatter.ofPattern("EEE, MMM d, yyyy", Locale.getDefault())
-private val TimeLabelFmt = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
-private val WhenFmt = DateTimeFormatter.ofPattern("EEE, d MMM · h:mm a", Locale.getDefault())
+private val WhenDayFmt = DateTimeFormatter.ofPattern("EEE, d MMM", Locale.getDefault())
 
 private val ReminderOptions = listOf(
     AivoraPickerOption("0", "None"),
@@ -383,6 +383,7 @@ private fun ScheduledCallDetail(
                 PrimaryButton(
                     text = "Start call",
                     onClick = {
+                        if (blockSecondCall(context)) return@PrimaryButton
                         scope.launch {
                             val id = call.id ?: return@launch
                             Toast.makeText(context, "Starting…", Toast.LENGTH_SHORT).show()
@@ -392,7 +393,7 @@ private fun ScheduledCallDetail(
                                     CallLog.e("schedule start failed id=$id", it)
                                     Toast.makeText(
                                         context,
-                                        it.message ?: "Start failed",
+                                        com.aivora.app.data.api.ApiErrors.call(it),
                                         Toast.LENGTH_LONG,
                                     ).show()
                                 }
@@ -644,7 +645,7 @@ private fun ScheduleCallForm(onBack: () -> Unit, onDone: () -> Unit) {
             FieldLabel("Time")
             FormRow(
                 icon = AppIcons.AccessTime,
-                label = time.format(TimeLabelFmt),
+                label = ClockFormat.format(time),
                 placeholder = false,
                 onClick = { showTime = true },
             )
@@ -789,7 +790,10 @@ private fun ParticipantPicker(
 private fun formatCallDetail(item: ScheduledCallDto): String {
     val zone = ZoneId.of("Asia/Karachi")
     val whenLabel = item.startsAt?.let {
-        runCatching { WhenFmt.withZone(zone).format(Instant.parse(it)) }.getOrNull()
+        runCatching {
+            val at = Instant.parse(it).atZone(zone)
+            "${WhenDayFmt.format(at)} · ${ClockFormat.format(at)}"
+        }.getOrNull()
     } ?: "Soon"
     val media = when {
         item.media.equals("video", true) -> "Video"

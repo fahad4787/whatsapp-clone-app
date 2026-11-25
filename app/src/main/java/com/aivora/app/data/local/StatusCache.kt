@@ -30,6 +30,10 @@ object StatusCache {
         val authorAvatarUrl: String? = null,
     )
 
+    fun clear(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
+    }
+
     fun load(context: Context): List<LocalStatus> {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY, null) ?: return emptyList()

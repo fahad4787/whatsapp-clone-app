@@ -50,6 +50,8 @@ fun rememberMediaActions(
     context: Context,
     onCancel: (() -> Unit)? = null,
     onDocument: ((Uri) -> Unit)? = null,
+    /** Profile and group photos can't be videos. */
+    imagesOnly: Boolean = false,
     onImage: (Uri) -> Unit,
 ): MediaActions {
     var pendingCapture by remember { mutableStateOf<Uri?>(null) }
@@ -114,7 +116,11 @@ fun rememberMediaActions(
         pickGallery = {
             pickVisual.launch(
                 androidx.activity.result.PickVisualMediaRequest(
-                    ActivityResultContracts.PickVisualMedia.ImageAndVideo,
+                    if (imagesOnly) {
+                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                    } else {
+                        ActivityResultContracts.PickVisualMedia.ImageAndVideo
+                    },
                 ),
             )
         },

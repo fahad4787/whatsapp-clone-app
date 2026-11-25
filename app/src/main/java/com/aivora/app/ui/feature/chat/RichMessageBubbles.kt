@@ -1,5 +1,6 @@
 package com.aivora.app.ui.feature.chat
 
+import com.aivora.app.data.ClockFormat
 import com.aivora.app.ui.icons.AppIcons
 
 import android.content.Intent
@@ -46,12 +47,13 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val EventFmt = DateTimeFormatter.ofPattern("EEE, MMM d · h:mm a", Locale.getDefault())
+private val EventDayFmt = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())
 private val DayFmt = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
 
 /** Short event time like "Sat, Oct 24 · 7:30 PM"; falls back to the raw string. */
 internal fun formatEventStart(iso: String): String = runCatching {
-    EventFmt.format(Instant.parse(iso).atZone(ZoneId.systemDefault()))
+    val at = Instant.parse(iso).atZone(ZoneId.systemDefault())
+    "${EventDayFmt.format(at)} · ${ClockFormat.format(at)}"
 }.getOrDefault(iso)
 
 /** Presence subtitle from an ISO last-seen timestamp (Today / Yesterday / date). */

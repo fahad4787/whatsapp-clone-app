@@ -291,7 +291,7 @@ object InMemoryChatStore {
         context?.let { MessageCache.clearChat(it, chatId) }
         _chats.update { list ->
             list.map {
-                if (it.id == chatId) it.copy(preview = "No messages", time = "Now", unread = 0)
+                if (it.id == chatId) it.copy(preview = "No messages", previewSender = null, time = "Now", unread = 0)
                 else it
             }
         }
@@ -314,6 +314,7 @@ object InMemoryChatStore {
                 if (it.id != chatId) it
                 else it.copy(
                     preview = last?.body ?: "No messages",
+                    previewSender = last?.let { m -> previewSender(it, m) },
                     time = last?.time ?: it.time,
                 )
             }
@@ -332,7 +333,7 @@ object InMemoryChatStore {
             }
         }
         val last = messageFlow(chatId).value.lastOrNull()
-        if (last != null && last.mine) {
+        if (last != null && last.mine && !last.system) {
             _chats.update { list ->
                 list.map { c ->
                     if (c.id == chatId && (c.lastStatus != last.status || !c.lastMine)) {
@@ -433,13 +434,21 @@ object InMemoryChatStore {
             list.map { c ->
                 if (c.id != chatId) c
                 else if (last != null) {
-                    c.copy(preview = last.body, time = last.time, unread = 0)
+                    c.copy(
+                        preview = last.body,
+                        previewSender = previewSender(c, last),
+                        time = last.time,
+                        unread = 0,
+                    )
                 } else {
-                    c.copy(preview = "No messages", unread = 0)
+                    c.copy(preview = "No messages", previewSender = null, unread = 0)
                 }
             }
         }
     }
+
+    private fun previewSender(chat: LocalChat, last: LocalMessage): String? =
+        if (chat.isGroup && !last.mine && !last.system) last.senderName else null
 
     private fun sameMessageSnapshot(a: List<LocalMessage>, b: List<LocalMessage>): Boolean {
         if (a.size != b.size) return false
@@ -489,7 +498,7 @@ object InMemoryChatStore {
                 ?: LocalChat(chatId, "Chat", message.body, message.time)
             val unread = when {
                 message.mine || viewingChatId == chatId -> 0
-                alreadyHad -> current.unread
+                alreadyHad || message.handledByMe -> current.unread
                 else -> current.unread + 1
             }
             // Only bump home preview for new / latest messages (not mid-thread reacts).
@@ -499,15 +508,26 @@ object InMemoryChatStore {
                 ChatComposerPrefs.load(com.aivora.app.AivoraApp.instance).keepArchived
             }.getOrDefault(true)
             val unarchive =
-                !message.mine && !alreadyHad && current.archived && !keepArchived
+                !message.mine && !message.handledByMe && !alreadyHad &&
+                    current.archived && !keepArchived
             listOf(
                 current.copy(
                     preview = preview,
+                    previewSender = if (!alreadyHad || isLatest) {
+                        previewSender(current, message)
+                    } else {
+                        current.previewSender
+                    },
                     time = time,
                     unread = unread,
                     archived = if (unarchive) false else current.archived,
                     lastMine = if (!alreadyHad || isLatest) after.lastOrNull()?.mine ?: message.mine else current.lastMine,
-                    lastStatus = if (!alreadyHad || isLatest) after.lastOrNull()?.status ?: message.status else current.lastStatus,
+                    lastStatus = if (!alreadyHad || isLatest) {
+                        val newest = after.lastOrNull() ?: message
+                        newest.status.takeUnless { newest.system }
+                    } else {
+                        current.lastStatus
+                    },
                 ),
             ) + list.filterNot { it.id == chatId }
         }
@@ -528,7 +548,8 @@ object InMemoryChatStore {
         _chats.update { list ->
             val current = list.find { it.id == chatId } ?: SeedData.chat(chatId)
             val updated = current.copy(
-                preview = if (message.mine) preview else preview,
+                preview = preview,
+                previewSender = previewSender(current, message),
                 time = "Now",
                 unread = if (message.mine) 0 else current.unread + 1,
                 lastMine = message.mine,

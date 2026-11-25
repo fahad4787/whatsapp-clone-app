@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
@@ -26,13 +28,17 @@ import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.push.MessageNotifier
 import com.aivora.app.data.push.PushRegistrar
 import com.aivora.app.data.realtime.PresenceLifecycle
+import com.aivora.app.data.realtime.RealtimeClient
+import com.aivora.app.ui.feature.calls.ActiveCallHost
 import com.aivora.app.ui.feature.calls.IncomingCallOverlay
+import com.aivora.app.ui.feature.calls.isCallRoute
 import com.aivora.app.ui.motion.MotionPrefs
 import com.aivora.app.ui.navigation.AivoraNavHost
 import com.aivora.app.ui.navigation.DeepLinks
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.security.AppLockHost
 import com.aivora.app.ui.theme.AivoraTheme
+import com.aivora.app.ui.theme.ApplySystemBars
 import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -54,6 +60,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         MotionPrefs.refresh(this)
+        com.aivora.app.data.local.InMemoryMeStore.attach(this)
         // Ensure warm kick even if Application path already ran (idempotent).
         StartupWarm.kick(applicationContext)
         pendingDeepLink.value = DeepLinks.routeFrom(intent)
@@ -81,7 +88,11 @@ class MainActivity : FragmentActivity() {
         }
         setContent {
             val start = remember {
-                if (SessionStore.hasSession(this@MainActivity)) Routes.Home else Routes.Login
+                when {
+                    !SessionStore.hasSession(this@MainActivity) -> Routes.Login
+                    SessionStore.needsProfile(this@MainActivity) -> Routes.ProfileSetup
+                    else -> Routes.Home
+                }
             }
             val deepRoute by pendingDeepLink
             AivoraAppRoot(
@@ -111,11 +122,26 @@ fun AivoraAppRoot(
     onDeepLinkConsumed: () -> Unit = {},
 ) {
     AivoraTheme {
+        ApplySystemBars()
         Surface(modifier = Modifier.fillMaxSize()) {
             val navController = rememberNavController()
+            val context = LocalContext.current
+            // Without this the user stays on a screen where every request fails.
+            LaunchedEffect(SessionStore.expired) {
+                if (!SessionStore.expired) return@LaunchedEffect
+                RealtimeClient.stop()
+                if (navController.currentDestination?.route != Routes.Login) {
+                    navController.navigate(Routes.Login) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                    Toast.makeText(context, "You were signed out. Please sign in again.", Toast.LENGTH_LONG)
+                        .show()
+                }
+                SessionStore.acknowledgeExpired()
+            }
             LaunchedEffect(deepLinkRoute, startDestination) {
                 val route = deepLinkRoute ?: return@LaunchedEffect
-                if (startDestination == Routes.Login) return@LaunchedEffect
+                if (startDestination != Routes.Home) return@LaunchedEffect
                 navController.navigate(route) {
                     launchSingleTop = true
                 }
@@ -123,12 +149,20 @@ fun AivoraAppRoot(
             }
             AppLockHost {
                 Box(Modifier.fillMaxSize()) {
-                    AivoraNavHost(
-                        navController = navController,
-                        startDestination = startDestination,
-                    )
+                    ActiveCallHost(navController) {
+                        AivoraNavHost(
+                            navController = navController,
+                            startDestination = startDestination,
+                        )
+                    }
                     IncomingCallOverlay(
-                        onNavigate = { route -> navController.navigate(route) },
+                        onNavigate = { route ->
+                            // Answering from another call replaces that call's screen.
+                            if (isCallRoute(navController.currentDestination?.route)) {
+                                navController.popBackStack()
+                            }
+                            navController.navigate(route)
+                        },
                     )
                     com.aivora.app.ui.feature.chat.MuteDurationHost()
             com.aivora.app.ui.feature.chat.ConfirmActionHost()

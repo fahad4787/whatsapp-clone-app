@@ -11,6 +11,7 @@ import com.aivora.app.data.local.LocalPollOption
 import com.aivora.app.data.local.LocalReaction
 import com.aivora.app.data.local.LocalReplyPreview
 import com.aivora.app.data.local.MessageDeliveryStatus
+import com.aivora.app.data.local.callNoticeForViewer
 import com.aivora.app.data.local.looksLikeSystemNotice
 import com.aivora.app.data.model.MessageDto
 
@@ -156,6 +157,9 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         localEvent != null -> "Event: ${localEvent.title}"
         else -> null
     }
+    val isNotice = system ||
+        type.equals("system", ignoreCase = true) ||
+        looksLikeSystemNotice(text.orEmpty())
     return LocalMessage(
         id = id.orEmpty(),
         clientId = clientId,
@@ -165,7 +169,8 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
             deleted -> "This message was deleted"
             disappeared -> DISAPPEARED_TEXT
             richBody != null -> richBody
-            !text.isNullOrBlank() -> text!!
+            !text.isNullOrBlank() ->
+                if (isNotice) callNoticeForViewer(text!!, senderId == myUserId) else text!!
             viewOnce && media == null -> "Opened"
             else -> fallbackBody
         },
@@ -201,9 +206,8 @@ fun MessageDto.toLocalMessage(myUserId: String): LocalMessage {
         event = localEvent,
         expiresAtIso = expiresAt,
         disappeared = disappeared,
-        system = system ||
-            type.equals("system", ignoreCase = true) ||
-            looksLikeSystemNotice(text.orEmpty()),
+        system = isNotice,
+        handledByMe = myUserId in handledBy,
         editedAtIso = editedAt,
         viewOnce = viewOnce,
         isSticker = isSticker,

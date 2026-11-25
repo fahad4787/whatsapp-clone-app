@@ -1,5 +1,9 @@
 package com.aivora.app.ui.feature.chat
 
+import androidx.compose.runtime.DisposableEffect
+import android.content.pm.ActivityInfo
+import android.content.ContextWrapper
+import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -8,12 +12,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,14 +37,36 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.aivora.app.data.MediaGallery
+import com.aivora.app.ui.components.blockTouchesBehind
+import com.aivora.app.ui.feature.calls.CallSystemBars
 import com.aivora.app.ui.icons.AppIcons
 import com.aivora.app.ui.media.rememberBubbleImageModel
 import kotlinx.coroutines.launch
+
+/**
+ * The app is portrait-only; photos may follow the phone (respecting the system rotation lock).
+ * The manifest handles these config changes, so rotating does not rebuild the activity.
+ */
+@Composable
+private fun RotateWhileVisible() {
+    val context = LocalContext.current
+    DisposableEffect(context) {
+        val activity = generateSequence(context) { (it as? ContextWrapper)?.baseContext }
+            .filterIsInstance<Activity>()
+            .firstOrNull()
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
+}
 
 /** Caption shown under a photo — skips placeholder bubble labels. */
 fun mediaCaptionOf(body: String): String? {
@@ -70,6 +98,16 @@ fun ChatImageViewer(
     val scope = rememberCoroutineScope()
     var saving by remember { mutableStateOf(false) }
     BackHandler(onBack = onDismiss)
+    RotateWhileVisible()
+    CallSystemBars()
+
+    // The keyboard from the chat underneath would otherwise cover the photo.
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(url) {
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
+    }
 
     // Media visibility On → copy into gallery when the photo is opened (Wave 57).
     LaunchedEffect(url, viewOnce) {
@@ -81,7 +119,8 @@ fun ChatImageViewer(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(Color.Black)
+            .blockTouchesBehind(),
     ) {
         AsyncImage(
             model = rememberBubbleImageModel(url, width = 720.dp, height = 1280.dp),
@@ -99,7 +138,12 @@ fun ChatImageViewer(
                         listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent),
                     ),
                 )
-                .statusBarsPadding()
+                // Sideways, the navigation bar and camera cutout sit at the screen's edges.
+                .windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(
+                        WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                    ),
+                )
                 .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

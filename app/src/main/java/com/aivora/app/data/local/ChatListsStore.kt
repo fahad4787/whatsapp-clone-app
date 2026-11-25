@@ -24,4 +24,8 @@ object ChatListsStore {
     }
 
     fun get(id: String): ChatListDto? = _lists.value.find { it.id == id }
+
+    fun clear() {
+        _lists.value = emptyList()
+    }
 }

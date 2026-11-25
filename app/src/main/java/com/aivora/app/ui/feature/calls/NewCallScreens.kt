@@ -70,6 +70,7 @@ fun NewCallScreen(
         val peer = selected ?: return
         val peerId = peer.id ?: return
         val name = peer.displayLabel()
+        if (blockSecondCall(context)) return
         if (!useRemote) {
             onNavigate(if (media == "video") Routes.videoCall(name) else Routes.audioCall(name))
             return
@@ -88,7 +89,7 @@ fun NewCallScreen(
                 )
             }.onFailure {
                 CallLog.e("new-call failed", it)
-                Toast.makeText(context, "Call failed: ${it.message ?: "error"}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, com.aivora.app.data.api.ApiErrors.call(it), Toast.LENGTH_LONG).show()
             }.getOrNull()
             calling = false
             if (result == null) return@launch

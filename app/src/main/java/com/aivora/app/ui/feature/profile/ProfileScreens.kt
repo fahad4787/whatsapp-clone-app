@@ -90,6 +90,11 @@ fun ProfileIdScreen(
     }
 
     fun startCall(media: String) {
+        if (chat.blockedByMe) {
+            Toast.makeText(context, "Unblock ${chat.title} to call", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (com.aivora.app.ui.feature.calls.blockSecondCall(context)) return
         if (!useRemote) {
             onNavigate(if (media == "video") Routes.videoCall(chat.title) else Routes.audioCall(chat.title))
             return
@@ -99,7 +104,7 @@ fun ProfileIdScreen(
             val result = runCatching {
                 api.postCalls(CallStartBody(conversationId = chat.id, media = media))
             }.onFailure {
-                Toast.makeText(context, "Call failed: ${it.message ?: "error"}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, com.aivora.app.data.api.ApiErrors.call(it), Toast.LENGTH_LONG).show()
             }.getOrNull() ?: return@launch
             val token = result.token
             val url = result.livekitUrl
@@ -234,12 +239,6 @@ fun ProfileIdScreen(
                         null,
                         AppIcons.Security,
                         onClick = { onNavigate(Routes.SettingsPrivacyAdvanced) },
-                    ),
-                    SettingsItem(
-                        "Encryption",
-                        "Messages and calls are end-to-end encrypted.",
-                        AppIcons.Lock,
-                        onClick = { },
                     ),
                     SettingsItem("Clear chat", null, AppIcons.Delete, danger = true, onClick = {
                         showClearChat = true

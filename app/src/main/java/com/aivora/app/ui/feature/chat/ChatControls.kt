@@ -85,7 +85,7 @@ object ChatControls {
             },
             blockedByMe = blockedByMe ?: current.blockedByMe,
         )
-        InMemoryChatStore.upsertChat(next)
+        InMemoryChatStore.upsertChat(next, promote = false)
         return next
     }
 
@@ -153,6 +153,7 @@ object ChatControls {
             }
             return true
         }
+        if (nextMuted) mergeLocal(chat.id, mutedUntil = until) else mergeLocal(chat.id, clearMute = true)
         return runCatching {
             val res = api.putConversationsIdSettings(
                 chat.id,
@@ -167,6 +168,8 @@ object ChatControls {
                 mutedUntil = res.mutedUntil,
                 clearMute = res.mutedUntil.isNullOrBlank(),
             )
+        }.onFailure {
+            mergeLocal(chat.id, mutedUntil = chat.mutedUntil, clearMute = chat.mutedUntil == null)
         }.isSuccess
     }
 
@@ -176,13 +179,14 @@ object ChatControls {
             mergeLocal(chat.id, pinned = nextPinned)
             return true
         }
+        mergeLocal(chat.id, pinned = nextPinned)
         return runCatching {
             val res = api.putConversationsIdSettings(
                 chat.id,
                 ConversationSettingsBody(pinned = nextPinned),
             )
             mergeLocal(chat.id, pinned = res.pinned)
-        }.isSuccess
+        }.onFailure { mergeLocal(chat.id, pinned = chat.pinned) }.isSuccess
     }
 
     suspend fun toggleFavorite(api: AivoraApi, useRemote: Boolean, chat: LocalChat): Boolean {
@@ -191,13 +195,14 @@ object ChatControls {
             mergeLocal(chat.id, favorite = nextFavorite)
             return true
         }
+        mergeLocal(chat.id, favorite = nextFavorite)
         return runCatching {
             val res = api.putConversationsIdSettings(
                 chat.id,
                 ConversationSettingsBody(favorite = nextFavorite),
             )
             mergeLocal(chat.id, favorite = res.favorite)
-        }.isSuccess
+        }.onFailure { mergeLocal(chat.id, favorite = chat.favorite) }.isSuccess
     }
 
     suspend fun setWallpaper(api: AivoraApi, useRemote: Boolean, chat: LocalChat, key: String): Boolean {
@@ -220,13 +225,14 @@ object ChatControls {
             mergeLocal(chat.id, archived = nextArchived)
             return true
         }
+        mergeLocal(chat.id, archived = nextArchived)
         return runCatching {
             val res = api.putConversationsIdSettings(
                 chat.id,
                 ConversationSettingsBody(archived = nextArchived),
             )
             mergeLocal(chat.id, archived = res.archived)
-        }.isSuccess
+        }.onFailure { mergeLocal(chat.id, archived = chat.archived) }.isSuccess
     }
 
     suspend fun block(api: AivoraApi, useRemote: Boolean, chat: LocalChat): Boolean {

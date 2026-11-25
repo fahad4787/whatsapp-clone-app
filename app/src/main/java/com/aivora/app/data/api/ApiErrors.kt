@@ -29,6 +29,22 @@ object ApiErrors {
         }
     }
 
+    /** Why a call couldn't start, instead of "Call failed: HTTP 403". */
+    fun call(t: Throwable): String {
+        if (t is java.io.IOException) return "No connection. Check your internet and try again"
+        val http = t as? HttpException
+        val body = http?.response()?.errorBody()?.string().orEmpty()
+        return when {
+            body.contains("blocked") -> "You can’t call this person"
+            body.contains("livekit_not_configured") -> "Calls aren’t available right now"
+            body.contains("no_callees") -> "There’s no one to call in this chat"
+            body.contains("too_many_callees") -> "This group is too big for a call"
+            http?.code() == 429 -> "Too many tries. Please wait a moment"
+            http != null && http.code() >= 500 -> "Server is waking up. Try again in a few seconds"
+            else -> "Couldn’t start the call. Try again"
+        }
+    }
+
     fun message(t: Throwable, fallback: String = "Something went wrong"): String {
         val body = (t as? HttpException)?.response()?.errorBody()?.string().orEmpty()
         val hay = "$body ${t.message.orEmpty()}"

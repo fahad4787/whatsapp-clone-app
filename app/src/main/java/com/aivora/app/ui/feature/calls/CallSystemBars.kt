@@ -1,26 +1,19 @@
 package com.aivora.app.ui.feature.calls
 
-import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
+import com.aivora.app.ui.theme.SystemBars
 
-/** Light (white) status/nav icons so time & battery stay visible on dark WA call screens. */
+/**
+ * Keeps status/nav icons readable on full-screen call, photo and status screens: [lightContent]
+ * means white icons (dark screen), otherwise dark icons (light screen). With [navigationBar] the
+ * nav bar also goes transparent so no grey scrim shows under the screen on 3-button navigation.
+ */
 @Composable
-fun CallSystemBars() {
-    val view = LocalView.current
-    DisposableEffect(Unit) {
-        val window = (view.context as? Activity)?.window
-            ?: return@DisposableEffect onDispose { }
-        val controller = WindowCompat.getInsetsController(window, view)
-        val prevStatus = controller.isAppearanceLightStatusBars
-        val prevNav = controller.isAppearanceLightNavigationBars
-        controller.isAppearanceLightStatusBars = false
-        controller.isAppearanceLightNavigationBars = false
-        onDispose {
-            controller.isAppearanceLightStatusBars = prevStatus
-            controller.isAppearanceLightNavigationBars = prevNav
-        }
+fun CallSystemBars(navigationBar: Boolean = true, lightContent: Boolean = true) {
+    DisposableEffect(navigationBar, lightContent) {
+        val request = SystemBars.Request(lightContent, navigationBar)
+        SystemBars.requests.add(request)
+        onDispose { SystemBars.requests.remove(request) }
     }
 }

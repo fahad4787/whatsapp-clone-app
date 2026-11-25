@@ -115,6 +115,12 @@ object RealtimeClient {
         )
     }
 
+    /** Like [stop], and also forgets the joined rooms, which belong to the signed-out account. */
+    fun signOut() {
+        stop()
+        synchronized(joinedRooms) { joinedRooms.clear() }
+    }
+
     fun stop() {
         suppressReconnect = true
         reconnectJob?.cancel()
@@ -269,7 +275,7 @@ object RealtimeClient {
                 if (app != null) InMemoryChatStore.persistMessages(app, chatId)
                 if (!local.mine && !local.deletedForEveryone) {
                     ackDelivered(listOfNotNull(dto.id))
-                    if (!InMemoryChatStore.isViewing(chatId) && app != null) {
+                    if (!local.handledByMe && !InMemoryChatStore.isViewing(chatId) && app != null) {
                         val preview = when {
                             local.mediaKind == com.aivora.app.data.local.LocalMediaKind.Image -> "Photo"
                             local.mediaKind == com.aivora.app.data.local.LocalMediaKind.Audio -> "Voice message"

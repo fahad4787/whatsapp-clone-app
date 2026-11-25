@@ -91,6 +91,7 @@ fun StatusViewerScreen(
     onBack: (() -> Unit)? = null,
     onNavigate: (String) -> Unit = {},
 ) {
+    com.aivora.app.ui.feature.calls.CallSystemBars()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // Pin author from the entry status — deleting that id must not wipe the queue.
@@ -615,8 +616,9 @@ private fun formatViewerTime(iso: String?): String {
             secs < 60 -> "Just now"
             secs < 3600 -> "${secs / 60} min ago"
             local.toLocalDate() == now.atZone(ZoneId.systemDefault()).toLocalDate() ->
-                "Today, " + local.format(DateTimeFormatter.ofPattern("h:mm a"))
-            else -> local.format(DateTimeFormatter.ofPattern("MMM d, h:mm a"))
+                "Today, " + com.aivora.app.data.ClockFormat.format(local)
+            else -> local.format(DateTimeFormatter.ofPattern("MMM d")) + ", " +
+                com.aivora.app.data.ClockFormat.format(local)
         }
     }.getOrDefault("Just now")
 }

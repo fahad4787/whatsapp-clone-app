@@ -31,6 +31,7 @@ data class CallListItem(
 
 class CallListAdapter(
     private val onClick: (CallListItem) -> Unit,
+    private val onCall: (CallListItem) -> Unit,
 ) : ListAdapter<CallListItem, CallListAdapter.Holder>(DIFF) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
@@ -114,20 +115,23 @@ class CallListAdapter(
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
         end.addView(time)
-        end.addView(icon.apply {
-            val lp = LinearLayout.LayoutParams(dp(22), dp(22))
-            lp.gravity = Gravity.END
-            lp.topMargin = dp(4)
-            layoutParams = lp
-        })
+        // Only this button dials; a 44dp target so it is easy to hit on purpose.
+        icon.apply {
+            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44)).also { it.marginStart = dp(4) }
+            setPadding(dp(11), dp(11), dp(11), dp(11))
+            val ripple = TypedValue()
+            ctx.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, ripple, true)
+            setBackgroundResource(ripple.resourceId)
+        }
         row.addView(avatarBox)
         row.addView(mid)
         row.addView(end)
+        row.addView(icon)
         return Holder(row, avatar, avatarImage, name, detail, time, icon)
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
-        holder.bind(getItem(position), onClick)
+        holder.bind(getItem(position), onClick, onCall)
     }
 
     class Holder(
@@ -139,7 +143,11 @@ class CallListAdapter(
         private val time: TextView,
         private val icon: ImageView,
     ) : RecyclerView.ViewHolder(itemView) {
-        fun bind(item: CallListItem, onClick: (CallListItem) -> Unit) {
+        fun bind(
+            item: CallListItem,
+            onClick: (CallListItem) -> Unit,
+            onCall: (CallListItem) -> Unit,
+        ) {
             val letter = item.name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
             avatar.text = letter
             avatar.background = GradientDrawable().apply {
@@ -165,6 +173,8 @@ class CallListAdapter(
                 icon,
                 android.content.res.ColorStateList.valueOf(if (item.missed) NativeColors.Danger else NativeColors.Primary),
             )
+            icon.contentDescription = if (item.video) "Video call ${item.name}" else "Voice call ${item.name}"
+            icon.setOnClickListener { onCall(item) }
             itemView.setOnClickListener { onClick(item) }
         }
     }

@@ -67,13 +67,10 @@ import com.aivora.app.ui.components.SettingsCard
 import com.aivora.app.ui.components.SettingsItem
 import com.aivora.app.ui.components.rememberPeopleSearch
 import com.aivora.app.ui.navigation.Routes
+import com.aivora.app.ui.media.AvatarCropScreen
+import com.aivora.app.ui.media.avatarPart
 import com.aivora.app.ui.theme.AivoraColors
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
 
 @Composable
 fun GroupInfoScreen(
@@ -99,36 +96,51 @@ fun GroupInfoScreen(
     fun applyConv(next: ConversationDto) {
         conv = next
         com.aivora.app.data.local.InMemoryConversationDetailStore.put(chatId, next)
-        InMemoryChatStore.upsertChat(next.toLocalChat())
+        InMemoryChatStore.upsertChat(next.toLocalChat(), promote = false)
     }
 
+    var cropSource by remember { mutableStateOf<Uri?>(null) }
+    var uploadingPhoto by remember { mutableStateOf(false) }
+    var photoError by remember { mutableStateOf<String?>(null) }
     val pickAvatar = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
     ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            runCatching {
-                val bytes = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                } ?: error("Could not read image")
-                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
-                val part = MultipartBody.Part.createFormData(
-                    "file",
-                    "group.jpg",
-                    bytes.toRequestBody(mime.toMediaTypeOrNull()),
-                )
-                api.postConversationsIdAvatar(chatId, part)
-            }.onSuccess { applyConv(it) }
-                .onFailure {
-                    Toast.makeText(context, "Could not update photo", Toast.LENGTH_SHORT).show()
-                }
-        }
+        photoError = null
+        cropSource = uri
     }
 
     LaunchedEffect(chatId) {
         runCatching { api.getConversationsId(chatId) }
             .onSuccess { applyConv(it) }
             .onFailure { error = "Could not load group" }
+    }
+
+    cropSource?.let { source ->
+        AvatarCropScreen(
+            source = source,
+            busy = uploadingPhoto,
+            error = photoError,
+            onCancel = {
+                cropSource = null
+                photoError = null
+            },
+            onDone = { jpeg ->
+                uploadingPhoto = true
+                photoError = null
+                scope.launch {
+                    runCatching { api.postConversationsIdAvatar(chatId, avatarPart(jpeg)) }
+                        .onSuccess {
+                            applyConv(it)
+                            cropSource = null
+                        }
+                        .onFailure {
+                            photoError = "Couldn't upload the photo. Check your connection and try again."
+                        }
+                    uploadingPhoto = false
+                }
+            },
+        )
+        return
     }
 
     val title = conv?.title?.takeIf { it.isNotBlank() }

@@ -4,6 +4,7 @@ import com.aivora.app.ui.icons.AppIcons
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -29,10 +30,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Cameraswitch
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.Icon
@@ -42,7 +41,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -118,12 +116,31 @@ private fun InCallContent(
     val enableVideo = videoMode || session?.media == "video"
     val isLive = answered && remoteJoined
 
-    CallSystemBars()
+    // Video is always dark; the audio screen follows the theme, so icons must too.
+    CallSystemBars(lightContent = enableVideo || AivoraColors.isDark)
 
-    var elapsedSec by remember { mutableLongStateOf(0L) }
+    val elapsedSec = rememberCallElapsedSeconds() ?: 0L
+    // The call this screen was opened for; a newer call gets its own screen.
+    val screenCallId = remember { ActiveCallSession.session.value?.callId }
     var permissionReady by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }
     var leaveLabel by remember { mutableStateOf<String?>(null) }
+
+    // Leaving keeps the call running; the bar at the top of the app brings it back.
+    fun minimise() {
+        if (leaving) return
+        leaving = true
+        onEnd()
+    }
+    BackHandler { minimise() }
+
+    // A call screen with no call behind it (it ended while hidden) just closes.
+    LaunchedEffect(session == null) {
+        if (session == null && !leaving && ActiveCallSession.endedReason.value == null) {
+            leaving = true
+            onEnd()
+        }
+    }
 
     val permissions = remember(enableVideo) {
         buildList {
@@ -147,16 +164,15 @@ private fun InCallContent(
 
     LaunchedEffect(session?.callId, permissionReady, enableVideo) {
         val s = session
-        if (!permissionReady || s == null) return@LaunchedEffect
-        runCatching {
-            LiveKitCallController.connect(
-                context = context,
-                url = s.livekitUrl,
-                token = s.token,
-                enableVideo = enableVideo || s.media == "video",
-                waitForPeer = s.asCaller && !enableVideo, // video: publish self-preview while ringing
-            )
-        }.onFailure { CallLog.e("in-call connect failed callId=${s.callId}", it) }
+        if (!permissionReady || s == null || s.callId != screenCallId) return@LaunchedEffect
+        LiveKitCallController.ensureConnected(
+            context = context,
+            callId = s.callId,
+            url = s.livekitUrl,
+            token = s.token,
+            enableVideo = enableVideo || s.media == "video",
+            waitForPeer = s.asCaller && !enableVideo, // video: publish self-preview while ringing
+        )
     }
 
     LaunchedEffect(answered, remoteJoined, session?.asCaller, enableVideo) {
@@ -166,31 +182,13 @@ private fun InCallContent(
         }
     }
 
-    LaunchedEffect(isLive) {
-        if (!isLive) {
-            elapsedSec = 0
-            return@LaunchedEffect
-        }
-        elapsedSec = 0
-        while (true) {
-            delay(1000)
-            elapsedSec += 1
-        }
-    }
-
     LaunchedEffect(endedReason) {
         val reason = endedReason ?: return@LaunchedEffect
         if (leaving) return@LaunchedEffect
         leaving = true
-        leaveLabel = when (reason) {
-            "rejected" -> "Call declined"
-            "timeout", "missed" -> "No answer"
-            "cancelled" -> "Call cancelled"
-            else -> "Call ended"
-        }
+        leaveLabel = callEndedLabel(reason)
         LiveKitCallController.disconnect()
         delay(1200)
-        ActiveCallSession.clear()
         ActiveCallSession.consumeEndedReason()
         onEnd()
     }
@@ -207,6 +205,7 @@ private fun InCallContent(
                     .onFailure { CallLog.w("end api failed callId=$callId", it) }
             }
             ActiveCallSession.clear()
+            ActiveCallSession.consumeEndedReason()
             onEnd()
         }
     }
@@ -231,21 +230,20 @@ private fun InCallContent(
         callTypeLabel = if (enableVideo) "Video call" else "Audio call",
         connectedLabel = connectedLabel,
         elapsedLabel = if (isLive) formatElapsed(elapsedSec) else null,
-        showSpeaking = isLive && !muted,
         videoMode = enableVideo,
         muted = muted,
         speakerOn = speakerOn,
         cameraOff = cameraOff,
         remoteVideo = remoteVideo,
         localVideo = localVideo,
-        onBack = { hangUp() },
         onMute = { LiveKitCallController.setMuted(!muted) },
-        onSpeaker = { LiveKitCallController.setSpeaker(context, !speakerOn) },
+        onSpeaker = { LiveKitCallController.toggleSpeaker(context) },
         onCamera = {
             if (enableVideo) LiveKitCallController.setCameraOff(!cameraOff)
         },
         onFlip = { LiveKitCallController.flipCamera() },
         onEnd = { hangUp() },
+        onMinimise = { minimise() },
     )
 }
 
@@ -255,19 +253,18 @@ private fun BoltaCallScreen(
     callTypeLabel: String,
     connectedLabel: String,
     elapsedLabel: String?,
-    showSpeaking: Boolean,
     videoMode: Boolean,
     muted: Boolean,
     speakerOn: Boolean,
     cameraOff: Boolean,
     remoteVideo: VideoTrack?,
     localVideo: VideoTrack?,
-    onBack: () -> Unit,
     onMute: () -> Unit,
     onSpeaker: () -> Unit,
     onCamera: () -> Unit,
     onFlip: () -> Unit,
     onEnd: () -> Unit,
+    onMinimise: () -> Unit,
 ) {
     if (videoMode) {
         WhatsAppVideoCallScreen(
@@ -282,6 +279,7 @@ private fun BoltaCallScreen(
             onCamera = onCamera,
             onFlip = onFlip,
             onEnd = onEnd,
+            onMinimise = onMinimise,
         )
         return
     }
@@ -297,28 +295,17 @@ private fun BoltaCallScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding(),
         ) {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(CallPanel)
-                        .clickable(onClick = onBack),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        AppIcons.ExpandMore,
-                        contentDescription = "Minimize",
-                        tint = CallInk,
-                        modifier = Modifier.size(28.dp),
-                    )
-                }
+                MinimiseButton(
+                    tint = CallInk,
+                    onClick = onMinimise,
+                    modifier = Modifier.align(Alignment.CenterStart),
+                )
                 Text(
                     callTypeLabel,
                     color = CallInk,
@@ -392,16 +379,6 @@ private fun BoltaCallScreen(
                     }
                 }
 
-                if (showSpeaking) {
-                    Spacer(Modifier.height(20.dp))
-                    SpeakingWave()
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        "$name is speaking",
-                        color = AivoraColors.TextSecondary,
-                        fontSize = 12.sp,
-                    )
-                }
                 Spacer(Modifier.weight(1f))
             }
 
@@ -429,12 +406,6 @@ private fun BoltaCallScreen(
                         label = "Speaker",
                         active = speakerOn,
                         onClick = onSpeaker,
-                    )
-                    BoltaControl(
-                        icon = AppIcons.PersonAdd,
-                        label = "Add person",
-                        active = false,
-                        onClick = {},
                     )
                 }
                 Spacer(Modifier.height(32.dp))
@@ -484,6 +455,7 @@ private fun WhatsAppVideoCallScreen(
     onCamera: () -> Unit,
     onFlip: () -> Unit,
     onEnd: () -> Unit,
+    onMinimise: () -> Unit,
 ) {
     val hasRemote = remoteVideo != null
     val hasLocal = localVideo != null && !cameraOff
@@ -596,7 +568,7 @@ private fun WhatsAppVideoCallScreen(
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                    .padding(horizontal = 56.dp, vertical = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
@@ -617,6 +589,14 @@ private fun WhatsAppVideoCallScreen(
                     fontSize = 14.sp,
                 )
             }
+            MinimiseButton(
+                tint = Color.White,
+                onClick = onMinimise,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(start = 8.dp, top = 8.dp),
+            )
         }
 
         // PiP — tap swaps big/small (WA). Does not flip lens.
@@ -685,6 +665,19 @@ private fun WhatsAppVideoCallScreen(
 }
 
 @Composable
+private fun MinimiseButton(tint: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(AppIcons.ArrowBack, contentDescription = "Minimise call", tint = tint)
+    }
+}
+
+@Composable
 private fun WaVideoControl(
     icon: ImageVector,
     label: String,
@@ -715,26 +708,6 @@ private fun WaVideoControl(
         }
         Spacer(Modifier.height(8.dp))
         Text(label, color = Color.White.copy(alpha = 0.9f), fontSize = 11.sp)
-    }
-}
-
-@Composable
-private fun SpeakingWave() {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.height(24.dp),
-    ) {
-        val heights = listOf(8, 13, 21, 15, 24, 11, 18, 8, 15)
-        heights.forEach { h ->
-            Box(
-                Modifier
-                    .width(3.dp)
-                    .height(h.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(AivoraColors.Primary),
-            )
-        }
     }
 }
 
@@ -816,10 +789,4 @@ private fun VideoTrackAndroidView(
             renderer.release()
         },
     )
-}
-
-private fun formatElapsed(sec: Long): String {
-    val m = sec / 60
-    val s = sec % 60
-    return "%02d:%02d".format(m, s)
 }

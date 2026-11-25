@@ -269,7 +269,8 @@ fun AivoraNavHost(
                     if (com.aivora.app.ui.feature.auth.LoginHandoff.hasProfile) {
                         navController.navigateClearing(Routes.Home, Routes.Login, inclusive = true)
                     } else {
-                        navController.navigateClearing(Routes.ProfileSetup, Routes.Login, inclusive = false)
+                        // Already signed in, so Back must not return to the sign-in form.
+                        navController.navigateClearing(Routes.ProfileSetup, Routes.Login, inclusive = true)
                     }
                 },
             )
@@ -373,9 +374,10 @@ fun AivoraNavHost(
         }
         composable(Routes.ProfileSetup) {
             ProfileSetupScreen(
-                onBack = back,
                 onFinished = {
-                    navController.navigateClearing(Routes.Home, Routes.Login, inclusive = true)
+                    navController.navigate(Routes.Home) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
                 },
             )
         }

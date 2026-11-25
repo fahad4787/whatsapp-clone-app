@@ -47,6 +47,10 @@ fun JoinCallLinkScreen(
             error = "Invalid link"
             return@LaunchedEffect
         }
+        if (blockSecondCall(context)) {
+            error = "Leave your current call to join this one"
+            return@LaunchedEffect
+        }
         runCatching { api.postCallLinksCode(code, EmptyRequestBody()) }
             .onSuccess { join ->
                 val token = join.token

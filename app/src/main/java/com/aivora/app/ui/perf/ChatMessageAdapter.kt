@@ -322,6 +322,7 @@ class ChatMessageAdapter(
             viewOnceRow.setOnClickListener(null)
             // Default bubble pad; voice overrides to Figma 12, photo to 8.
             bubble.setPadding(dp(10), dp(8), dp(10), dp(8))
+            meta.setPadding(0, dp(4), 0, 0)
 
             msg.replyTo?.let { q ->
                 reply.visibility = View.VISIBLE
@@ -440,6 +441,9 @@ class ChatMessageAdapter(
                 }
                 msg.mediaKind == LocalMediaKind.File -> {
                     fileRow.visibility = View.VISIBLE
+                    // The icon already gives the row its height: keep the time close under it.
+                    bubble.setPadding(dp(8), dp(8), dp(10), dp(5))
+                    meta.setPadding(0, 0, 0, 0)
                     val docName = msg.fileName ?: msg.body.ifBlank { "Document" }
                     val docExt = docName.substringAfterLast('.', "").uppercase()
                     fileName.text = android.text.SpannableStringBuilder(docName).also { sb ->
@@ -685,8 +689,7 @@ class ChatMessageAdapter(
                         },
                     )
                     val whenText = runCatching {
-                        java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM · h:mm a", java.util.Locale.getDefault())
-                            .format(java.time.Instant.parse(e.startsAt).atZone(java.time.ZoneId.systemDefault()))
+                        com.aivora.app.ui.feature.chat.formatEventStart(e.startsAt)
                     }.getOrNull()
                     val details = listOfNotNull(
                         whenText?.let { "🗓 $it" },
@@ -1284,7 +1287,6 @@ class ChatMessageAdapter(
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
                     visibility = View.GONE
-                    setPadding(0, dp(4), 0, dp(4))
                     minimumWidth = dp(180)
                     addView(fileIcon)
                     addView(fileNameTv)

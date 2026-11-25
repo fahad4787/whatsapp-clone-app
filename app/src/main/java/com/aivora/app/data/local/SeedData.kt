@@ -41,7 +41,11 @@ data class LocalChat(
     /** Last message was sent by me (list shows ticks). */
     val lastMine: Boolean = false,
     val lastStatus: MessageDeliveryStatus? = null,
+    /** Group only: who wrote the last message, when it was somebody else. */
+    val previewSender: String? = null,
 ) {
+    /** Preview line as the chat list shows it. */
+    val listPreview: String get() = previewSender?.let { "$it: $preview" } ?: preview
     val isGroupAdmin: Boolean get() = myRole.equals("admin", ignoreCase = true)
     val isMuted: Boolean
         get() {
@@ -162,6 +166,8 @@ data class LocalMessage(
     val disappeared: Boolean = false,
     /** Centered WhatsApp-style info (e.g. disappearing messages). */
     val system: Boolean = false,
+    /** A notice about a call this user answered or declined; never new or unread. */
+    val handledByMe: Boolean = false,
     val editedAtIso: String? = null,
     val viewOnce: Boolean = false,
     /** Wave 25 — emoji sticker bubble. */

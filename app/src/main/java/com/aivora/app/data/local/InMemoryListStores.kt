@@ -160,16 +160,40 @@ object InMemoryMeStore {
     private val meState = androidx.compose.runtime.mutableStateOf<Me?>(null)
     val me: Me? get() = meState.value
 
-    fun replace(displayName: String?, about: String?, phone: String?, avatarUrl: String?) {
+    private var disk: android.content.SharedPreferences? = null
+
+    /** Restores the last known profile so a cold start never flashes initials over the photo. */
+    fun attach(context: android.content.Context) {
+        val prefs = context.applicationContext
+            .getSharedPreferences("aivora_me_cache", android.content.Context.MODE_PRIVATE)
+        disk = prefs
+        if (meState.value != null || !prefs.contains("name")) return
         meState.value = Me(
+            displayName = prefs.getString("name", "").orEmpty(),
+            about = prefs.getString("about", "").orEmpty(),
+            phone = prefs.getString("phone", "").orEmpty(),
+            avatarUrl = prefs.getString("avatar", null),
+        )
+    }
+
+    fun replace(displayName: String?, about: String?, phone: String?, avatarUrl: String?) {
+        val next = Me(
             displayName = displayName.orEmpty(),
             about = about.orEmpty(),
             phone = phone.orEmpty(),
             avatarUrl = avatarUrl,
         )
+        meState.value = next
+        disk?.edit()
+            ?.putString("name", next.displayName)
+            ?.putString("about", next.about)
+            ?.putString("phone", next.phone)
+            ?.putString("avatar", next.avatarUrl)
+            ?.apply()
     }
 
     fun clear() {
         meState.value = null
+        disk?.edit()?.clear()?.apply()
     }
 }

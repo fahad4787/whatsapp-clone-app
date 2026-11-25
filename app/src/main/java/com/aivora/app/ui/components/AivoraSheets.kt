@@ -31,10 +31,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import android.os.Build
+import android.view.View
+import android.view.WindowInsetsController
+import android.view.WindowManager
 import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,6 +73,31 @@ fun aivoraSystemNavClearance(): Dp {
     return maxOf(navBottom, 12.dp) + 8.dp
 }
 
+private const val SheetDimAmount = 0.45f
+
+/** Lets the system dim everything behind the popup, including the area the popup can't reach. */
+private fun dimBehind(view: View) {
+    val params = view.layoutParams as? WindowManager.LayoutParams ?: return
+    val dimmed = params.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND != 0
+    if (!view.isAttachedToWindow || (dimmed && params.dimAmount == SheetDimAmount)) return
+    params.flags = params.flags or WindowManager.LayoutParams.FLAG_DIM_BEHIND
+    params.dimAmount = SheetDimAmount
+    view.context.getSystemService(WindowManager::class.java)?.updateViewLayout(view, params)
+}
+
+/** The sheet sits behind the system nav buttons, so they need to contrast with its surface. */
+@Suppress("DEPRECATION")
+private fun darkNavigationIcons(view: View, dark: Boolean) {
+    if (Build.VERSION.SDK_INT >= 30) {
+        val mask = WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+        view.windowInsetsController?.setSystemBarsAppearance(if (dark) mask else 0, mask)
+    } else {
+        val flag = View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        view.systemUiVisibility =
+            if (dark) view.systemUiVisibility or flag else view.systemUiVisibility and flag.inv()
+    }
+}
+
 /**
  * Bottom sheet in the *activity* window (Popup), so [WindowInsets.navigationBars]
  * match the bottom nav. Dialog windows report 0 insets and cover system nav.
@@ -91,13 +124,17 @@ fun AivoraBottomSheet(
                 windowSize: IntSize,
                 layoutDirection: LayoutDirection,
                 popupContentSize: IntSize,
-            ): IntOffset = IntOffset.Zero
+            ): IntOffset =
+                // Android 14 and older cap a popup's height at the space between the system
+                // bars, so anchor it to the bottom edge of the screen.
+                IntOffset(0, (popupSize.height - popupContentSize.height).coerceAtLeast(0))
         }
     }
 
     // While the keyboard is up, Back should only hide the keyboard (like WhatsApp),
     // not close the sheet and lose what was typed.
     val imeVisible = androidx.compose.foundation.layout.WindowInsets.isImeVisible
+    var popupRoot by remember { mutableStateOf<View?>(null) }
     Popup(
         onDismissRequest = onDismiss,
         popupPositionProvider = positionProvider,
@@ -108,6 +145,8 @@ fun AivoraBottomSheet(
             clippingEnabled = false,
         ),
     ) {
+        val popupView = LocalView.current
+        SideEffect { popupRoot = popupView.rootView }
         Box(
             modifier = Modifier
                 .size(
@@ -115,12 +154,9 @@ fun AivoraBottomSheet(
                     height = with(density) { popupSize.height.toDp() },
                 ),
         ) {
-            // Scrim stops above system nav (same clearance as bottom nav).
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = navClearance)
-                    .background(Color.Black.copy(alpha = 0.45f))
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() },
@@ -142,7 +178,8 @@ fun AivoraBottomSheet(
                             interactionSource = remember { MutableInteractionSource() },
                             onClick = {},
                         )
-                        .padding(bottom = 16.dp),
+                        // The sheet reaches the screen edge; its content stays above system nav.
+                        .padding(bottom = 8.dp + navClearance),
                 ) {
                     Box(
                         modifier = Modifier
@@ -189,9 +226,16 @@ fun AivoraBottomSheet(
                     }
                     content()
                 }
-                // Identical to AivoraBottomNav — keep sheet off the system nav.
-                Spacer(Modifier.height(navClearance))
             }
+        }
+    }
+    // Declared after the Popup so it runs after the popup has (re)written its window flags.
+    val root = popupRoot
+    val darkTheme = AivoraColors.isDark
+    SideEffect {
+        if (root != null) {
+            dimBehind(root)
+            darkNavigationIcons(root, dark = !darkTheme)
         }
     }
 }

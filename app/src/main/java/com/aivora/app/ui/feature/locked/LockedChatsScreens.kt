@@ -108,7 +108,7 @@ fun LockedChatsScreen(
             locked.forEach { chat ->
                 PersonRow(
                     chat.title,
-                    chat.preview,
+                    chat.listPreview,
                     onClick = { onNavigate(Routes.ChatId.replace("{id}", chat.id)) },
                 )
             }

@@ -55,6 +55,13 @@ object InMemoryStatusStore {
         }
     }
 
+    /** Sign-out: drop the previous account's updates, including a save that is still pending. */
+    fun clear() {
+        persistJob?.cancel()
+        usingRemote = false
+        _statuses.value = emptyList()
+    }
+
     fun myStatuses(): List<LocalStatus> =
         _statuses.value.filter { it.mine }
 
@@ -243,7 +250,7 @@ object InMemoryStatusStore {
             val now = Instant.now().atZone(ZoneId.systemDefault())
             when {
                 local.toLocalDate() == now.toLocalDate() ->
-                    "Today, " + local.format(DateTimeFormatter.ofPattern("h:mm a"))
+                    "Today, " + com.aivora.app.data.ClockFormat.format(local)
                 local.toLocalDate() == now.toLocalDate().minusDays(1) -> "Yesterday"
                 else -> local.format(DateTimeFormatter.ofPattern("MMM d"))
             }

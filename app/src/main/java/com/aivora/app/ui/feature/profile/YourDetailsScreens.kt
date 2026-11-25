@@ -5,7 +5,6 @@ import com.aivora.app.ui.icons.AppIcons
 
 import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,13 +20,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,7 +38,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -50,14 +46,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.model.MeUpdateBody
@@ -66,15 +59,12 @@ import com.aivora.app.ui.components.AivoraBottomSheet
 import com.aivora.app.ui.components.AivoraSheetAction
 import com.aivora.app.ui.components.AivoraSheetActionList
 import com.aivora.app.ui.icons.AivoraIcons
+import com.aivora.app.ui.media.AvatarCropScreen
+import com.aivora.app.ui.media.avatarPart
 import com.aivora.app.ui.media.rememberMediaActions
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.AivoraDimens
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
 
 @Composable
 fun YourDetailsScreen(
@@ -97,8 +87,7 @@ fun YourDetailsScreen(
     var avatarUrl by remember { mutableStateOf(cachedMe?.avatarUrl) }
     var editingField by remember { mutableStateOf<String?>(null) }
     var showEditPhoto by remember { mutableStateOf(false) }
-    var showCrop by remember { mutableStateOf(false) }
-    var photoUri by remember { mutableStateOf<String?>(null) }
+    var cropSource by remember { mutableStateOf<Uri?>(null) }
     // Spinner only when we have nothing cached to paint.
     var loading by remember {
         mutableStateOf(cachedMe == null && name.isBlank() && phone.isBlank())
@@ -106,10 +95,10 @@ fun YourDetailsScreen(
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val media = rememberMediaActions(context) { uri ->
-        photoUri = uri.toString()
+    val media = rememberMediaActions(context, imagesOnly = true) { uri ->
         showEditPhoto = false
-        showCrop = true
+        error = null
+        cropSource = uri
     }
 
     fun applyUser(
@@ -146,35 +135,25 @@ fun YourDetailsScreen(
         }
     }
 
-    suspend fun uploadAvatar(uriString: String) {
-        val uri = Uri.parse(uriString)
-        val bytes = withContext(Dispatchers.IO) {
-            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        } ?: throw IllegalStateException("Could not read image")
-        val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
-        val body = bytes.toRequestBody(mime.toMediaTypeOrNull())
-        val part = MultipartBody.Part.createFormData("file", "avatar.jpg", body)
-        val me = api.postMeAvatar(part)
-        applyUser(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
-    }
-
-    BackHandler(enabled = showCrop && !saving) { showCrop = false }
-    if (showCrop) {
-        EditPhotoCropScreen(
-            name = name.ifBlank { "A" },
-            previewUri = photoUri,
+    cropSource?.let { source ->
+        AvatarCropScreen(
+            source = source,
             busy = saving,
-            onCancel = { showCrop = false },
-            onDone = {
-                val uri = photoUri ?: return@EditPhotoCropScreen
+            error = error,
+            onCancel = {
+                cropSource = null
+                error = null
+            },
+            onDone = { jpeg ->
                 saving = true
                 error = null
                 scope.launch {
                     try {
-                        uploadAvatar(uri)
-                        showCrop = false
+                        val me = api.postMeAvatar(avatarPart(jpeg))
+                        applyUser(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
+                        cropSource = null
                     } catch (e: Exception) {
-                        error = e.message ?: "Upload failed"
+                        error = "Couldn't upload the photo. Check your connection and try again."
                     } finally {
                         saving = false
                     }
@@ -203,7 +182,6 @@ fun YourDetailsScreen(
                             try {
                                 val me = api.deleteMeAvatar()
                                 applyUser(me.displayName, me.about, me.phoneDisplay ?: me.phone, me.avatarUrl)
-                                photoUri = null
                             } catch (e: Exception) {
                                 error = e.message ?: "Could not delete photo"
                             } finally {
@@ -415,84 +393,6 @@ private fun ProfileDetailRow(
             tint = AivoraColors.IconSecondary,
             modifier = Modifier.size(16.dp),
         )
-    }
-}
-
-@Composable
-private fun EditPhotoCropScreen(
-    name: String,
-    previewUri: String?,
-    busy: Boolean,
-    onCancel: () -> Unit,
-    onDone: () -> Unit,
-) {
-    var scale by remember { mutableFloatStateOf(1f) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF0B141A))
-            .statusBarsPadding()
-            .navigationBarsPadding(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            IconButton(onClick = onCancel, enabled = !busy) {
-                Icon(AppIcons.Close, contentDescription = "Cancel", tint = Color.White)
-            }
-            Text("Move and scale", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-            IconButton(onClick = onDone, enabled = !busy) {
-                if (busy) {
-                    CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp, color = AivoraColors.Primary)
-                } else {
-                    Icon(AppIcons.Check, contentDescription = "Done", tint = AivoraColors.Primary)
-                }
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(280.dp)
-                    .clip(CircleShape)
-                    .border(2.dp, Color.White.copy(alpha = 0.35f), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (!previewUri.isNullOrBlank()) {
-                    AsyncImage(
-                        model = previewUri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                            },
-                    )
-                } else {
-                    Avatar(
-                        name,
-                        size = 280,
-                        modifier = Modifier.graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                        },
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(24.dp))
     }
 }
 

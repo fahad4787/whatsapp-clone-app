@@ -2,6 +2,7 @@ package com.aivora.app.ui.security
 
 import android.os.Build
 import androidx.biometric.BiometricManager
+import androidx.activity.compose.BackHandler
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,6 +41,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.aivora.app.data.local.AppLockPrefs
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.ui.components.PrimaryButton
+import com.aivora.app.ui.components.blockTouchesBehind
 import com.aivora.app.ui.theme.AivoraColors
 
 /** Observes app backgrounding and prompts biometric unlock when enabled. */
@@ -113,10 +117,22 @@ private fun AppLockOverlay(
     error: String?,
     onUnlockRequest: () -> Unit,
 ) {
+    // Nothing behind the lock may react: Back leaves the app, and the keyboard is closed
+    // so it can't type into the chat underneath.
+    val context = LocalContext.current
+    BackHandler { (context as? FragmentActivity)?.moveTaskToBack(true) }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(Unit) {
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(AivoraColors.LightBackground),
+            .background(AivoraColors.LightBackground)
+            .blockTouchesBehind(),
         contentAlignment = Alignment.Center,
     ) {
         Column(

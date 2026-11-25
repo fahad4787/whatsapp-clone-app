@@ -95,6 +95,7 @@ fun NewStatusScreen(
         NetworkModule.api(NetworkModule.okHttp { SessionStore.accessToken(context) })
     }
 
+    com.aivora.app.ui.feature.calls.CallSystemBars(navigationBar = false)
     val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) {
         PendingMedia.consume()?.let {

@@ -1,5 +1,10 @@
 package com.aivora.app.ui.feature.auth
 
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.runtime.snapshotFlow
 import com.aivora.app.ui.icons.AppIcons
 
 import androidx.compose.animation.AnimatedContent
@@ -217,6 +222,7 @@ fun LoginScreen(
             me.id?.let { SessionStore.saveUserId(context, it) }
             LoginHandoff.hasProfile = !me.displayName.isNullOrBlank()
         } catch (_: Exception) { /* optional */ }
+        SessionStore.setNeedsProfile(context, !LoginHandoff.hasProfile)
         com.aivora.app.data.push.PushRegistrar.refresh(context)
         return null
     }
@@ -332,13 +338,16 @@ fun LoginScreen(
                 ),
         )
 
+        val formScroll = rememberScrollState()
+        KeepFormAboveKeyboard(formScroll)
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .imePadding()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(formScroll)
                 .padding(horizontal = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -817,6 +826,17 @@ fun LoginScreen(
             Spacer(Modifier.height(8.dp))
             Spacer(Modifier.height(20.dp))
         }
+    }
+}
+
+/** Scrolls to the end while the keyboard opens, so the field and its button stay in view. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun KeepFormAboveKeyboard(scroll: ScrollState) {
+    val keyboardOpen = WindowInsets.isImeVisible
+    LaunchedEffect(keyboardOpen) {
+        if (!keyboardOpen) return@LaunchedEffect
+        snapshotFlow { scroll.maxValue }.collect { scroll.scrollTo(it) }
     }
 }
 

@@ -18,15 +18,20 @@ fun ConversationDto.toLocalChat(): LocalChat {
         com.aivora.app.data.local.SessionStore.userId(com.aivora.app.AivoraApp.instance)
     }.getOrNull()
     val lastMine = lastMessage != null && myId != null && lastMessage?.senderId == myId
-    val lastStatus = if (lastMine) lastMessage?.toLocalMessage(myId!!)?.status else null
-    val preview = lastMessage?.text?.takeIf { it.isNotBlank() } ?: "Say hello"
+    // Through the message mapper, so a photo or voice note is named instead of "Say hello".
+    val last = myId?.let { lastMessage?.toLocalMessage(it) }
+    // Call and timer notices are not messages I sent, so they carry no delivery tick.
+    val lastStatus = if (lastMine && last?.system != true) last?.status else null
+    val preview = (last?.body ?: lastMessage?.text)?.takeIf { it.isNotBlank() } ?: "Say hello"
+    val group = type.equals("group", ignoreCase = true)
+    val previewSender = if (group && last != null && !last.mine && !last.system) last.senderName else null
     return LocalChat(
         id = id.orEmpty(),
         title = title,
         preview = preview,
         time = chatListTime(lastMessageAt ?: lastMessage?.createdAt ?: updatedAt),
         unread = unreadCount,
-        isGroup = type.equals("group", ignoreCase = true),
+        isGroup = group,
         favorite = favorite,
         archived = archived,
         pinned = pinned,
@@ -50,6 +55,7 @@ fun ConversationDto.toLocalChat(): LocalChat {
         peerPresenceVisible = peer?.presenceVisible ?: true,
         lastMine = lastMine,
         lastStatus = lastStatus,
+        previewSender = previewSender,
     )
 }
 

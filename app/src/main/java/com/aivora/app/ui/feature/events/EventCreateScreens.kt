@@ -1,5 +1,6 @@
 package com.aivora.app.ui.feature.events
 
+import com.aivora.app.data.ClockFormat
 import com.aivora.app.ui.icons.AppIcons
 
 import android.widget.Toast
@@ -80,7 +81,6 @@ import java.util.Locale
 import java.util.UUID
 
 private val DateLabelFmt = DateTimeFormatter.ofPattern("EEE, MMM d, yyyy", Locale.getDefault())
-private val TimeLabelFmt = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault())
 
 private val CommonZones = listOf(
     "Asia/Karachi",
@@ -195,7 +195,7 @@ fun EventCreateChatScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     FieldLabel("Start time *")
                     PickerField(
-                        value = startTime?.format(TimeLabelFmt).orEmpty(),
+                        value = startTime?.let(ClockFormat::format).orEmpty(),
                         placeholder = "Start",
                         trailing = { Icon(AppIcons.AccessTime, contentDescription = null, tint = AivoraColors.TextSecondary) },
                         onClick = { showStartTime = true },
@@ -204,7 +204,7 @@ fun EventCreateChatScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     FieldLabel("End time")
                     PickerField(
-                        value = endTime?.format(TimeLabelFmt).orEmpty(),
+                        value = endTime?.let(ClockFormat::format).orEmpty(),
                         placeholder = "End",
                         trailing = { Icon(AppIcons.AccessTime, contentDescription = null, tint = AivoraColors.TextSecondary) },
                         onClick = { showEndTime = true },
@@ -256,7 +256,7 @@ fun EventCreateChatScreen(
                     if (chatId.isNotBlank()) {
                         InMemoryChatStore.sendText(
                             chatId,
-                            "📅 Event: ${title.trim()} · ${d.format(DateLabelFmt)} ${start.format(TimeLabelFmt)}" +
+                            "📅 Event: ${title.trim()} · ${d.format(DateLabelFmt)} ${ClockFormat.format(start)}" +
                                 if (location.isNotBlank()) " · $location" else "",
                         )
                     }

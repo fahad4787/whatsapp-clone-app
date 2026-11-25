@@ -655,12 +655,16 @@ private fun ChatsTab(
                     onRecyclerReady = { rv ->
                         rv.adapter = homeConcat
                         val d = rv.resources.displayMetrics.density
-                        rv.setPadding(0, (2 * d).toInt(), 0, (8 * d).toInt())
+                        // Room to scroll the last row clear of the floating button.
+                        rv.clipToPadding = false
+                        rv.setPadding(0, (2 * d).toInt(), 0, (88 * d).toInt())
                     },
                     update = { rv ->
                         if (rv.adapter !== homeConcat) rv.adapter = homeConcat
                         lockedFooter.visible = filter == ChatFilter.All && customListId == null && debouncedQuery.isBlank() && allChats.any { it.locked }
-                        chatAdapter.submitList(chats)
+                        // A chat that moves to the top must be visible, not hidden above the fold.
+                        val atTop = !rv.canScrollVertically(-1)
+                        chatAdapter.submitList(chats) { if (atTop) rv.scrollToPosition(0) }
                     },
                 )
                 // Drawn after (above) the RecyclerView: the AndroidView would otherwise swallow the button's taps.
@@ -910,7 +914,7 @@ private fun HomeChatRow(
             }
             Spacer(Modifier.height(2.dp))
                                 Text(
-                                    chat.preview,
+                                    chat.listPreview,
                 fontSize = 14.sp,
                 color = AivoraColors.TextSecondary,
                 maxLines = 1,
@@ -1270,11 +1274,11 @@ private fun CallsTab(
             val z = java.time.ZonedDateTime.ofInstant(instant, java.time.ZoneId.systemDefault())
             val today = java.time.LocalDate.now()
             when (z.toLocalDate()) {
-                today -> z.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+                today -> com.aivora.app.data.ClockFormat.format(z)
                 today.minusDays(1) -> "Yesterday"
                 else -> z.format(java.time.format.DateTimeFormatter.ofPattern("EEE"))
             }
-        }.getOrDefault(iso.take(16))
+        }.getOrDefault("")
     }
 
     val rows = remember(items) {
@@ -1328,6 +1332,7 @@ private fun CallsTab(
 
     fun redial(row: CallRow) {
         val chatId = row.conversationId
+        if (com.aivora.app.ui.feature.calls.blockSecondCall(context)) return
         if (chatId.isNullOrBlank() || !useRemote) {
             onNavigate(if (row.video) Routes.videoCall(row.name) else Routes.audioCall(row.name))
             return
@@ -1342,7 +1347,7 @@ private fun CallsTab(
                     ),
                 )
             }.onFailure {
-                Toast.makeText(context, "Call failed: ${it.message ?: "error"}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, com.aivora.app.data.api.ApiErrors.call(it), Toast.LENGTH_LONG).show()
             }.getOrNull() ?: return@launch
             val token = result.token
             val url = result.livekitUrl
@@ -1403,9 +1408,27 @@ private fun CallsTab(
             filtered.associateBy { it.id.ifBlank { it.name + it.time } }
         }
         val clickRef = remember { arrayOf<(CallListItem) -> Unit>({}) }
-        clickRef[0] = { item -> callRowsById[item.id]?.let { redial(it) } }
+        val callRef = remember { arrayOf<(CallListItem) -> Unit>({}) }
+        // Row opens the chat (so a stray tap never dials); the call icon redials.
+        clickRef[0] = { item ->
+            callRowsById[item.id]?.let { row ->
+                val chatId = row.conversationId
+                val locked = com.aivora.app.data.local.InMemoryChatStore.chats.value
+                    .any { it.id == chatId && it.locked }
+                when {
+                    chatId.isNullOrBlank() -> redial(row)
+                    // Locked chats must go through the unlock screen.
+                    locked -> onNavigate(Routes.LockedChats)
+                    else -> onNavigate(Routes.ChatId.replace("{id}", chatId))
+                }
+            }
+        }
+        callRef[0] = { item -> callRowsById[item.id]?.let { redial(it) } }
         val callAdapter = remember {
-            CallListAdapter { item -> clickRef[0](item) }
+            CallListAdapter(
+                onClick = { item -> clickRef[0](item) },
+                onCall = { item -> callRef[0](item) },
+            )
         }
         when {
             loading -> com.aivora.app.ui.components.LoadingState()
@@ -1416,10 +1439,17 @@ private fun CallsTab(
             )
             else -> RecyclerHost(
                 modifier = Modifier.fillMaxSize(),
-                onRecyclerReady = { rv -> rv.adapter = callAdapter },
+                onRecyclerReady = { rv ->
+                    rv.adapter = callAdapter
+                    // Room to scroll the last call button clear of the floating button.
+                    rv.clipToPadding = false
+                    rv.setPadding(0, 0, 0, (88 * rv.resources.displayMetrics.density).toInt())
+                },
                 update = { rv ->
                     if (rv.adapter !== callAdapter) rv.adapter = callAdapter
-                    callAdapter.submitList(callItems)
+                    // The newest call is inserted at the top; keep it in view.
+                    val atTop = !rv.canScrollVertically(-1)
+                    callAdapter.submitList(callItems) { if (atTop) rv.scrollToPosition(0) }
                 },
             )
         }
