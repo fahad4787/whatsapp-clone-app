@@ -47,10 +47,12 @@ object InMemoryChatStore {
 
     fun setViewingChat(chatId: String?) {
         viewingChatId = chatId
-        if (chatId != null) markRead(chatId)
+        if (chatId != null && isViewing(chatId)) markRead(chatId)
     }
 
-    fun isViewing(chatId: String): Boolean = viewingChatId == chatId
+    /** A chat left open behind a backgrounded app is not being read. */
+    fun isViewing(chatId: String): Boolean =
+        viewingChatId == chatId && com.aivora.app.data.realtime.PresenceLifecycle.foreground
 
     fun messageEpoch(chatId: String): Int =
         messageEpoch.getOrPut(chatId) { AtomicInteger(0) }.get()
@@ -497,7 +499,7 @@ object InMemoryChatStore {
             val current = list.find { it.id == chatId }
                 ?: LocalChat(chatId, "Chat", message.body, message.time)
             val unread = when {
-                message.mine || viewingChatId == chatId -> 0
+                message.mine || isViewing(chatId) -> 0
                 alreadyHad || message.handledByMe -> current.unread
                 else -> current.unread + 1
             }

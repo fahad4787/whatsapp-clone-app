@@ -245,4 +245,10 @@ object MessageNotifier {
         }
         nm.notify(callId.hashCode() and 0x7fffffff, builder.build())
     }
+
+    /** Removes the incoming-call notification once that call is over. */
+    fun cancelCall(context: Context, callId: String) {
+        context.getSystemService(NotificationManager::class.java)
+            ?.cancel(callId.hashCode() and 0x7fffffff)
+    }
 }

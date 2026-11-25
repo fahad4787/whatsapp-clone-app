@@ -103,7 +103,8 @@ object ActiveCallSession {
         val id = _session.value?.callId ?: _incoming.value?.id
         CallLog.i("ended callId=$id reason=$reason")
         _endedReason.value = reason
-        _incoming.value = null
+        // A second call may be ringing while this one ends; leave it on screen.
+        if (_incoming.value?.id == id) _incoming.value = null
         _session.value = null
         _answered.value = false
         _liveSince.value = null

@@ -41,6 +41,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -111,6 +112,7 @@ private fun InCallContent(
     val speakerOn by LiveKitCallController.speakerOn.collectAsState()
     val cameraOff by LiveKitCallController.cameraOff.collectAsState()
     val remoteVideo by LiveKitCallController.remoteVideo.collectAsState()
+    val remoteCameraOff by LiveKitCallController.remoteCameraOff.collectAsState()
     val localVideo by LiveKitCallController.localVideo.collectAsState()
     val peerName = session?.peerName?.ifBlank { name } ?: name
     val enableVideo = videoMode || session?.media == "video"
@@ -235,6 +237,7 @@ private fun InCallContent(
         speakerOn = speakerOn,
         cameraOff = cameraOff,
         remoteVideo = remoteVideo,
+        remoteCameraOff = remoteCameraOff,
         localVideo = localVideo,
         onMute = { LiveKitCallController.setMuted(!muted) },
         onSpeaker = { LiveKitCallController.toggleSpeaker(context) },
@@ -258,6 +261,7 @@ private fun BoltaCallScreen(
     speakerOn: Boolean,
     cameraOff: Boolean,
     remoteVideo: VideoTrack?,
+    remoteCameraOff: Boolean,
     localVideo: VideoTrack?,
     onMute: () -> Unit,
     onSpeaker: () -> Unit,
@@ -274,6 +278,7 @@ private fun BoltaCallScreen(
             muted = muted,
             cameraOff = cameraOff,
             remoteVideo = remoteVideo,
+            remoteCameraOff = remoteCameraOff,
             localVideo = localVideo,
             onMute = onMute,
             onCamera = onCamera,
@@ -450,6 +455,7 @@ private fun WhatsAppVideoCallScreen(
     muted: Boolean,
     cameraOff: Boolean,
     remoteVideo: VideoTrack?,
+    remoteCameraOff: Boolean,
     localVideo: VideoTrack?,
     onMute: () -> Unit,
     onCamera: () -> Unit,
@@ -514,8 +520,9 @@ private fun WhatsAppVideoCallScreen(
                 interactionSource = remember { MutableInteractionSource() },
             ) { controlsVisible = !controlsVisible },
     ) {
-        // Stable main renderer — swap track in place (cheaper than recreate).
-        if (bigTrack != null) {
+        // A paused remote camera would otherwise show its last frame as if it were live.
+        val bigPaused = remoteCameraOff && bigTrack != null && bigTrack === remoteVideo
+        if (bigTrack != null && !bigPaused) {
             VideoTrackAndroidView(
                 track = bigTrack,
                 modifier = Modifier.fillMaxSize(),
@@ -532,7 +539,7 @@ private fun WhatsAppVideoCallScreen(
                 Avatar(name, size = 120)
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    if (cameraOff) "Camera off" else "Starting camera…",
+                    if (bigPaused || cameraOff) "Camera off" else "Starting camera…",
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 14.sp,
                 )
@@ -615,12 +622,18 @@ private fun WhatsAppVideoCallScreen(
                         controlsVisible = true
                     },
             ) {
-                VideoTrackAndroidView(
-                    track = pipTrack,
-                    modifier = Modifier.fillMaxSize(),
-                    mirror = pipTrack === localVideo,
-                    fill = true,
-                )
+                if (remoteCameraOff && pipTrack === remoteVideo) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Avatar(name, size = 56)
+                    }
+                } else {
+                    VideoTrackAndroidView(
+                        track = pipTrack,
+                        modifier = Modifier.fillMaxSize(),
+                        mirror = pipTrack === localVideo,
+                        fill = true,
+                    )
+                }
             }
         }
 
@@ -758,35 +771,30 @@ private fun VideoTrackAndroidView(
 ) {
     // Must use Room EGL via LiveKitCallController.initRenderer — a private EglBase
     // leaves the local camera preview blank.
-    var bound by remember { mutableStateOf<VideoTrack?>(null) }
     val roomConnected by LiveKitCallController.roomConnected.collectAsState()
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx ->
-            TextureViewRenderer(ctx).also { renderer ->
-                LiveKitCallController.initRenderer(renderer, fill = fill)
+    // A new renderer per track: a reused one keeps showing the previous track's last frame.
+    key(track) {
+        AndroidView(
+            modifier = modifier,
+            factory = { ctx ->
+                TextureViewRenderer(ctx).also { renderer ->
+                    LiveKitCallController.initRenderer(renderer, fill = fill)
+                    renderer.setMirror(mirror)
+                    track.addRenderer(renderer)
+                }
+            },
+            update = { renderer ->
+                // Room may connect after first composition — re-init once available.
+                if (roomConnected) {
+                    runCatching { LiveKitCallController.initRenderer(renderer, fill = fill) }
+                }
                 renderer.setMirror(mirror)
-                track.addRenderer(renderer)
-                bound = track
-            }
-        },
-        update = { renderer ->
-            // Room may connect after first composition — re-init once available.
-            if (roomConnected) {
-                runCatching { LiveKitCallController.initRenderer(renderer, fill = fill) }
-            }
-            renderer.setMirror(mirror)
-            val prev = bound
-            if (prev !== track) {
-                prev?.removeRenderer(renderer)
-                track.addRenderer(renderer)
-                bound = track
-            }
-        },
-        onRelease = { renderer ->
-            bound?.removeRenderer(renderer)
-            bound = null
-            renderer.release()
-        },
-    )
+            },
+            onRelease = { renderer ->
+                // The room may already be gone when the call ends.
+                runCatching { track.removeRenderer(renderer) }
+                renderer.release()
+            },
+        )
+    }
 }

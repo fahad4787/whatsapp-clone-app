@@ -77,7 +77,7 @@ class MainActivity : FragmentActivity() {
             if (SessionStore.hasSession(this@MainActivity)) {
                 SessionRestorer.ensureFresh(applicationContext)
                 // After token refresh, ensure WS uses the fresh access token (idempotent).
-                com.aivora.app.data.realtime.RealtimeClient.startFromSession(applicationContext)
+                PresenceLifecycle.allowConnect(applicationContext)
                 PushRegistrar.refresh(applicationContext)
                 runCatching {
                     val api = com.aivora.app.data.api.NetworkModule.api()

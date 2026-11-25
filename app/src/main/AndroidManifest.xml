@@ -116,6 +116,11 @@
         </provider>
 
         <service
+            android:name=".data.call.CallForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <service
             android:name=".data.push.AivoraFirebaseMessagingService"
             android:exported="false">
             <intent-filter>

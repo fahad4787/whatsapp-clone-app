@@ -3,6 +3,7 @@ package com.aivora.app.data.realtime
 import com.aivora.app.BuildConfig
 import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.call.ActiveCallSession
+import com.aivora.app.data.call.CallActions
 import com.aivora.app.data.call.CallLog
 import com.aivora.app.data.call.LiveKitCallController
 import com.aivora.app.data.local.InMemoryChatStore
@@ -198,6 +199,8 @@ object RealtimeClient {
                         rooms.forEach { id ->
                             send("join", buildJsonObject { put("conversation_id", id) })
                         }
+                        // The call may have been answered or ended while we were offline.
+                        CallActions.resync()
                     }
 
                     override fun onMessage(webSocket: WebSocket, text: String) {
@@ -398,6 +401,22 @@ object RealtimeClient {
                 }
                 // Never auto-join — only show Accept / Decline.
                 ActiveCallSession.setIncoming(call)
+                // A second call while this one runs in the background: no screen to ring on,
+                // and the server sends no push because the socket is open.
+                val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
+                val callId = call.id
+                if (!PresenceLifecycle.foreground && app != null && callId != null &&
+                    ActiveCallSession.session.value != null
+                ) {
+                    com.aivora.app.data.push.MessageNotifier.showCall(
+                        app,
+                        call.caller?.name?.ifBlank { null } ?: "Incoming call",
+                        if (call.media.equals("video", true)) "Incoming video call"
+                        else "Incoming voice call",
+                        call.conversationId,
+                        callId,
+                    )
+                }
             }
             "call.answered" -> {
                 val data = frame.data ?: return
@@ -413,38 +432,12 @@ object RealtimeClient {
                 }
             }
             "call.rejected", "call.ended" -> {
-                val data = frame.data
-                val call = data?.let {
+                val call = frame.data?.let {
                     runCatching {
                         NetworkModule.json.decodeFromJsonElement(CallDto.serializer(), it)
                     }.getOrNull()
                 }
-                val reason = when {
-                    frame.type == "call.rejected" -> "rejected"
-                    call?.endReason.equals("rejected", true) -> "rejected"
-                    call?.endReason.equals("cancelled", true) -> "cancelled"
-                    call?.endReason.equals("timeout", true) -> "timeout"
-                    call?.status.equals("missed", true) -> "missed"
-                    else -> "ended"
-                }
-                val activeId = ActiveCallSession.session.value?.callId
-                val incomingId = ActiveCallSession.incoming.value?.id
-                val matchesIncoming = incomingId != null && (call?.id == null || call.id == incomingId)
-                val matchesActive = activeId != null && (call?.id == null || call.id == activeId)
-                CallLog.i(
-                    "ws ${frame.type} id=${call?.id} reason=$reason " +
-                        "matchIncoming=$matchesIncoming matchActive=$matchesActive",
-                )
-                // Always tear down local UI so one side never stays on the call screen alone.
-                if (matchesIncoming) {
-                    ActiveCallSession.clearIncoming()
-                }
-                if (matchesActive) {
-                    LiveKitCallController.disconnect()
-                    ActiveCallSession.markEnded(reason)
-                } else if (matchesIncoming && frame.type == "call.ended") {
-                    // Incoming dismissed (peer cancelled / timeout) — no in-call session.
-                }
+                CallActions.applyRemoteEnd(call, rejected = frame.type == "call.rejected")
             }
             "status.new" -> {
                 val data = frame.data ?: return

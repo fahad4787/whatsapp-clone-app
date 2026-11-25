@@ -59,6 +59,7 @@ import com.aivora.app.ui.theme.AivoraColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private val endScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -131,18 +132,28 @@ fun IncomingCallOverlay(
             @Suppress("DEPRECATION")
             vibrator?.vibrate(longArrayOf(0, 800, 400, 800), 0)
         }
-        onDispose {
+        fun stopRinging() {
             runCatching { ringtone?.stop() }
             vibrator?.cancel()
+        }
+        // In the background this screen is not redrawn, so a cancelled call would keep ringing.
+        val watcher = endScope.launch(Dispatchers.Main) {
+            ActiveCallSession.incoming.first { it?.id != call.id }
+            stopRinging()
+        }
+        onDispose {
+            watcher.cancel()
+            stopRinging()
             if (prevMode != null) am?.mode = prevMode
         }
     }
 
     fun decline() {
-        scope.launch {
-            val id = call.id ?: return@launch
-            CallLog.i("decline callId=$id")
-            ActiveCallSession.clearIncoming()
+        val id = call.id ?: return
+        CallLog.i("decline callId=$id")
+        ActiveCallSession.clearIncoming()
+        // Clearing the call removes this screen, which would cancel a request tied to it.
+        endScope.launch {
             runCatching { NetworkModule.api().postCallsIdAction(id, "reject") }
                 .onFailure { CallLog.w("reject api failed callId=$id", it) }
         }

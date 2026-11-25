@@ -46,6 +46,7 @@ object LiveKitCallController {
     private var connectedCallId: String? = null
     private var isVideoCall = false
     private var minimised = false
+    private var backgrounded = false
 
     /** Publishing is serialised so the latest mute / camera choice always wins. */
     private val publishLock = Mutex()
@@ -62,6 +63,10 @@ object LiveKitCallController {
 
     private val _remoteVideo = MutableStateFlow<VideoTrack?>(null)
     val remoteVideo: StateFlow<VideoTrack?> = _remoteVideo.asStateFlow()
+
+    /** The other side paused their camera; the track then only holds a frozen last frame. */
+    private val _remoteCameraOff = MutableStateFlow(false)
+    val remoteCameraOff: StateFlow<Boolean> = _remoteCameraOff.asStateFlow()
 
     private val _localVideo = MutableStateFlow<VideoTrack?>(null)
     val localVideo: StateFlow<VideoTrack?> = _localVideo.asStateFlow()
@@ -133,6 +138,23 @@ object LiveKitCallController {
     fun setMinimised(value: Boolean) {
         if (minimised == value) return
         minimised = value
+        refreshCamera()
+    }
+
+    /**
+     * Android takes the camera from a background app and does not hand it back, so release it
+     * on the way out and open it again on return. The microphone keeps running.
+     */
+    fun setBackgrounded(value: Boolean) {
+        if (backgrounded == value) return
+        backgrounded = value
+        refreshCamera()
+        // The notification could not be started if the app was left before the call connected.
+        val ctx = appContext
+        if (!value && ctx != null) CallForegroundService.start(ctx)
+    }
+
+    private fun refreshCamera() {
         if (isVideoCall && !userCameraOff && _roomConnected.value) enableMedia(true)
     }
 
@@ -150,6 +172,8 @@ object LiveKitCallController {
         isVideoCall = enableVideo
         appContext = appCtx
         CallLog.i("livekit connect video=$enableVideo waitForPeer=$waitForPeer gen=$gen")
+        // Started while the app is on screen: Android only allows a microphone service then.
+        CallForegroundService.start(appCtx)
 
         val preset = videoPresetForDevice(appCtx)
         val created = LiveKit.create(
@@ -193,12 +217,24 @@ object LiveKitCallController {
                         refreshRemoteJoined(created)
                         val track = event.track
                         if (track is VideoTrack && event.participant != created.localParticipant) {
+                            _remoteCameraOff.value = event.publication.muted
                             _remoteVideo.value = track
                         }
                     }
                     is RoomEvent.TrackUnsubscribed -> {
                         if (event.track === _remoteVideo.value) {
                             _remoteVideo.value = null
+                            _remoteCameraOff.value = false
+                        }
+                    }
+                    is RoomEvent.TrackMuted -> {
+                        if (event.publication.track === _remoteVideo.value) {
+                            _remoteCameraOff.value = true
+                        }
+                    }
+                    is RoomEvent.TrackUnmuted -> {
+                        if (event.publication.track === _remoteVideo.value) {
+                            _remoteCameraOff.value = false
                         }
                     }
                     is RoomEvent.TrackPublished -> {
@@ -316,6 +352,7 @@ object LiveKitCallController {
     fun disconnect() {
         connectGeneration++
         CallLog.d("livekit disconnect gen=$connectGeneration")
+        appContext?.let { CallForegroundService.stop(it) }
         eventsJob?.cancel()
         eventsJob = null
         pendingEnableVideo = null
@@ -332,6 +369,7 @@ object LiveKitCallController {
         _roomConnected.value = false
         _remoteJoined.value = false
         _remoteVideo.value = null
+        _remoteCameraOff.value = false
         _localVideo.value = null
         _muted.value = false
         _cameraOff.value = false
@@ -355,7 +393,7 @@ object LiveKitCallController {
                 return
             }
             // Keep whatever the user chose while ringing (mute / camera off).
-            val camera = enableVideo && !userCameraOff && !minimised
+            val camera = enableVideo && !userCameraOff && !minimised && !backgrounded
             val result = runCatching {
                 lp.setMicrophoneEnabled(!_muted.value)
                 lp.setCameraEnabled(camera)

@@ -101,17 +101,11 @@ fun ActiveCallHost(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val session by ActiveCallSession.session.collectAsState()
-    val answered by ActiveCallSession.answered.collectAsState()
     val endedReason by ActiveCallSession.endedReason.collectAsState()
-    val remoteJoined by LiveKitCallController.remoteJoined.collectAsState()
     val entry by navController.currentBackStackEntryAsState()
     val route = entry?.destination?.route
     val onCallScreen = isCallRoute(route)
     val showBar = session != null && !onCallScreen && route != Routes.Login
-
-    LaunchedEffect(answered, remoteJoined, session?.callId) {
-        if (answered && remoteJoined) ActiveCallSession.markLive()
-    }
 
     LaunchedEffect(onCallScreen, session?.callId) {
         if (session != null) LiveKitCallController.setMinimised(!onCallScreen)

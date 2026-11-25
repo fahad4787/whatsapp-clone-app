@@ -142,6 +142,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.withStarted
 import androidx.recyclerview.widget.ConcatAdapter
 import coil3.compose.AsyncImage
 import com.aivora.app.data.ChatRepository
@@ -162,6 +163,7 @@ import com.aivora.app.data.model.ReplyPreviewDto
 import com.aivora.app.data.model.RsvpBody
 import com.aivora.app.data.model.SendMessageBody
 import com.aivora.app.data.model.VoteBody
+import com.aivora.app.data.realtime.PresenceLifecycle
 import com.aivora.app.data.realtime.RealtimeClient
 import com.aivora.app.data.sendAttachmentMessage
 import com.aivora.app.data.sendImageMessage
@@ -518,7 +520,8 @@ fun ChatIdScreen(
 
     LaunchedEffect(Unit) {
         if (!useRemote) return@LaunchedEffect
-        RealtimeClient.startFromSession(context)
+        // Only connects while the app is visible: this screen also redraws behind a call.
+        PresenceLifecycle.allowConnect(context)
         if (myUserId == null) {
             try {
                 val me = api.getMe()
@@ -1537,7 +1540,10 @@ private fun ChatMessageList(
     val lastSubmittedId = remember(chatId) { arrayOfNulls<String>(1) }
 
     val newestId = messages.lastOrNull()?.id
+    val readOwner = LocalLifecycleOwner.current
     LaunchedEffect(chatId, newestId) {
+        // Messages that arrive while the app is hidden stay unread until it is visible again.
+        readOwner.lifecycle.withStarted { }
         InMemoryChatStore.markRead(chatId)
         if (!useRemote) return@LaunchedEffect
         delay(250)

@@ -200,7 +200,6 @@ fun HomeScreen(
         }
         // WS after first paint (PresenceLifecycle.allowConnect); idempotent if already up.
         PresenceLifecycle.allowConnect(context)
-        RealtimeClient.startFromSession(context)
         // Defer HTTP so first home frames are not competing with list fetch (PERF F8).
         kotlinx.coroutines.delay(100)
         val api = ChatRepository.api()
