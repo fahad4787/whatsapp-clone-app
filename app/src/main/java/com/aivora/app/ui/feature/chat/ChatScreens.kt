@@ -563,7 +563,10 @@ fun ChatIdScreen(
                 groupMemberNames = remote.members.orEmpty()
                     .mapNotNull { m ->
                         if (m.user?.id == myUserId) "You"
+                        // Members without a name still count: show their number.
                         else m.user?.displayName?.takeIf { it.isNotBlank() }
+                            ?: m.user?.phoneDisplay?.takeIf { it.isNotBlank() }
+                            ?: m.user?.phone?.takeIf { it.isNotBlank() }
                     }
                     .sortedBy { it == "You" } // WhatsApp lists "You" last
             }
