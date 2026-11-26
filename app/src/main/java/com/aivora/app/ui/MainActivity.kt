@@ -24,6 +24,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.aivora.app.data.SessionRestorer
 import com.aivora.app.data.StartupWarm
+import com.aivora.app.data.call.ActiveCallSession
 import com.aivora.app.data.local.SessionStore
 import com.aivora.app.data.push.MessageNotifier
 import com.aivora.app.data.push.PushRegistrar
@@ -41,6 +42,8 @@ import com.aivora.app.ui.theme.AivoraTheme
 import com.aivora.app.ui.theme.ApplySystemBars
 import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
@@ -64,6 +67,20 @@ class MainActivity : FragmentActivity() {
         // Ensure warm kick even if Application path already ran (idempotent).
         StartupWarm.kick(applicationContext)
         pendingDeepLink.value = DeepLinks.routeFrom(intent)
+        handleCallIntent(intent)
+
+        // Like a phone call: a ringing or ongoing call shows over the lock screen and turns
+        // the screen on. Off again as soon as the call is over, so chats stay behind the lock.
+        if (Build.VERSION.SDK_INT >= 27) {
+            lifecycleScope.launch {
+                combine(ActiveCallSession.incoming, ActiveCallSession.session) { ringing, call ->
+                    ringing != null || call != null
+                }.distinctUntilChanged().collect { onCall ->
+                    setShowWhenLocked(onCall)
+                    setTurnScreenOn(onCall)
+                }
+            }
+        }
 
         // After first frame: allow WS, then settle before FCM/permission.
         lifecycleScope.launch {
@@ -107,6 +124,14 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingDeepLink.value = DeepLinks.routeFrom(intent)
+        handleCallIntent(intent)
+    }
+
+    /** Answer tapped on the incoming-call notification: the call screen picks it up. */
+    private fun handleCallIntent(intent: Intent?) {
+        val callId = intent?.getStringExtra(MessageNotifier.EXTRA_ANSWER_CALL_ID) ?: return
+        intent.removeExtra(MessageNotifier.EXTRA_ANSWER_CALL_ID)
+        ActiveCallSession.requestAnswer(callId)
     }
 
     override fun onResume() {

@@ -52,6 +52,7 @@ import com.aivora.app.data.api.NetworkModule
 import com.aivora.app.data.call.ActiveCallSession
 import com.aivora.app.data.call.CallLog
 import com.aivora.app.data.call.LiveKitCallController
+import com.aivora.app.data.push.MessageNotifier
 import com.aivora.app.ui.components.Avatar
 import com.aivora.app.ui.components.blockTouchesBehind
 import com.aivora.app.ui.navigation.Routes
@@ -191,6 +192,20 @@ fun IncomingCallOverlay(
                 asCaller = false,
             )
             onNavigate(if (isVideo) Routes.videoCall(name) else Routes.audioCall(name))
+        }
+    }
+
+    // This screen rings by itself; silence the call notification's ringtone so it doesn't double up.
+    LaunchedEffect(call.id) {
+        call.id?.let { MessageNotifier.silenceCall(context, it) }
+    }
+
+    // Answer tapped on the call notification.
+    val answerRequest by ActiveCallSession.answerRequest.collectAsState()
+    LaunchedEffect(answerRequest, call.id) {
+        if (answerRequest != null && answerRequest == call.id) {
+            ActiveCallSession.consumeAnswerRequest()
+            accept()
         }
     }
 

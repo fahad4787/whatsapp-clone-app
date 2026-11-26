@@ -120,6 +120,10 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
+        <receiver
+            android:name=".data.push.CallActionReceiver"
+            android:exported="false" />
+
         <service
             android:name=".data.push.AivoraFirebaseMessagingService"
             android:exported="false">

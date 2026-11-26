@@ -1,6 +1,8 @@
 package com.aivora.app.data.call
 
 import android.os.SystemClock
+import com.aivora.app.AivoraApp
+import com.aivora.app.data.push.MessageNotifier
 import com.aivora.app.data.model.CallDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,7 +52,7 @@ object ActiveCallSession {
         peerName: String,
         asCaller: Boolean,
     ) {
-        _incoming.value = null
+        dropIncoming()
         _endedReason.value = null
         // Callee only reaches here after Accept → already answered.
         _answered.value = !asCaller
@@ -108,9 +110,32 @@ object ActiveCallSession {
     }
 
     fun clearIncoming() {
+        val id = dropIncoming()
+        if (id != null) CallLog.d("cleared incoming callId=$id")
+    }
+
+    /** Clears the ringing call and its notification (which would otherwise keep ringing). */
+    private fun dropIncoming(): String? {
         val id = _incoming.value?.id
         _incoming.value = null
-        if (id != null) CallLog.d("cleared incoming callId=$id")
+        _answerRequest.value = null
+        if (id != null) {
+            runCatching { MessageNotifier.cancelCall(AivoraApp.instance, id) }
+        }
+        return id
+    }
+
+    /** Set when Answer is tapped on the call notification; the call screen answers it. */
+    private val _answerRequest = MutableStateFlow<String?>(null)
+    val answerRequest: StateFlow<String?> = _answerRequest.asStateFlow()
+
+    fun requestAnswer(callId: String) {
+        CallLog.i("answer from notification callId=$callId")
+        _answerRequest.value = callId
+    }
+
+    fun consumeAnswerRequest() {
+        _answerRequest.value = null
     }
 
     fun markEnded(reason: String) {
@@ -118,7 +143,7 @@ object ActiveCallSession {
         CallLog.i("ended callId=$id reason=$reason")
         _endedReason.value = reason
         // A second call may be ringing while this one ends; leave it on screen.
-        if (_incoming.value?.id == id) _incoming.value = null
+        if (_incoming.value?.id == id) dropIncoming()
         _session.value = null
         _answered.value = false
         _liveSince.value = null
