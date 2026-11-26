@@ -34,6 +34,9 @@ android {
         if (f.exists()) f.inputStream().use { load(it) }
     }
     val hasReleaseKey = keystoreProps.getProperty("storeFile") != null
+    // v4 signature (.idsig) lets scripts/dev-install.sh use `adb install --incremental`:
+    // the app starts while the rest of the APK streams in (Android 11+).
+    signingConfigs.getByName("debug") { enableV4Signing = true }
     if (hasReleaseKey) {
         signingConfigs.create("release") {
             storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
