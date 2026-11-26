@@ -4,10 +4,20 @@ import com.aivora.app.data.call.ActiveCallSession
 import com.aivora.app.data.model.CallDto
 import com.aivora.app.data.model.CallerDto
 import com.aivora.app.data.realtime.RealtimeClient
+import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
 class AivoraFirebaseMessagingService : FirebaseMessagingService() {
+    override fun onCreate() {
+        // FirebaseInitProvider is removed for a faster cold start, so a push that wakes a
+        // closed app arrives before PushRegistrar has set Firebase up. Do it here instead.
+        if (FirebaseApp.getApps(applicationContext).isEmpty()) {
+            runCatching { FirebaseApp.initializeApp(applicationContext) }
+        }
+        super.onCreate()
+    }
+
     override fun onNewToken(token: String) {
         PushRegistrar.registerToken(applicationContext, token)
     }
