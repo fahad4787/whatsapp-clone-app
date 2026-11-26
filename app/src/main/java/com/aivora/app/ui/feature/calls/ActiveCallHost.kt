@@ -45,6 +45,7 @@ import com.aivora.app.data.call.ActiveCallSession
 import com.aivora.app.data.call.CallLog
 import com.aivora.app.data.call.LiveKitCallController
 import com.aivora.app.ui.icons.AppIcons
+import com.aivora.app.ui.navigation.DeepLinks
 import com.aivora.app.ui.navigation.Routes
 import com.aivora.app.ui.theme.AivoraColors
 import com.aivora.app.ui.theme.SystemBars
@@ -140,11 +141,7 @@ fun ActiveCallHost(
             ReturnToCallBar(
                 video = active.media == "video",
                 onClick = {
-                    val target = if (active.media == "video") {
-                        Routes.videoCall(active.peerName)
-                    } else {
-                        Routes.audioCall(active.peerName)
-                    }
+                    val target = DeepLinks.activeCallRoute() ?: return@ReturnToCallBar
                     navController.navigate(target) { launchSingleTop = true }
                 },
             )

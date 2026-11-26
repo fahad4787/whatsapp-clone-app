@@ -14,6 +14,8 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.aivora.app.R
+import com.aivora.app.ui.MainActivity
+import com.aivora.app.ui.navigation.DeepLinks
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -90,9 +92,15 @@ class CallForegroundService : Service() {
         val session = ActiveCallSession.session.value
         val liveSince = ActiveCallSession.liveSince.value
         val kind = if (session?.media == "video") "video call" else "voice call"
-        val open = packageManager.getLaunchIntentForPackage(packageName)?.let {
-            PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
-        }
+        // Tapping the notification goes straight back to the call screen.
+        val open = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java)
+                .setAction(DeepLinks.ACTION_OPEN_CALL)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
         val hangUp = PendingIntent.getService(
             this,
             1,

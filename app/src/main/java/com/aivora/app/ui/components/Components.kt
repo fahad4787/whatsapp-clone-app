@@ -611,11 +611,19 @@ fun Avatar(
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-        } else if (name.isBlank()) {
-            Icon(AppIcons.Person, contentDescription = null, tint = Color.White)
         } else {
+            val letter = avatarLetter(name)
+            if (letter == null) {
+                Icon(
+                    AppIcons.Person,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size((size * 0.55f).dp),
+                )
+                return@Box
+            }
             Text(
-                name.trim().first().uppercaseChar().toString(),
+                letter,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontSize = (size * 0.42f).sp,
                 ),

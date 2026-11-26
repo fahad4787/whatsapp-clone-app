@@ -2,6 +2,7 @@ package com.aivora.app.ui.navigation
 
 import android.content.Intent
 import android.net.Uri
+import com.aivora.app.data.call.ActiveCallSession
 
 /**
  * Maps call-link intents to in-app routes.
@@ -10,7 +11,19 @@ import android.net.Uri
 object DeepLinks {
     private const val StagingHost = "whatsapp-clone-backend-hep1.onrender.com"
 
-    fun routeFrom(intent: Intent?): String? = routeFrom(intent?.data)
+    /** Sent by the ongoing-call notification: open the running call's screen. */
+    const val ACTION_OPEN_CALL = "com.aivora.app.action.OPEN_CALL"
+
+    fun routeFrom(intent: Intent?): String? {
+        if (intent?.action == ACTION_OPEN_CALL) return activeCallRoute()
+        return routeFrom(intent?.data)
+    }
+
+    /** Screen of the call that is running now, or null when there is none. */
+    fun activeCallRoute(): String? {
+        val s = ActiveCallSession.session.value ?: return null
+        return if (s.media == "video") Routes.videoCall(s.peerName) else Routes.audioCall(s.peerName)
+    }
 
     fun routeFrom(uri: Uri?): String? {
         if (uri == null) return null

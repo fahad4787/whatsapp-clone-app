@@ -1,5 +1,6 @@
 package com.aivora.app.ui.perf
 
+import com.aivora.app.ui.components.setAvatarLabel
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
@@ -148,8 +149,7 @@ class CallListAdapter(
             onClick: (CallListItem) -> Unit,
             onCall: (CallListItem) -> Unit,
         ) {
-            val letter = item.name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-            avatar.text = letter
+            avatar.setAvatarLabel(item.name)
             avatar.background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(NativeColors.Primary)

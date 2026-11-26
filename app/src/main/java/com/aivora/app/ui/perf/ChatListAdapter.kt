@@ -1,5 +1,6 @@
 package com.aivora.app.ui.perf
 
+import com.aivora.app.ui.components.setAvatarLabel
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
@@ -141,8 +142,7 @@ class ChatListAdapter(
             onLongPress: (LocalChat) -> Unit,
         ) {
             val d = itemView.resources.displayMetrics.density
-            val letter = chat.title.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-            avatar.text = letter
+            avatar.setAvatarLabel(chat.title)
             avatar.background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(avatarColor(chat.title))

@@ -1,5 +1,6 @@
 package com.aivora.app.ui.perf
 
+import com.aivora.app.ui.components.setAvatarLabel
 import android.content.Intent
 import android.graphics.Outline
 import android.graphics.Typeface
@@ -265,8 +266,7 @@ class ChatMessageAdapter(
                     peerTitle.isNotBlank() -> peerTitle
                     else -> "?"
                 }
-                val letter = label.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-                avatarLetter.text = letter
+                avatarLetter.setAvatarLabel(label)
                 avatarLetter.background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
                     setColor(avatarColor(label))
@@ -604,11 +604,11 @@ class ChatMessageAdapter(
                     )
                     val phone = c.phones.firstOrNull().orEmpty()
                     val avatar = TextView(ctx).apply {
-                        text = c.name.trim().firstOrNull()?.uppercase() ?: "?"
                         gravity = Gravity.CENTER
                         setTextColor(NativeColors.White)
                         setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
                         typeface = Typeface.DEFAULT_BOLD
+                        setAvatarLabel(c.name)
                         background = GradientDrawable().apply {
                             shape = GradientDrawable.OVAL
                             setColor(0xFF8696A0.toInt())
