@@ -58,7 +58,11 @@ class CallForegroundService : Service() {
         }
         if (updates == null) {
             updates = scope.launch {
-                combine(ActiveCallSession.session, ActiveCallSession.liveSince) { s, _ -> s }
+                combine(
+                    ActiveCallSession.session,
+                    ActiveCallSession.liveSince,
+                    ActiveCallSession.ringingCallId,
+                ) { s, _, _ -> s }
                     .collect { session ->
                         if (session != null) {
                             runCatching {
@@ -110,7 +114,13 @@ class CallForegroundService : Service() {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_aivora)
             .setContentTitle(session?.peerName?.ifBlank { null } ?: "Aivora call")
-            .setContentText(if (liveSince == null) "Calling…" else "Ongoing $kind")
+            .setContentText(
+                when {
+                    liveSince != null -> "Ongoing $kind"
+                    session != null && session.callId == ActiveCallSession.ringingCallId.value -> "Ringing…"
+                    else -> "Calling…"
+                },
+            )
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_CALL)

@@ -401,6 +401,7 @@ object RealtimeClient {
                 }
                 // Never auto-join — only show Accept / Decline.
                 ActiveCallSession.setIncoming(call)
+                com.aivora.app.data.call.CallActions.reportRinging(call.id)
                 // A second call while this one runs in the background: no screen to ring on,
                 // and the server sends no push because the socket is open.
                 val app = runCatching { com.aivora.app.AivoraApp.instance }.getOrNull()
@@ -417,6 +418,14 @@ object RealtimeClient {
                         callId,
                     )
                 }
+            }
+            "call.ringing" -> {
+                val call = frame.data?.let {
+                    runCatching {
+                        NetworkModule.json.decodeFromJsonElement(CallDto.serializer(), it)
+                    }.getOrNull()
+                }
+                call?.id?.let { ActiveCallSession.markRinging(it) }
             }
             "call.answered" -> {
                 val data = frame.data ?: return

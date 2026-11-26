@@ -105,6 +105,7 @@ private fun InCallContent(
     val scope = rememberCoroutineScope()
     val session by ActiveCallSession.session.collectAsState()
     val answered by ActiveCallSession.answered.collectAsState()
+    val ringingCallId by ActiveCallSession.ringingCallId.collectAsState()
     val endedReason by ActiveCallSession.endedReason.collectAsState()
     val roomConnected by LiveKitCallController.roomConnected.collectAsState()
     val remoteJoined by LiveKitCallController.remoteJoined.collectAsState()
@@ -212,9 +213,12 @@ private fun InCallContent(
         }
     }
 
+    // Like WhatsApp: "Calling" until the other phone has the call, then "Ringing".
+    val peerRinging = session?.callId != null && session?.callId == ringingCallId
     val statusLine = when {
         leaveLabel != null -> leaveLabel!!
         !roomConnected -> "Connecting…"
+        session?.asCaller == true && !isLive && peerRinging -> "Ringing…"
         session?.asCaller == true && !isLive -> "Calling…"
         isLive -> formatElapsed(elapsedSec)
         else -> "Connecting…"
@@ -222,6 +226,7 @@ private fun InCallContent(
     val connectedLabel = when {
         leaveLabel != null -> leaveLabel!!
         isLive -> "Connected"
+        session?.asCaller == true && roomConnected && peerRinging -> "Ringing"
         session?.asCaller == true && roomConnected -> "Calling"
         roomConnected -> "Connecting"
         else -> "Connecting"
@@ -590,6 +595,7 @@ private fun WhatsAppVideoCallScreen(
                     when {
                         connectedLabel == "Connected" && elapsedLabel != null -> elapsedLabel
                         connectedLabel == "Calling" -> "Calling…"
+                        connectedLabel == "Ringing" -> "Ringing…"
                         else -> connectedLabel
                     },
                     color = Color.White.copy(alpha = 0.85f),

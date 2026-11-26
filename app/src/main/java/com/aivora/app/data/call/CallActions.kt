@@ -31,6 +31,16 @@ object CallActions {
         }
     }
 
+    /** Tells the server this phone is ringing for [callId], so the caller sees "Ringing". */
+    fun reportRinging(callId: String?) {
+        if (callId.isNullOrBlank()) return
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { NetworkModule.api().postCallsIdAction(callId, "ringing") }
+            }.onFailure { CallLog.w("ringing api failed callId=$callId", it) }
+        }
+    }
+
     /** Hang up from outside the call screen (notification button, app swiped away). */
     fun hangUp() {
         scope.launch {

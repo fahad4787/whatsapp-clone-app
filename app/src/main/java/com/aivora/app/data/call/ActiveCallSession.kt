@@ -31,6 +31,13 @@ object ActiveCallSession {
     private val _liveSince = MutableStateFlow<Long?>(null)
     val liveSince: StateFlow<Long?> = _liveSince.asStateFlow()
 
+    /**
+     * Id of the outgoing call whose callee's phone has the call: the caller shows "Ringing"
+     * instead of "Calling". Kept by id because the event can beat [setActive].
+     */
+    private val _ringingCallId = MutableStateFlow<String?>(null)
+    val ringingCallId: StateFlow<String?> = _ringingCallId.asStateFlow()
+
     /** Terminal event for in-call UI (rejected / ended / missed). */
     private val _endedReason = MutableStateFlow<String?>(null)
     val endedReason: StateFlow<String?> = _endedReason.asStateFlow()
@@ -48,6 +55,7 @@ object ActiveCallSession {
         // Callee only reaches here after Accept → already answered.
         _answered.value = !asCaller
         _liveSince.value = null
+        if (_ringingCallId.value != callId) _ringingCallId.value = null
         _session.value = Session(
             callId = callId,
             token = token,
@@ -69,6 +77,11 @@ object ActiveCallSession {
         _answered.value = true
     }
 
+    fun markRinging(callId: String) {
+        if (_ringingCallId.value != callId) CallLog.i("ringing callId=$callId")
+        _ringingCallId.value = callId
+    }
+
     fun markLive() {
         if (_session.value != null && _liveSince.value == null) {
             _liveSince.value = SystemClock.elapsedRealtime()
@@ -80,6 +93,7 @@ object ActiveCallSession {
         _session.value = null
         _answered.value = false
         _liveSince.value = null
+        _ringingCallId.value = null
         if (id != null) CallLog.d("cleared session callId=$id")
     }
 
@@ -108,6 +122,7 @@ object ActiveCallSession {
         _session.value = null
         _answered.value = false
         _liveSince.value = null
+        _ringingCallId.value = null
     }
 
     fun consumeEndedReason(): String? {

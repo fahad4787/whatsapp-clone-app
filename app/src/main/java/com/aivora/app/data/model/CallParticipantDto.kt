@@ -13,4 +13,6 @@ data class CallParticipantDto(
     @SerialName("left_at") val leftAt: String? = null,
     @SerialName("silenced") val silenced: Boolean = false,
     @SerialName("ringing") val ringing: Boolean = false,
+    /** The call reached this person's phone (caller shows "Ringing" instead of "Calling"). */
+    @SerialName("delivered") val delivered: Boolean = false,
 )

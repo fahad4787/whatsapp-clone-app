@@ -29,10 +29,11 @@ fi
 while IFS= read -r s; do
   [ -z "$s" ] && continue
   # --incremental (Android 11+) lets the app start while the APK streams; fall back to a normal install.
-  if ! adb -s "$s" install -r --incremental "$APK" >/dev/null 2>&1; then
-    adb -s "$s" install -r "$APK" >/dev/null
+  # </dev/null: adb otherwise reads the rest of the phone list and only the first phone gets it.
+  if ! adb -s "$s" install -r --incremental "$APK" </dev/null >/dev/null 2>&1; then
+    adb -s "$s" install -r "$APK" </dev/null >/dev/null
   fi
-  adb -s "$s" shell am start -n "$PKG/com.aivora.app.ui.MainActivity" >/dev/null 2>&1 || true
+  adb -s "$s" shell am start -n "$PKG/com.aivora.app.ui.MainActivity" </dev/null >/dev/null 2>&1 || true
   echo "Installed on $s"
 done <<< "$SERIALS"
 

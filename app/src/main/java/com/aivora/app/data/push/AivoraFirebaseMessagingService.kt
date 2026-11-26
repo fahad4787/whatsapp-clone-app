@@ -54,6 +54,7 @@ class AivoraFirebaseMessagingService : FirebaseMessagingService() {
         // Wave 52 — Silence unknown callers.
         if (com.aivora.app.data.call.CallSilence.shouldSuppressRing(stub)) return
         ActiveCallSession.setIncoming(stub)
+        com.aivora.app.data.call.CallActions.reportRinging(callId)
         MessageNotifier.ensureCallsChannel(applicationContext)
         MessageNotifier.showCall(
             applicationContext,
